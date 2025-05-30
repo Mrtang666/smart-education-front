@@ -1,0 +1,201 @@
+<template>
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="logo-area">
+            <!-- logo图片支持插入 -->
+            <img class="logo-img" :src="props.logoUrl" alt="logo" />
+            <span class="app-name">{{ props.appName }}</span>
+        </div>
+        <div class="header-right">
+            <el-input v-if="props.showInviteCode" placeholder="请输入邀请码" v-model="inviteCode" class="invite-input"
+                size="small" style="width: 140px; margin-right: 12px;" />
+            <el-input 
+                placeholder="请输入查询词" 
+                class="search-input" 
+                size="small" 
+                v-model="searchValue"
+                @input="handleSearchInput"
+                @keyup.enter="handleSearch"
+            />
+            <el-upload class="avatar-uploader" :show-file-list="false" :on-success="handleAvatarSuccess"
+                :before-upload="beforeAvatarUpload" action="#">
+                <el-avatar :src="props.avatarUrl" class="avatar" />
+            </el-upload>
+            <el-dropdown>
+                <span class="user-name">
+                    {{ props.userName }}
+                    <el-icon-arrow-down style="margin-left: 4px;" />
+                </span>
+                <template #dropdown>
+                    <el-dropdown-menu>
+                        <el-dropdown-item @click="emit('userAction', 'profile')">个人中心</el-dropdown-item>
+                        <el-dropdown-item @click="emit('userAction', 'changePassword')">修改密码</el-dropdown-item>
+                        <el-dropdown-item divided @click="emit('userAction', 'logout')">退出登录</el-dropdown-item>
+                    </el-dropdown-menu>
+                </template>
+            </el-dropdown>
+        </div>
+    </header>
+</template>
+
+<script setup>
+import { ref, defineProps, defineEmits } from 'vue'
+import { ElMessage } from 'element-plus'
+
+const props = defineProps({
+    logoUrl: {
+        type: String,
+        default: 'https://placehold.co/48x48?text=Logo'
+    },
+    appName: {
+        type: String,
+        default: '软件名称'
+    },
+    avatarUrl: {
+        type: String,
+        default: 'https://placehold.co/40x40?text=头像'
+    },
+    userName: {
+        type: String,
+        default: ''
+    },
+    showInviteCode: {
+        type: Boolean,
+        default: false
+    },
+    defaultSearchValue: {
+        type: String,
+        default: ''
+    }
+})
+
+const searchValue = ref(props.defaultSearchValue)
+
+// 搜索
+const emit = defineEmits(['userAction', 'avatarChange', 'search', 'searchInput'])
+
+const inviteCode = ref('')
+
+function handleAvatarSuccess(res, file) {
+    // 这里只做本地预览，实际应上传到服务器
+    const avatarUrl = URL.createObjectURL(file.raw)
+    emit('avatarChange', avatarUrl)
+}
+
+function beforeAvatarUpload(file) {
+    const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
+    const isLt2M = file.size / 1024 / 1024 < 2
+    if (!isJPG) {
+        ElMessage.error('头像图片只能是 JPG/PNG 格式!')
+    }
+    if (!isLt2M) {
+        ElMessage.error('头像图片大小不能超过 2MB!')
+    }
+    return isJPG && isLt2M
+}
+
+function handleSearchInput() {
+    // 将搜索框的值发送给父组件
+    emit('searchInput', searchValue.value)
+}
+
+function handleSearch() {
+    // 当按下回车键时执行搜索
+    emit('search', searchValue.value)
+}
+</script>
+
+<style scoped>
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 64px;
+    padding: 0 32px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+}
+
+/* 覆盖Element Plus下拉菜单样式 */
+:deep(.el-dropdown-menu) {
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+:deep(.el-dropdown-menu__item:hover) {
+    background-color: #f5f7fa !important;
+    color: #409eff !important;
+    border: none !important;
+    outline: none !important;
+}
+
+:deep(.el-dropdown-menu__item:focus) {
+    border: none !important;
+    outline: none !important;
+}
+
+:deep(.el-dropdown) {
+    outline: none !important;
+}
+
+:deep(.el-dropdown:focus-visible) {
+    outline: none !important;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+}
+
+.logo-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 16px;
+}
+
+.app-name {
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.search-input {
+    width: 180px;
+}
+
+.invite-input {
+    width: 140px;
+}
+
+.avatar-uploader {
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.avatar {
+    background: #e6f7ff;
+    cursor: pointer;
+}
+
+.user-name {
+    cursor: pointer;
+    margin-left: 8px;
+    display: flex;
+    align-items: center;
+    outline: none;
+    user-select: none;
+}
+
+.user-name:focus,
+.user-name:active {
+    outline: none;
+    border: none;
+}
+</style>
