@@ -59,9 +59,9 @@ const handleLogin = () => {
         
         // 根据角色不同跳转至首页
         if (res.roles && res.roles.includes('ROLE_STUDENT')) {
-            router.push('/studentCenter');
+            router.push('/student');
         } else if (res.roles && res.roles.includes('ROLE_TEACHER')) {
-            router.push('/teacher/center');
+            router.push('/teacher');
         }
     }).catch(err => {
         console.error('登录失败:', err);

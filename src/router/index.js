@@ -13,11 +13,75 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
-    path: "/teacher/center",
-    name: "TeacherCenter",
+    path: "/teacher",
     component: () => import("@/views/teacher/teacherCenter.vue"),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "course",
+        component: () => import("@/views/teacher/teacherCourse.vue"),
+       },
+      // {
+      //   path: "exam",
+      //   component: () => import("@/views/teacher/teacherExam.vue"),
+      // },
+      // {
+      //   path: "examCheck",
+      //   component: () => import("@/views/teacher/teacherExamCheck.vue"),
+      // },
+      // {
+      //   path: "exercise",
+      //   component: () => import("@/views/teacher/teacherExercise.vue"),
+      // },
+      // {
+      //   path: "exerciseCheck",
+      //   component: () => import("@/views/teacher/teacherExerciseCheck.vue"),
+      // },
+      // {
+      //   path: "attendanceManagement",
+      //   component: () => import("@/views/teacher/teacherAttendanceManagement.vue"),
+      // },
+      // {
+      //   path: "class",
+      //   component: () => import("@/views/teacher/teacherClass.vue"),
+      // },
+      // {
+      //   path: "studentAnalysis",
+      //   component: () => import("@/views/teacher/StudentAnalysis.vue"),
+      // },
+    ]
   },
+  // {
+  //   path: "/student",
+  //   redirect: "/student/center",
+  //   meta: { requiresAuth: true },
+  //   children: [
+  //     {
+  //       path: "center",
+  //       component: () => import("@/views/student/studentCenter.vue"),
+  //     },
+  //     {
+  //       path: "course",
+  //       component: () => import("@/views/student/studentCourse.vue"),
+  //     },
+  //     {
+  //       path: "courseDetail",
+  //       component: () => import("@/views/student/studentCourseDetail.vue"),
+  //     },
+  //     {
+  //       path: "exam",
+  //       component: () => import("@/views/student/studentExam.vue"),
+  //     },
+  //     {
+  //       path: "report",
+  //       component: () => import("@/views/student/studentReport.vue"),
+  //     },
+  //     {
+  //       path: "exercise",
+  //       component: () => import("@/views/student/studentExercise.vue"),
+  //     },
+  //   ]
+  // },
   {
     path: "/",
     redirect: "/login"

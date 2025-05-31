@@ -16,24 +16,39 @@
     <main class="main-content">
       <!-- 左侧菜单栏 -->
       <aside class="sidebar">
-        <el-button v-for="item in menuList" :key="item" class="menu-btn" plain>{{ item }}</el-button>
+        <div class="sidebar-divider"></div>
+        <div class="menu-container">
+          <div 
+            v-for="item in menuList" 
+            :key="item.name" 
+            class="menu-btn" 
+            :class="{ 'menu-btn-active': activeMenu === item.name }"
+            @click="handleMenuClick(item)"
+          >
+            <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
+            <span>{{ item.name }}</span>
+          </div>
+        </div>
       </aside>
       <!-- 右侧内容区 -->
       <section class="content-area">
-        <div class="content-placeholder">内容区</div>
+        <router-view></router-view>
       </section>
     </main>
 
     <!-- 右下角AI对话框入口 -->
     <div class="ai-chat-entry" @click="showAIChat = true" v-if="!showAIChat">
-      ai对话框，点击放大进行对话
+      <el-icon :size="24"><ChatDotRound /></el-icon>
     </div>
     <!-- AI聊天弹窗 -->
     <transition name="slide-up">
-      <div v-if="showAIChat" class="ai-chat-modal">
+      <div v-if="showAIChat" class="ai-chat-modal" :style="{ width: chatWidth + 'px' }">
+        <!-- 左侧拖动调整大小的区域 -->
+        <div class="resize-handle" @mousedown="startResize"></div>
+        
         <div class="ai-chat-header">
           <span>AI智能对话</span>
-          <div class="close-btn" @click="showAIChat = false"></div>
+          <el-icon class="close-icon" @click="showAIChat = false"><Close /></el-icon>
         </div>
         <div class="ai-chat-body">
           <div class="chat-message" v-for="(msg, idx) in chatMessages" :key="idx"
@@ -53,8 +68,13 @@
           </div>
           <div class="chat-input-row">
             <el-input v-model="chatInput" placeholder="请输入你的问题..." size="small" @keyup.enter="sendChat"
-              class="chat-input-full" />
-            <el-button type="primary" size="small" @click="sendChat" class="send-btn-inline">发送</el-button>
+              class="chat-input-full">
+              <template #append>
+                <el-button type="primary" @click="sendChat">
+                  <el-icon><Position /></el-icon>
+                </el-button>
+              </template>
+            </el-input>
           </div>
         </div>
       </div>
@@ -64,9 +84,23 @@
 
 <script setup>
 import { getValidToken } from '@/utils/auth'
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/common/AppHeader.vue'
+import { useRouter } from 'vue-router'
+import { 
+  ChatDotRound, 
+  Close, 
+  Position, 
+  Reading, 
+  Document, 
+  EditPen, 
+  User, 
+  Collection, 
+  DataAnalysis 
+} from '@element-plus/icons-vue'
+
+const router = useRouter()
 const logoUrl = ref('https://placehold.co/48x48?text=Logo') // 可替换为实际logo图片
 const avatarUrl = ref('https://placehold.co/40x40?text=头像') // 默认头像
 const userName = ref('某教师') // 默认用户名
@@ -76,6 +110,52 @@ const searchValue = ref('') // 搜索框的值
 const chatMessages = ref([
   { role: 'ai', content: '您好，有什么可以帮您？' }
 ])
+
+// 对话框宽度相关
+const chatWidth = ref(400) // 初始宽度
+const minWidth = 300 // 最小宽度
+const maxWidth = 800 // 最大宽度
+const isResizing = ref(false)
+const startX = ref(0)
+const startWidth = ref(0)
+
+// 开始调整大小
+function startResize(e) {
+  isResizing.value = true
+  startX.value = e.clientX
+  startWidth.value = chatWidth.value
+  document.addEventListener('mousemove', handleResize)
+  document.addEventListener('mouseup', stopResize)
+  // 防止文本选择
+  document.body.style.userSelect = 'none'
+}
+
+// 处理调整大小
+function handleResize(e) {
+  if (!isResizing.value) return
+  const offsetX = startX.value - e.clientX
+  let newWidth = startWidth.value + offsetX
+  
+  // 限制最小和最大宽度
+  if (newWidth < minWidth) newWidth = minWidth
+  if (newWidth > maxWidth) newWidth = maxWidth
+  
+  chatWidth.value = newWidth
+}
+
+// 停止调整大小
+function stopResize() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', handleResize)
+  document.removeEventListener('mouseup', stopResize)
+  document.body.style.userSelect = ''
+}
+
+// 组件卸载时清理事件监听器
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleResize)
+  document.removeEventListener('mouseup', stopResize)
+})
 
 // 聊天建议选项
 const chatSuggestions = ref([
@@ -87,16 +167,47 @@ const chatSuggestions = ref([
 
 // 左侧菜单栏
 const menuList = [
-  '创建课程',
-  '编辑课程信息',
-  '管理课程知识点',
-  '添加知识点巩固练习题',
-  '查看课后习题学习作答统计',
-  '自动生成考试卷题',
-  '智能助手自动讲评学生考试作答',
-  '查看考试作答情况总结',
-  '查看学情分析'
+  { name: '课程', icon: Reading },
+  { name: '考试', icon: Document },
+  { name: '作业', icon: EditPen },
+  { name: '学生', icon: User },
+  { name: '班级', icon: Collection },
+  { name: '分析', icon: DataAnalysis },
 ]
+
+const activeMenu = ref('') // 默认选中第一个菜单
+
+// 菜单点击处理
+function handleMenuClick(menu) {
+  activeMenu.value = menu.name
+  console.log('选中菜单:', menu.name)
+  
+  // 根据菜单项跳转到不同的路由
+  switch (menu.name) {
+    case '课程':
+      router.push('/teacher/course')
+      break
+    // case '考试':
+    //   router.push('/teacher/exam')
+    //   break
+    // case '作业':
+    //   router.push('/teacher/homework')
+    //   break
+    // case '学生':
+    //   router.push('/teacher/student')
+    //   break
+    // case '班级':
+    //   router.push('/teacher/class')
+    //   break
+    // case '分析':
+    //   router.push('/teacher/analysis')
+    //   break
+    default:
+      break
+  }
+  
+  ElMessage.success(`切换到${menu.name}页面`)
+}
 
 // 用户操作
 function handleUserAction(action) {
@@ -159,6 +270,10 @@ function sendChat() {
   border-color: transparent !important;
 }
 
+:deep(.sidebar .menu-container .menu-btn) {
+  padding: 12px 20px !important;
+}
+
 :deep(.el-button:hover),
 :deep(.el-button:focus) {
   border-color: transparent !important;
@@ -175,7 +290,7 @@ function sendChat() {
   border-color: transparent !important;
   background-color: transparent;
 }
-/* ------------------------- */
+
 .main-content {
   flex: 1;
   display: flex;
@@ -183,48 +298,82 @@ function sendChat() {
 }
 
 .sidebar {
-  width: 260px;
-  background: #fff;
-  border-right: 1px solid rgba(0, 0, 0, 0.05);
-  padding: 24px 0;
+  width: 100px;
+  background: #2e3a4f;
+  color: #fff;
+  padding: 0 0 24px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
   position: relative;
   z-index: 5;
 }
 
-.menu-btn {
-  width: 200px;
-  border-radius: 8px;
-  font-size: 15px;
-  transition: all 0.3s;
-  border: 1px solid #ebeef5;
-  position: relative;
-  overflow: hidden;
+
+.sidebar-divider {
+  width: 80%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 10px;
 }
 
-.menu-btn::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 4px;
-  background: transparent;
-  transition: background 0.3s;
+.menu-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding-top: 10px;
+}
+
+.menu-btn {
+  box-sizing: border-box;
+  width: 100px;
+  font-size: 14px;
+  transition: all 0.3s;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  margin: 0;
+  cursor: pointer;
+  background-color: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  padding-left: 24px;
 }
 
 .menu-btn:hover {
-  background: #f5f7fa;
-  color: #409eff;
-  border-color: #d9ecff;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
-.menu-btn:hover::before {
-  background: #409eff;
+.menu-btn-active {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+  position: relative;
+}
+
+.menu-btn-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 60%;
+  width: 4px;
+  background: #4b8de6;
+  transform: translateY(-50%);
+  border-radius: 0 2px 2px 0;
+}
+
+.menu-icon {
+  margin-right: 12px;
+  font-size: 16px;
 }
 
 .content-area {
@@ -243,18 +392,18 @@ function sendChat() {
 
 .ai-chat-entry {
   position: fixed;
-  right: 32px;
-  bottom: 24px;
-  width: 260px;
+  right: 20px;
+  bottom: 20px;
+  width: 60px;
   height: 60px;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 10px 10px 0 0;
-  box-shadow: 0 -2px 15px rgba(0, 0, 0, 0.08);
+  border-radius: 50%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #606266;
+  color: #409eff;
   cursor: pointer;
   font-size: 15px;
   z-index: 100;
@@ -262,9 +411,8 @@ function sendChat() {
 }
 
 .ai-chat-entry:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.12);
-  color: #409eff;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.25);
 }
 
 /* AI聊天弹窗样式 */
@@ -281,18 +429,36 @@ function sendChat() {
 
 .ai-chat-modal {
   position: fixed;
-  right: 32px;
-  bottom: 84px;
-  width: 380px;
-  height: 700px;
+  right: 0;
+  top: 60px; /* 导航栏高度，根据实际情况调整 */
+  bottom: 0;
+  width: 400px;
+  height: auto;
   background: #fff;
-  border-radius: 12px 12px 0 0;
+  border-radius: 12px 0 0 0;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   z-index: 200;
   border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;
+}
+
+/* 拖动调整大小的区域 */
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  background-color: transparent;
+  z-index: 300;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background-color: rgba(64, 158, 255, 0.1);
 }
 
 .ai-chat-header {
@@ -308,46 +474,15 @@ function sendChat() {
   color: #303133;
 }
 
-.close-btn {
-  width: 32px;
-  height: 32px;
-  position: relative;
+.close-icon {
   cursor: pointer;
-  transition: background 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+  font-size: 20px;
+  color: #909399;
+  transition: color 0.2s;
 }
 
-.close-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.close-btn::before,
-.close-btn::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 22px;
-  height: 3px;
-  background: #909399;
-  border-radius: 2px;
-  transition: background 0.2s;
-}
-
-.close-btn::before {
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.close-btn::after {
-  transform: translate(-50%, -50%) rotate(-45deg);
-}
-
-.close-btn:hover::before,
-.close-btn:hover::after {
-  background: #f56c6c;
+.close-icon:hover {
+  color: #f56c6c;
 }
 
 .ai-chat-body {
@@ -474,22 +609,6 @@ function sendChat() {
   width: 100%;
   margin-bottom: 0;
   margin-top: 0;
-}
-
-.send-btn-inline {
-  margin-left: 0;
-  height: 32px;
-  padding: 0 18px;
-  background: #409eff;
-  border-color: #409eff;
-  transition: all 0.3s;
-}
-
-.send-btn-inline:hover {
-  background: #66b1ff;
-  border-color: #66b1ff;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
 }
 
 .ai-chat-footer {
