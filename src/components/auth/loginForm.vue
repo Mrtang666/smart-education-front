@@ -25,7 +25,7 @@
             <van-checkbox v-model="rememberMe" class="remember-me">十天内免登录</van-checkbox>
             <div class="right-links">
                 <span class="forgot-password">忘记密码？</span>
-                <span class="register-link">去注册</span>
+                <span class="register-link" @click="goToRegister">去注册</span>
             </div>
         </div>
     </div>
@@ -67,6 +67,10 @@ const handleLogin = () => {
         console.error('登录失败:', err);
         ElMessage.error('登录失败,请稍后再试');
     });
+};
+
+const goToRegister = () => {
+    router.push('/register');
 };
 </script>
 

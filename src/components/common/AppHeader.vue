@@ -3,7 +3,7 @@
     <header class="header">
         <div class="logo-area">
             <!-- logo图片支持插入 -->
-            <img class="logo-img" :src="props.logoUrl" alt="logo" />
+            <img class="logo-img" src="@/assets/logo.png" alt="logo" />
             <span class="app-name">{{ props.appName }}</span>
         </div>
         <div class="header-right">
@@ -30,7 +30,7 @@
                     <el-dropdown-menu>
                         <el-dropdown-item @click="emit('userAction', 'profile')">个人中心</el-dropdown-item>
                         <el-dropdown-item @click="emit('userAction', 'changePassword')">修改密码</el-dropdown-item>
-                        <el-dropdown-item divided @click="emit('userAction', 'logout')">退出登录</el-dropdown-item>
+                        <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                     </el-dropdown-menu>
                 </template>
             </el-dropdown>
@@ -41,6 +41,8 @@
 <script setup>
 import { ref, defineProps, defineEmits } from 'vue'
 import { ElMessage } from 'element-plus'
+import { clearAuth } from '@/utils/auth'
+import { useRouter } from 'vue-router'
 
 const props = defineProps({
     logoUrl: {
@@ -69,6 +71,7 @@ const props = defineProps({
     }
 })
 
+const router = useRouter()
 const searchValue = ref(props.defaultSearchValue)
 
 // 搜索
@@ -102,6 +105,17 @@ function handleSearchInput() {
 function handleSearch() {
     // 当按下回车键时执行搜索
     emit('search', searchValue.value)
+}
+
+function handleLogout() {
+    // 清除所有认证信息
+    clearAuth()
+    
+    // 提示用户已退出登录
+    ElMessage.success('已退出登录')
+    
+    // 跳转到登录页
+    router.push('/login')
 }
 </script>
 

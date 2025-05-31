@@ -100,12 +100,6 @@ const menuList = [
 
 // 用户操作
 function handleUserAction(action) {
-  if (action === 'logout') {
-    console.log('退出登录')
-    ElMessage.success('退出登录成功')
-    // todo 这里可以添加退出登录逻辑
-  }
-
   if (action === 'profile') {
     getValidToken();
     console.log('个人中心')
