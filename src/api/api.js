@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { getToken } from '@/utils/auth';
+import { getValidToken, getRefreshToken, setToken, setRefreshToken } from '@/utils/auth';
 
 // 学生端 Axios 实例
 const studentAxios = axios.create({
-    baseURL: 'http://118.89.136.119:8082', // 学生端端口
+    baseURL: 'http://118.89.136.119:8081', // 学生端端口
     timeout: 10000,
 });
 
@@ -16,20 +16,60 @@ const teacherAxios = axios.create({
 // 创建带有拦截器的学生端 Axios 实例
 const createStudentAuthorizedAxios = () => {
     const instance = axios.create({
-        baseURL: 'http://118.89.136.119:8082',
+        baseURL: 'http://118.89.136.119:8081',
         timeout: 10000,
     });
 
     // 请求拦截器：添加 token
     instance.interceptors.request.use(
         (config) => {
-            const token = getToken();
+            const token = getValidToken();
             if (token) {
                 config.headers['Authorization'] = `Bearer ${token}`;
             }
             return config;
         },
         (error) => Promise.reject(error)
+    );
+
+    // 响应拦截器：处理401错误
+    instance.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            const originalRequest = error.config;
+            
+            // 如果是401错误且没有重试过
+            if (error.response && error.response.status === 401 && !originalRequest._retry) {
+                originalRequest._retry = true;
+                
+                try {
+                    // 获取刷新token
+                    const refreshToken = getRefreshToken();
+                    if (!refreshToken) {
+                        throw new Error('没有刷新token可用');
+                    }
+                    
+                    // 刷新token
+                    const response = await authAPI.studentRefreshToken({ refreshToken });
+                    const { accessToken, refreshToken: newRefreshToken } = response;
+                    
+                    // 保存新token
+                    setToken(accessToken);
+                    setRefreshToken(newRefreshToken);
+                    
+                    // 更新请求头并重试
+                    originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+                    return instance(originalRequest);
+                } catch (refreshError) {
+                    console.error('刷新token失败，需要重新登录:', refreshError);
+                    // 可以在这里添加重定向到登录页的逻辑
+                    window.location.href = '/login';
+                    return Promise.reject(refreshError);
+                }
+            }
+            
+            return Promise.reject(error);
+        }
     );
 
     return instance;
@@ -45,13 +85,53 @@ const createTeacherAuthorizedAxios = () => {
     // 请求拦截器：添加 token
     instance.interceptors.request.use(
         (config) => {
-            const token = getToken();
+            const token = getValidToken();
             if (token) {
                 config.headers['Authorization'] = `Bearer ${token}`;
             }
             return config;
         },
         (error) => Promise.reject(error)
+    );
+
+    // 响应拦截器：处理401错误
+    instance.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            const originalRequest = error.config;
+            
+            // 如果是401错误且没有重试过
+            if (error.response && error.response.status === 401 && !originalRequest._retry) {
+                originalRequest._retry = true;
+                
+                try {
+                    // 获取刷新token
+                    const refreshToken = getRefreshToken();
+                    if (!refreshToken) {
+                        throw new Error('没有刷新token可用');
+                    }
+                    
+                    // 刷新token
+                    const response = await authAPI.teacherRefreshToken({ refreshToken });
+                    const { accessToken, refreshToken: newRefreshToken } = response;
+                    
+                    // 保存新token
+                    setToken(accessToken);
+                    setRefreshToken(newRefreshToken);
+                    
+                    // 更新请求头并重试
+                    originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+                    return instance(originalRequest);
+                } catch (refreshError) {
+                    console.error('刷新token失败，需要重新登录:', refreshError);
+                    // 可以在这里添加重定向到登录页的逻辑
+                    window.location.href = '/login';
+                    return Promise.reject(refreshError);
+                }
+            }
+            
+            return Promise.reject(error);
+        }
     );
 
     return instance;
@@ -176,7 +256,9 @@ export const authAPI = {
      *   - refreshToken: string 新的刷新token
      */
     async studentRefreshToken(refreshData) {
+        console.log('开始刷新token，参数:', refreshData);
         const response = await studentAxios.post('/api/auth/refresh', refreshData);
+        console.log('刷新token响应:', response.data);
         return response.data;
     },
 
@@ -190,7 +272,9 @@ export const authAPI = {
      *   - refreshToken: string 新的刷新token
      */
     async teacherRefreshToken(refreshData) {
+        console.log('开始刷新教师token，参数:', refreshData);
         const response = await teacherAxios.post('/api/auth/refresh', refreshData);
+        console.log('刷新教师token响应:', response.data);
         return response.data;
     },
 };

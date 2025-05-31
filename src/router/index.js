@@ -1,17 +1,20 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
-import TeacherCenter from '@/views/teacher/teacherCenter.vue'
+import { createRouter, createWebHashHistory } from "vue-router";
 
 const routes = [
   {
-    path: '/teacher/center',
-    name: 'TeacherCenter',
-    component: TeacherCenter
-  }
-]
+    path: "/login",
+    component: () => import("@/views/auth/loginPage.vue"),
+  },
+  {
+    path: "/teacher/center",
+    name: "TeacherCenter",
+    component: () => import("@/views/teacher/teacherCenter.vue"),
+  },
+];
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes
-})
+  routes,
+});
 
-export default router
+export default router;

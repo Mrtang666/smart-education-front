@@ -1,12 +1,14 @@
 const TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
-const USER_INFO_KEY = 'user_info';
-const STUDENT_INFO_KEY = 'student_info';
 const TOKEN_EXPIRY_KEY = 'token_expiry';  // 用于存储token过期时间
+const USER_INFO_KEY = 'user_info';
 
+import { ElMessage } from 'element-plus';
+
+// 避免循环依赖，将API调用移到函数内部
 /**
- * 获取token
- * @returns {string} token值，确保格式正确
+ * 获取访问token
+ * @returns {string|null} 访问token或null
  */
 export function getToken() {
   // 先尝试获取当前token
@@ -43,7 +45,15 @@ export function getValidToken() {
   
   // 检查token是否可能过期但不立即拒绝
   if (isTokenExpired()) {
-    console.warn('token可能已过期，但仍然返回当前token');
+    // 获取刷新token
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      console.warn('没有刷新token可用');
+      return token; // 返回可能过期的token
+    }
+    
+    // 刷新token操作移到API层处理，避免循环依赖
+    console.log('token即将过期，请求时将尝试刷新');
   }
   
   return token;
@@ -65,7 +75,7 @@ export function isTokenExpired() {
  * @param {string} token - 要设置的token值
  * @param {number} [expiryInMinutes=30] - token过期时间（分钟）
  */
-export function setToken(token, expiryInMinutes = 30) {
+export function setToken(token, expiryInMinutes = 4) {
   if (!token) {
     console.warn('尝试设置空token');
     return;
@@ -132,42 +142,44 @@ export function removeRefreshToken() {
 }
 
 /**
- * 保存用户信息
- * @param {Object} userInfo 
+ * 初始化存储用户信息
  */
-export function setUserInfo(userInfo) {
-  // 检查userInfo是否包含必要字段
-  if (!userInfo || typeof userInfo !== 'object') {
-    console.error('无效的userInfo对象', userInfo);
-    return;
-  }
-  
-  // 处理角色信息
-  if (userInfo.roles && Array.isArray(userInfo.roles)) {
-    // 保持原始角色数组
-    userInfo.originalRoles = [...userInfo.roles];
+export function initUserInfo() {
+  // 导入API，避免循环依赖
+  import('@/api/api').then(({ studentAPI, teacherAPI }) => {
+    // 获取用户信息
+    // 根据角色不同调用不同接口
+    const userRole = localStorage.getItem('user_role');
     
-    // 处理角色格式
-    const formattedRoles = userInfo.roles.map(role => {
-      const roleStr = String(role).toUpperCase();
-      // 处理ROLE_前缀
-      if (roleStr.startsWith('ROLE_')) {
-        return roleStr.substring(5).toLowerCase();
+    try {
+      const roleObj = JSON.parse(userRole);
+      
+      if (roleObj.includes('ROLE_STUDENT')) {
+        studentAPI.getSelfStudentInfo().then(res => {
+          localStorage.setItem(USER_INFO_KEY, JSON.stringify(res));
+          localStorage.setItem('is_logged_in', 'true');
+        }).catch(err => {
+          console.error('获取用户信息失败:', err);
+          ElMessage.error('获取用户信息失败');
+        });
+      } else if (roleObj.includes('ROLE_TEACHER')) {
+        teacherAPI.getSelfTeacherInfo().then(res => {
+          localStorage.setItem(USER_INFO_KEY, JSON.stringify(res));
+          localStorage.setItem('is_logged_in', 'true');
+        }).catch(err => {
+          console.error('获取用户信息失败:', err);
+          ElMessage.error('获取用户信息失败');
+        });
+      } else {
+        ElMessage.error('用户角色错误');
       }
-      return String(role).toLowerCase();
-    });
-    
-    // 添加简化后的角色
-    userInfo.formattedRoles = formattedRoles;
-    
-    console.log('处理角色信息:', {
-      original: userInfo.originalRoles,
-      formatted: userInfo.formattedRoles
-    });
-  }
-  
-  console.log('保存用户信息到localStorage:', userInfo);
-  localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
+    } catch (err) {
+      console.error('解析用户角色失败:', err);
+      ElMessage.error('用户角色格式错误');
+    }
+  }).catch(err => {
+    console.error('导入API模块失败:', err);
+  });
 }
 
 /**
@@ -198,29 +210,6 @@ export function removeUserInfo() {
 }
 
 /**
- * 保存学生信息
- * @param {Object} studentInfo 
- */
-export function setStudentInfo(studentInfo) {
-  localStorage.setItem(STUDENT_INFO_KEY, JSON.stringify(studentInfo));
-}
-
-/**
- * 获取学生信息
- */
-export function getStudentInfo() {
-  const studentInfo = localStorage.getItem(STUDENT_INFO_KEY);
-  return studentInfo ? JSON.parse(studentInfo) : null;
-}
-
-/**
- * 移除学生信息
- */
-export function removeStudentInfo() {
-  localStorage.removeItem(STUDENT_INFO_KEY);
-}
-
-/**
  * 清除所有认证信息
  */
 export function clearAuth() {
@@ -235,12 +224,8 @@ export function clearAuth() {
   // 清除用户信息
   removeUserInfo();
   
-  // 清除学生信息
-  removeStudentInfo();
-  
-  // 清除其他登录状态和用户数据
-  localStorage.removeItem('isLoggedIn');
-  localStorage.removeItem('userData');
+  // 清除其他登录状态为false
+  localStorage.setItem('is_logged_in', 'false');
   
   // 确认清除完成
   const checkTokens = localStorage.getItem(TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY);
@@ -252,22 +237,3 @@ export function clearAuth() {
   
   console.log('所有认证信息已清除');
 }
-
-/**
- * 清理冗余认证信息，保留必要信息
- * 删除：userInfo, userRole, refreshToken (仅保留refresh_token)
- */
-export function cleanRedundantAuth() {
-  console.log('开始清理冗余认证信息...');
-  
-  // 删除冗余的userInfo(null值)
-  localStorage.removeItem('userInfo');
-  
-  // 删除独立的userRole（已包含在user_info中）
-  localStorage.removeItem('userRole');
-  
-  // 删除refreshToken（使用标准键名refresh_token）
-  localStorage.removeItem('refreshToken');
-  
-  console.log('冗余认证信息已清理完成');
-} 

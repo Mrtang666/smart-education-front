@@ -63,10 +63,10 @@
 </template>
 
 <script setup>
+import { getValidToken } from '@/utils/auth'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/common/AppHeader.vue'
-
 const logoUrl = ref('https://placehold.co/48x48?text=Logo') // 可替换为实际logo图片
 const avatarUrl = ref('https://placehold.co/40x40?text=头像') // 默认头像
 const userName = ref('某教师') // 默认用户名
@@ -107,6 +107,7 @@ function handleUserAction(action) {
   }
 
   if (action === 'profile') {
+    getValidToken();
     console.log('个人中心')
     ElMessage.success('进入个人中心')
   }
