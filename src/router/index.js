@@ -26,6 +26,10 @@ const routes = [
         path: "center",
         component: () => import("@/views/teacher/teacherHome.vue"),
       },
+      {
+        path: "knowledge",
+        component: () => import("@/views/teacher/teacherKnowledge.vue"),
+      },
       // {
       //   path: "exam",
       //   component: () => import("@/views/teacher/teacherExam.vue"),
