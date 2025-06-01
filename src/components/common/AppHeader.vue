@@ -21,10 +21,8 @@
                     <el-icon><Search /></el-icon>
                 </template>
             </el-input>
-            <el-upload class="avatar-uploader" :show-file-list="false" :on-success="handleAvatarSuccess"
-                :before-upload="beforeAvatarUpload" action="#">
-                <el-avatar :src="props.avatarUrl" class="avatar" />
-            </el-upload>
+            <!-- 使用已有的default.jpg作为头像 -->
+            <el-avatar class="avatar" />
             <el-dropdown>
                 <span class="user-name">
                     <div class="user-name-text">{{ props.userName }}</div>
@@ -60,7 +58,7 @@ const props = defineProps({
     },
     avatarUrl: {
         type: String,
-        default: 'https://placehold.co/40x40?text=头像'
+        default: '/src/assets/default.jpg'
     },
     userName: {
         type: String,
@@ -80,27 +78,9 @@ const router = useRouter()
 const searchValue = ref(props.defaultSearchValue)
 
 // 搜索
-const emit = defineEmits(['userAction', 'avatarChange', 'search', 'searchInput'])
+const emit = defineEmits(['userAction', 'search', 'searchInput'])
 
 const inviteCode = ref('')
-
-function handleAvatarSuccess(res, file) {
-    // 这里只做本地预览，实际应上传到服务器
-    const avatarUrl = URL.createObjectURL(file.raw)
-    emit('avatarChange', avatarUrl)
-}
-
-function beforeAvatarUpload(file) {
-    const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
-    const isLt2M = file.size / 1024 / 1024 < 2
-    if (!isJPG) {
-        ElMessage.error('头像图片只能是 JPG/PNG 格式!')
-    }
-    if (!isLt2M) {
-        ElMessage.error('头像图片大小不能超过 2MB!')
-    }
-    return isJPG && isLt2M
-}
 
 function handleSearchInput() {
     // 将搜索框的值发送给父组件
@@ -217,15 +197,12 @@ function handleLogout() {
     width: 140px;
 }
 
-.avatar-uploader {
-    display: inline-block;
-    margin-left: 12px;
-    margin-right: -12px;
-}
-
 .avatar {
-    background: #e6f7ff;
-    cursor: pointer;
+    background: url('@/assets/default.jpg') no-repeat center center;
+    background-size: cover;
+    margin-left: 12px;
+    width: 32px;
+    height: 32px;
 }
 
 .user-name {

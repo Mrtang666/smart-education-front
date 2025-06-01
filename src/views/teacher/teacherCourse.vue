@@ -130,11 +130,125 @@
               :value="option.value"></el-option>
           </el-select>
         </el-form-item>
+        
+        <!-- 添加知识点选择 -->
+        <el-form-item label="知识点">
+          <div class="knowledge-selection">
+            <div class="selected-knowledge-list" v-if="selectedKnowledge.length > 0">
+              <el-tag
+                v-for="item in selectedKnowledge"
+                :key="item.knowledgeId"
+                closable
+                @close="removeKnowledge(item)"
+                class="knowledge-tag"
+                :type="getKnowledgeTagType(item.difficultyLevel)"
+              >
+                {{ item.name }}
+              </el-tag>
+            </div>
+            <div class="knowledge-empty" v-else>
+              <span class="knowledge-empty-text">暂未选择</span>
+            </div>
+            <el-button type="primary" plain size="small" @click="showKnowledgeSelectionDialog">
+              <el-icon><Plus /></el-icon>选择
+            </el-button>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="createCourseDialogVisible = false">取消</el-button>
           <el-button type="primary" @click="createCourse">创建</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 知识点选择对话框 -->
+    <el-dialog v-model="knowledgeSelectionVisible" title="选择知识点" width="800px" append-to-body class="knowledge-dialog">
+      <div class="knowledge-dialog-content">
+        <!-- 知识点搜索 -->
+        <div class="knowledge-search-container">
+          <el-input 
+            v-model="knowledgeSearchKeyword" 
+            placeholder="搜索知识点" 
+            class="knowledge-search-input"
+            @input="filterKnowledgeList"
+            clearable
+          >
+            <template #prefix>
+              <el-icon class="search-icon"><Search /></el-icon>
+            </template>
+          </el-input>
+        </div>
+
+        <!-- 知识点列表 -->
+        <div class="knowledge-list-container">
+          <el-table
+            ref="knowledgeTableRef"
+            v-loading="knowledgeLoading"
+            :data="paginatedKnowledgeList"
+            style="width: 100%"
+            height="300px"
+            @selection-change="handleKnowledgeSelectionChange"
+            @row-click="handleRowClick"
+            border
+            highlight-current-row
+            stripe
+          >
+            <el-table-column type="selection" width="55" />
+            <el-table-column prop="name" label="知识点名称" min-width="120" show-overflow-tooltip />
+            <el-table-column prop="description" label="知识点描述" min-width="180" show-overflow-tooltip>
+              <template #default="scope">
+                <span class="knowledge-description">{{ scope.row.description || '暂无描述' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="teachPlan" label="教学计划" min-width="180" show-overflow-tooltip>
+              <template #default="scope">
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="scope.row.teachPlan || '暂无教学计划'"
+                >
+                  <template #reference>
+                    <span class="knowledge-teach-plan">{{ scope.row.teachPlan || '暂无教学计划' }}</span>
+                  </template>
+                </el-popover>
+              </template>
+            </el-table-column>
+            <el-table-column prop="difficultyLevel" label="难度等级" width="100" align="center">
+              <template #default="scope">
+                <el-tag :type="getKnowledgeTagType(scope.row.difficultyLevel)">
+                  {{ scope.row.difficultyLevel }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <!-- 分页控件 -->
+          <div class="pagination-container">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :page-sizes="[5, 10, 20, 50]"
+              layout="total, sizes, prev, pager, next, jumper"
+              :total="filteredKnowledgeList.length"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+              background
+            />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <span class="selected-count" v-if="selectedKnowledgeIds.length > 0">
+            已选择 {{ selectedKnowledgeIds.length }} 个知识点
+          </span>
+          <div class="dialog-buttons">
+            <el-button @click="knowledgeSelectionVisible = false">取消</el-button>
+            <el-button type="primary" @click="confirmKnowledgeSelection">确定</el-button>
+          </div>
         </div>
       </template>
     </el-dialog>
@@ -146,7 +260,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElLoading } from 'element-plus'
 import { Plus, Reading, /*Document,*/ Search, } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { courseAPI } from '@/api/api'
+import { courseAPI, knowledgeAPI } from '@/api/api'
 
 const router = useRouter()
 
@@ -558,8 +672,146 @@ function showCreateCourseDialog() {
     credit: 3,
     color: '#DCDFE6' // 浅灰色
   }
+  // 清空已选知识点
+  selectedKnowledge.value = []
 }
 
+// 知识点相关
+const knowledgeSelectionVisible = ref(false)
+const knowledgeList = ref([])
+const selectedKnowledgeIds = ref([]) // 临时选中的知识点ID
+const selectedKnowledge = ref([]) // 最终选中的知识点
+const knowledgeLoading = ref(false)
+const knowledgeSearchKeyword = ref('')
+
+// 过滤后的知识点列表
+const filteredKnowledgeList = computed(() => {
+  if (!knowledgeSearchKeyword.value) {
+    return knowledgeList.value
+  }
+  
+  const keyword = knowledgeSearchKeyword.value.toLowerCase()
+  return knowledgeList.value.filter(item => 
+    item.name.toLowerCase().includes(keyword) || 
+    (item.description && item.description.toLowerCase().includes(keyword))
+  )
+})
+
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+// 根据当前页码和每页数量计算分页后的知识点列表
+const paginatedKnowledgeList = computed(() => {
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  const endIndex = startIndex + pageSize.value
+  return filteredKnowledgeList.value.slice(startIndex, endIndex)
+})
+
+// 处理每页显示数量变化
+function handleSizeChange(size) {
+  pageSize.value = size
+  // 重置到第一页
+  currentPage.value = 1
+}
+
+// 处理页码变化
+function handleCurrentChange(page) {
+  currentPage.value = page
+}
+
+// 过滤知识点列表时重置分页
+function filterKnowledgeList() {
+  // 重置到第一页
+  currentPage.value = 1
+  // 由computed属性filteredKnowledgeList自动处理过滤逻辑
+}
+
+// 根据难度等级获取标签类型
+function getKnowledgeTagType(level) {
+  switch(level) {
+    case '简单':
+      return 'success'
+    case '中等':
+      return 'warning'
+    case '困难':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+// 显示知识点选择对话框
+async function showKnowledgeSelectionDialog() {
+  knowledgeSelectionVisible.value = true
+  knowledgeSearchKeyword.value = ''
+  
+  // 加载知识点列表
+  await fetchKnowledgeList()
+}
+
+// 获取教师的知识点列表
+async function fetchKnowledgeList() {
+  knowledgeLoading.value = true
+  try {
+    // 从localstorage中获取教师ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      throw new Error('未找到用户信息，请重新登录')
+    }
+    
+    // 解析JSON字符串
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.teacherId) {
+      throw new Error('用户信息不完整或不是教师账号')
+    }
+    
+    const teacherId = userInfo.teacherId
+    console.log('教师ID:', teacherId)
+    
+    // 调用API获取知识点列表
+    const response = await knowledgeAPI.getKnowledgeByTeacherId(teacherId)
+    console.log('获取到的知识点列表:', response)
+    knowledgeList.value = Array.isArray(response) ? response : []
+    
+    // 预选已选择的知识点
+    if (selectedKnowledge.value.length > 0) {
+      selectedKnowledgeIds.value = selectedKnowledge.value.map(item => item.knowledgeId)
+    }
+  } catch (error) {
+    console.error('获取知识点列表失败:', error)
+    ElMessage.error(`获取知识点列表失败: ${error.message || '请稍后重试'}`)
+  } finally {
+    knowledgeLoading.value = false
+  }
+}
+
+// 处理知识点选择变化
+function handleKnowledgeSelectionChange(selection) {
+  selectedKnowledgeIds.value = selection.map(item => item.knowledgeId)
+}
+
+// 确认知识点选择
+function confirmKnowledgeSelection() {
+  // 根据选中的ID获取完整的知识点对象
+  selectedKnowledge.value = knowledgeList.value.filter(item => 
+    selectedKnowledgeIds.value.includes(item.knowledgeId)
+  )
+  
+  // 关闭对话框
+  knowledgeSelectionVisible.value = false
+  
+  ElMessage.success(`已选择 ${selectedKnowledge.value.length} 个知识点`)
+}
+
+// 移除已选择的知识点
+function removeKnowledge(knowledge) {
+  selectedKnowledge.value = selectedKnowledge.value.filter(
+    item => item.knowledgeId !== knowledge.knowledgeId
+  )
+}
+
+// 修改创建课程函数，添加知识点关联
 async function createCourse() {
   // 在提交前确保分类已自动匹配
   if (!newCourse.value.category) {
@@ -575,7 +827,8 @@ async function createCourse() {
           description: newCourse.value.description || '',
           category: newCourse.value.category,
           credit: newCourse.value.credit,
-          status: 1 // 使用整数类型的状态
+          status: 1, // 使用整数类型的状态
+          knowledgeIds: selectedKnowledge.value.map(item => item.knowledgeId) // 添加知识点ID列表
         }
 
         // 调用API创建课程
@@ -604,6 +857,8 @@ async function createCourse() {
           credit: 3,
           color: '#DCDFE6' // 浅灰色
         }
+        // 清空已选知识点
+        selectedKnowledge.value = []
 
         ElMessage.success('课程创建成功')
       } catch (error) {
@@ -614,13 +869,21 @@ async function createCourse() {
   })
 }
 
-
 // 进入课程
 function enterCourse(course) {
   console.log('进入课程:', course)
   ElMessage.success(`进入课程: ${course.name}`)
   // 跳转到课程详情页
   router.push(`/teacher/course/${course.id}`)
+}
+
+// 表格引用
+const knowledgeTableRef = ref(null)
+
+// 处理行点击事件，实现点击行即可选择
+function handleRowClick(row) {
+  // 直接调用表格的toggleRowSelection方法来切换行的选择状态
+  knowledgeTableRef.value.toggleRowSelection(row)
 }
 </script>
 
@@ -940,5 +1203,125 @@ function enterCourse(course) {
   margin: 0 16px;
   height: 36px;
   padding: 0 16px;
+}
+
+/* 知识点选择样式 */
+.knowledge-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.selected-knowledge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #f5f7fa;
+  min-height: 40px;
+}
+
+.knowledge-tag {
+  margin-right: 5px;
+  margin-bottom: 5px;
+}
+
+.knowledge-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  color: #909399;
+}
+
+.knowledge-dialog :deep(.el-dialog__body) {
+  padding: 16px 20px;
+}
+
+.knowledge-dialog :deep(.el-dialog__header) {
+  padding: 16px 20px;
+  margin-right: 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.knowledge-dialog :deep(.el-dialog__footer) {
+  padding: 12px 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.knowledge-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.knowledge-search-container {
+  margin-bottom: 10px;
+}
+
+.knowledge-search-input {
+  width: 100%;
+}
+
+.knowledge-search-input :deep(.el-input__prefix) {
+  color: #909399;
+}
+
+.knowledge-list-container {
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pagination-container {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.selected-count {
+  color: #409EFF;
+  font-size: 14px;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* 表格样式优化 */
+.el-table {
+  --el-table-row-hover-bg-color: #f0f9ff;
+  flex: 1;
+}
+
+.el-table .el-table__row {
+  cursor: pointer;
+}
+
+.el-table :deep(th) {
+  background-color: #f5f7fa;
+  color: #606266;
+  font-weight: 600;
+}
+
+.knowledge-description,
+.knowledge-teach-plan {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  cursor: pointer;
 }
 </style>
