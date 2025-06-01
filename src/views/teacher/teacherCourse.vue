@@ -873,7 +873,7 @@ async function createCourse() {
 function enterCourse(course) {
   console.log('进入课程:', course)
   ElMessage.success(`进入课程: ${course.name}`)
-  // 跳转到课程详情页
+  // 跳转到课程详情页，使用课程ID作为路径参数
   router.push(`/teacher/course/${course.id}`)
 }
 

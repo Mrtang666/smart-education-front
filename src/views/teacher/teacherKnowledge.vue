@@ -320,6 +320,11 @@ const submitKnowledge = () => {
     knowledgeFormRef.value.validate(async (valid) => {
         if (valid) {
             try {
+                // 确保设置了teacherId
+                if (!knowledgeForm.value.teacherId) {
+                    knowledgeForm.value.teacherId = getTeacherId();
+                }
+                
                 if (isEdit.value) {
                     // 更新知识点
                     await knowledgeAPI.updateKnowledge(knowledgeForm.value)
@@ -351,7 +356,7 @@ const confirmDeleteKnowledge = (knowledge) => {
         }
     ).then(async () => {
         try {
-            await knowledgeAPI.deleteKnowledgeById(knowledge.knowledgeId)
+            await knowledgeAPI.deleteKnowledgeById(knowledge.courseId, knowledge.knowledgeId)
             ElMessage.success('知识点删除成功')
             fetchKnowledgeList()
         } catch (error) {

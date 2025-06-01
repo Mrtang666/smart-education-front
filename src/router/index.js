@@ -21,7 +21,13 @@ const routes = [
       {
         path: "course",
         component: () => import("@/views/teacher/teacherCourse.vue"),
-       },
+      },
+      {
+        path: "course/:courseId",
+        component: () => import("@/views/teacher/teacherCourseDetail.vue"),
+        props: true,
+        name: "teacherCourseDetail"
+      },
       {
         path: "center",
         component: () => import("@/views/teacher/teacherHome.vue"),

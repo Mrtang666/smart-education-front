@@ -936,19 +936,20 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 删除知识点（需要token）
+     * 根据课程ID和知识点ID删除知识点（需要token）
+     * @param {number} courseId 课程ID
      * @param {number} id 知识点ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
      *   - success: boolean 是否删除成功
      *   - message: string 提示信息
      */
-    async deleteKnowledgeById(id) {
+    async deleteKnowledgeById(courseId, id) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.delete(`/api/knowledge/${id}`);
+        const response = await axios.delete(`/api/knowledge/course/${courseId}/knowledge/${id}`);
         return response.data;
     },
-
+    
     /**
      * 根据教师ID获取知识点列表（需要token）
      * @param {number} teacherId 教师ID

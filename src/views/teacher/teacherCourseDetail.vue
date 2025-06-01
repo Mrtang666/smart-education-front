@@ -121,17 +121,19 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElLoading } from 'element-plus'
 import { ArrowLeft, Edit, Plus, Document } from '@element-plus/icons-vue'
+import { courseAPI } from '@/api/api'
 
 const route = useRoute()
 const router = useRouter()
-const courseId = route.params.id
+const courseId = route.params.courseId // 从路由参数中获取课程ID
 
 // 课程信息
 const courseName = ref('加载中...')
 const courseDescription = ref('')
 const courseColor = ref('#409EFF')
+const courseData = ref(null)
 
 // 当前激活的标签页
 const activeTab = ref('content')
@@ -146,33 +148,73 @@ const students = ref([])
 const homeworks = ref([])
 
 // 获取课程信息
-onMounted(() => {
-  // 实际应该从API获取课程信息
-  // 这里模拟API调用
-  setTimeout(() => {
-    console.log('加载课程ID:', courseId)
-    courseName.value = '高等数学'
-    courseDescription.value = '本课程主要讲授高等数学的基础知识，包括函数、极限、微积分等内容。'
-    courseColor.value = '#409EFF'
+onMounted(async () => {
+  if (!courseId) {
+    ElMessage.error('课程ID不存在')
+    goBack()
+    return
+  }
+
+  const loadingInstance = ElLoading.service({
+    target: '.course-detail',
+    text: '加载课程信息...',
+    background: 'rgba(255, 255, 255, 0.7)'
+  })
+
+  try {
+    // 通过API获取课程信息
+    const response = await courseAPI.getCourseById(courseId)
     
-    // 模拟课程资料
-    materials.value = [
-      { id: 1, name: '第一章 函数与极限.pdf', size: '2.5MB' },
-      { id: 2, name: '第二章 导数与微分.pptx', size: '1.8MB' },
-    ]
-    
-    // 模拟学生列表
-    students.value = [
-      { id: '2021001', name: '张三', gender: '男', class: '计算机科学与技术1班' },
-      { id: '2021002', name: '李四', gender: '女', class: '计算机科学与技术1班' },
-    ]
-    
-    // 模拟作业列表
-    homeworks.value = [
-      { id: 1, title: '第一章习题', deadline: '2023-06-01', submitRate: '85%' },
-      { id: 2, title: '第二章习题', deadline: '2023-06-15', submitRate: '70%' },
-    ]
-  }, 500)
+    if (response) {
+      courseData.value = response
+      courseName.value = response.name || '未命名课程'
+      courseDescription.value = response.description || '暂无课程介绍'
+      
+      // 设置课程颜色
+      // 这里可以根据课程类别设置不同的颜色
+      const categoryColors = {
+        '计算机科学': '#409EFF',
+        '数学': '#67C23A',
+        '物理': '#E6A23C',
+        '化学': '#F56C6C',
+        '生物': '#909399',
+        'AI通识': '#9B59B6',
+        '程序设计语言': '#3498DB'
+      }
+      
+      courseColor.value = categoryColors[response.category] || '#409EFF'
+      
+      console.log('课程数据加载成功:', response)
+      
+      // TODO: 加载课程资料、学生列表和作业列表
+      // 这里可以调用其他API获取相关数据
+      
+      // 暂时使用模拟数据
+      materials.value = [
+        { id: 1, name: '第一章 函数与极限.pdf', size: '2.5MB' },
+        { id: 2, name: '第二章 导数与微分.pptx', size: '1.8MB' },
+      ]
+      
+      students.value = [
+        { id: '2021001', name: '张三', gender: '男', class: '计算机科学与技术1班' },
+        { id: '2021002', name: '李四', gender: '女', class: '计算机科学与技术1班' },
+      ]
+      
+      homeworks.value = [
+        { id: 1, title: '第一章习题', deadline: '2023-06-01', submitRate: '85%' },
+        { id: 2, title: '第二章习题', deadline: '2023-06-15', submitRate: '70%' },
+      ]
+    } else {
+      ElMessage.error('获取课程信息失败')
+      goBack()
+    }
+  } catch (error) {
+    console.error('获取课程信息失败:', error)
+    ElMessage.error('获取课程信息失败，请稍后重试')
+    goBack()
+  } finally {
+    loadingInstance.close()
+  }
 })
 
 // 返回上一页
