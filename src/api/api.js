@@ -1019,6 +1019,51 @@ export const knowledgeAPI = {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.get(`/api/knowledge/course/${courseId}/teacher/${teacherId}`);
         return response.data;
+    },
+
+    /**
+     * 复制知识点到指定课程（需要token）
+     * @param {number} knowledgeId 知识点ID
+     * @param {number} courseId 目标课程ID
+     * @returns {Promise<Object>} 复制后的知识点信息
+     * 返回字段：
+     *   - knowledgeId: number 知识点ID
+     *   - name: string 知识点名称
+     *   - description: string 知识点描述
+     *   - difficultyLevel: string 难度等级
+     *   - teacherId: number 教师ID
+     *   - courseId: number 课程ID
+     *   - teachPlan: string 教学计划
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async copyKnowledgeToCourse(knowledgeId, courseId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.post(`/api/knowledge/${knowledgeId}/copy/course/${courseId}`);
+            return response.data;
+        } catch (error) {
+            console.error('复制知识点失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 添加已有知识点到指定课程（需要token）
+     * @param {number} knowledgeId 知识点ID
+     * @param {number} courseId 目标课程ID
+     * @returns {Promise<Object>} 操作结果
+     * 返回字段：由后端定义，通常包含成功状态和消息
+     */
+    async appendKnowledgeToCourse(knowledgeId, courseId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.post(`/api/knowledge/${knowledgeId}/append/course/${courseId}`);
+            return response.data;
+        } catch (error) {
+            console.error('添加知识点到课程失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     }
 };
 
