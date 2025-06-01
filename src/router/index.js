@@ -15,12 +15,17 @@ const routes = [
   {
     path: "/teacher",
     component: () => import("@/views/teacher/teacherCenter.vue"),
+    redirect: "/teacher/center",
     meta: { requiresAuth: true },
     children: [
       {
         path: "course",
         component: () => import("@/views/teacher/teacherCourse.vue"),
        },
+      {
+        path: "center",
+        component: () => import("@/views/teacher/teacherHome.vue"),
+      },
       // {
       //   path: "exam",
       //   component: () => import("@/views/teacher/teacherExam.vue"),

@@ -16,7 +16,6 @@
     <main class="main-content">
       <!-- 左侧菜单栏 -->
       <aside class="sidebar">
-        <div class="sidebar-divider"></div>
         <div class="menu-container">
           <div 
             v-for="item in menuList" 
@@ -84,7 +83,7 @@
 
 <script setup>
 import { getValidToken } from '@/utils/auth'
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/common/AppHeader.vue'
 import { useRouter } from 'vue-router'
@@ -103,7 +102,7 @@ import {
 const router = useRouter()
 const logoUrl = ref('https://placehold.co/48x48?text=Logo') // 可替换为实际logo图片
 const avatarUrl = ref('https://placehold.co/40x40?text=头像') // 默认头像
-const userName = ref('某教师') // 默认用户名
+const userName = getUserName() // 默认用户名
 const showAIChat = ref(false)
 const chatInput = ref('')
 const searchValue = ref('') // 搜索框的值
@@ -128,6 +127,16 @@ function startResize(e) {
   document.addEventListener('mouseup', stopResize)
   // 防止文本选择
   document.body.style.userSelect = 'none'
+}
+
+function getUserName() {
+  // 从localStorage获取用户信息
+  const userInfoStr = localStorage.getItem('user_info')
+  let userInfo = null
+  if (userInfoStr) {
+    userInfo = JSON.parse(userInfoStr)
+  }
+  return userInfo.fullName || '老师'
 }
 
 // 处理调整大小
@@ -176,6 +185,19 @@ const menuList = [
 ]
 
 const activeMenu = ref('') // 默认选中第一个菜单
+
+// 设置活动菜单的方法，供子组件调用
+const setActiveMenu = (menuName) => {
+  // 查找匹配的菜单项
+  const foundMenu = menuList.find(item => item.name === menuName)
+  if (foundMenu) {
+    activeMenu.value = menuName
+    console.log('从子组件设置活动菜单:', menuName)
+  }
+}
+
+// 将设置活动菜单的方法提供给子组件
+provide('setActiveMenu', setActiveMenu)
 
 // 菜单点击处理
 function handleMenuClick(menu) {
@@ -263,6 +285,7 @@ function sendChat() {
   display: flex;
   flex-direction: column;
   background: #f5f7fa;
+  overflow: hidden; /* Prevent any potential scrollbars */
 }
 
 /* 覆盖Element Plus按钮样式 */
@@ -295,6 +318,8 @@ function sendChat() {
   flex: 1;
   display: flex;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 .sidebar {
@@ -308,8 +333,8 @@ function sendChat() {
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
   position: relative;
   z-index: 5;
+  margin-top: 0; /* Remove any top margin */
 }
-
 
 .sidebar-divider {
   width: 80%;
@@ -619,5 +644,14 @@ function sendChat() {
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   background: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+}
+
+/* 确保所有文字都是横向显示的 */
+:deep(.el-dropdown-menu__item),
+:deep(.el-button),
+:deep(.user-name),
+:deep(.el-avatar),
+:deep(.el-dropdown) {
+  writing-mode: horizontal-tb !important;
 }
 </style>

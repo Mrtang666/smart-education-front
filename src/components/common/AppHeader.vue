@@ -10,21 +10,25 @@
             <el-input v-if="props.showInviteCode" placeholder="请输入邀请码" v-model="inviteCode" class="invite-input"
                 size="small" style="width: 140px; margin-right: 12px;" />
             <el-input 
-                placeholder="请输入查询词" 
+                placeholder="找资料" 
                 class="search-input" 
                 size="small" 
                 v-model="searchValue"
                 @input="handleSearchInput"
                 @keyup.enter="handleSearch"
-            />
+            >
+                <template #prefix>
+                    <el-icon><Search /></el-icon>
+                </template>
+            </el-input>
             <el-upload class="avatar-uploader" :show-file-list="false" :on-success="handleAvatarSuccess"
                 :before-upload="beforeAvatarUpload" action="#">
                 <el-avatar :src="props.avatarUrl" class="avatar" />
             </el-upload>
             <el-dropdown>
                 <span class="user-name">
-                    {{ props.userName }}
-                    <el-icon-arrow-down style="margin-left: 4px;" />
+                    <div class="user-name-text">{{ props.userName }}</div>
+                    <el-icon-arrow-down style="margin-left: 4px; width: 20px;" />
                 </span>
                 <template #dropdown>
                     <el-dropdown-menu>
@@ -43,6 +47,7 @@ import { ref, defineProps, defineEmits } from 'vue'
 import { ElMessage } from 'element-plus'
 import { clearAuth } from '@/utils/auth'
 import { useRouter } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 
 const props = defineProps({
     logoUrl: {
@@ -126,8 +131,10 @@ function handleLogout() {
     align-items: center;
     height: 64px;
     padding: 0 32px;
-    background: #fff;
-    border-bottom: 1px solid #eee;
+    background: rgb(46, 58, 79);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    margin-bottom: 0;
+    z-index: 10;
 }
 
 /* 覆盖Element Plus下拉菜单样式 */
@@ -172,6 +179,7 @@ function handleLogout() {
 .app-name {
     font-size: 20px;
     font-weight: 500;
+    color: rgb(193, 197, 205);
 }
 
 .header-right {
@@ -181,7 +189,28 @@ function handleLogout() {
 }
 
 .search-input {
-    width: 180px;
+    width: 220px;
+}
+
+:deep(.search-input .el-input__wrapper) {
+    background-color: rgba(95, 105, 126, 0.7);
+    box-shadow: none;
+    border-radius: 20px;
+    padding: 0 15px;
+}
+
+:deep(.search-input .el-input__inner) {
+    color: rgb(193, 197, 205);
+    height: 36px;
+}
+
+:deep(.search-input .el-input__inner::placeholder) {
+    color: rgb(193, 197, 205);
+}
+
+:deep(.search-input .el-input__prefix-inner .el-icon) {
+    color: rgb(193, 197, 205);
+    margin-right: 4px;
 }
 
 .invite-input {
@@ -190,7 +219,8 @@ function handleLogout() {
 
 .avatar-uploader {
     display: inline-block;
-    margin-right: 8px;
+    margin-left: 12px;
+    margin-right: -12px;
 }
 
 .avatar {
@@ -200,13 +230,18 @@ function handleLogout() {
 
 .user-name {
     cursor: pointer;
-    margin-left: 8px;
+    margin-left: 3px;
     display: flex;
     align-items: center;
     outline: none;
     user-select: none;
+    color: rgb(193, 197, 205);
+    writing-mode: horizontal-tb; /* 确保文字横向排版 */
 }
 
+.user-name-text {
+    width: 50px;
+}
 .user-name:focus,
 .user-name:active {
     outline: none;
