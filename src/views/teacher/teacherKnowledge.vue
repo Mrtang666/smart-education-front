@@ -163,7 +163,7 @@ const getTeacherId = () => {
     if (userInfoStr) {
         try {
             const userInfo = JSON.parse(userInfoStr)
-            return userInfo.id || null
+            return userInfo.teacherId || null
         } catch (e) {
             console.error('解析用户信息失败', e)
             return null
@@ -356,7 +356,12 @@ const confirmDeleteKnowledge = (knowledge) => {
         }
     ).then(async () => {
         try {
-            await knowledgeAPI.deleteKnowledgeById(knowledge.courseId, knowledge.knowledgeId)
+            console.log('删除知识点参数:', {
+                courseId: knowledge.courseId,
+                knowledgeId: knowledge.knowledgeId,
+                knowledge: knowledge
+            });
+            await knowledgeAPI.deleteKnowledgeFromCourseById(knowledge.courseId, knowledge.knowledgeId)
             ElMessage.success('知识点删除成功')
             fetchKnowledgeList()
         } catch (error) {

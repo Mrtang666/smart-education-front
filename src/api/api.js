@@ -944,10 +944,17 @@ export const knowledgeAPI = {
      *   - success: boolean 是否删除成功
      *   - message: string 提示信息
      */
-    async deleteKnowledgeById(courseId, id) {
+    async deleteKnowledgeFromCourseById(courseId, id) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.delete(`/api/knowledge/course/${courseId}/knowledge/${id}`);
-        return response.data;
+        try {
+            console.log(`尝试删除知识点，课程ID: ${courseId}, 知识点ID: ${id}`);
+            const response = await axios.delete(`/api/knowledge/course/${courseId}/knowledge/${id}`);
+            console.log('删除知识点响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('删除知识点API调用失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
     
     /**
