@@ -134,9 +134,22 @@ function getUserName() {
   const userInfoStr = localStorage.getItem('user_info')
   let userInfo = null
   if (userInfoStr) {
-    userInfo = JSON.parse(userInfoStr)
+    try {
+      userInfo = JSON.parse(userInfoStr)
+    } catch (error) {
+      console.error('解析用户信息出错:', error)
+      return '老师'
+    }
   }
-  return userInfo.fullName || '老师'
+  
+  // 确保userInfo不为null，并且有fullName属性
+  if (userInfo && userInfo.fullName) {
+    return userInfo.fullName
+  } else if (userInfo && userInfo.username) {
+    return userInfo.username
+  } else {
+    return '老师'
+  }
 }
 
 // 处理调整大小

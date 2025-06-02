@@ -261,6 +261,7 @@ import { ElMessage, ElLoading } from 'element-plus'
 import { Plus, Reading, /*Document,*/ Search, } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { courseAPI, knowledgeAPI } from '@/api/api'
+import BigNumber from 'bignumber.js'
 
 const router = useRouter()
 
@@ -455,18 +456,21 @@ async function handleSearch() {
 // 处理API返回的课程数据
 function processCoursesData(response) {
   courseList.value = Array.isArray(response) ? response.map(course => {
+    // 使用BigNumber处理ID以避免精度丢失
+    const courseId = course.id ? new BigNumber(course.id).toString() : Date.now().toString();
+    
     // 根据category获取颜色，如果category为null或不存在，则使用ID生成随机颜色
     let courseColor
     if (course.category) {
       const categoryObj = categoryOptions.find(cat => cat.value === course.category)
-      courseColor = categoryObj ? categoryObj.color : getRandomColor(course.id || 0)
+      courseColor = categoryObj ? categoryObj.color : getRandomColor(courseId)
     } else {
-      courseColor = getRandomColor(course.id || 0)
+      courseColor = getRandomColor(courseId)
     }
 
     // 确保每个字段都有合适的默认值
     return {
-      id: course.id || Date.now(),
+      id: courseId, // 使用字符串形式的ID
       name: course.name || '未命名课程',
       description: course.description || '暂无描述',
       category: course.category || '其他',
@@ -531,8 +535,10 @@ function getRandomColor(id) {
     '#909399', '#9B59B6', '#3498DB', '#1ABC9C'
   ]
 
+  // 将ID转换为数字（如果是字符串）以用作索引
+  const numericId = typeof id === 'string' ? parseInt(id.slice(-8), 10) : id
   // 使用ID作为索引，确保同一ID总是得到相同颜色
-  return colors[id % colors.length]
+  return colors[numericId % colors.length]
 }
 
 // 格式化日期
@@ -766,17 +772,24 @@ async function fetchKnowledgeList() {
       throw new Error('用户信息不完整或不是教师账号')
     }
     
-    const teacherId = userInfo.teacherId
+    const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
     console.log('教师ID:', teacherId)
     
     // 调用API获取知识点列表
     const response = await knowledgeAPI.getKnowledgeByTeacherId(teacherId)
     console.log('获取到的知识点列表:', response)
-    knowledgeList.value = Array.isArray(response) ? response : []
+    
+    // 处理知识点列表，确保ID使用字符串形式
+    knowledgeList.value = Array.isArray(response) ? response.map(item => ({
+      ...item,
+      knowledgeId: item.knowledgeId ? new BigNumber(item.knowledgeId).toString() : item.knowledgeId
+    })) : []
     
     // 预选已选择的知识点
     if (selectedKnowledge.value.length > 0) {
-      selectedKnowledgeIds.value = selectedKnowledge.value.map(item => String(item.knowledgeId))
+      selectedKnowledgeIds.value = selectedKnowledge.value.map(item => 
+        item.knowledgeId ? new BigNumber(item.knowledgeId).toString() : item.knowledgeId
+      )
     }
   } catch (error) {
     console.error('获取知识点列表失败:', error)
@@ -788,14 +801,19 @@ async function fetchKnowledgeList() {
 
 // 处理知识点选择变化
 function handleKnowledgeSelectionChange(selection) {
-  selectedKnowledgeIds.value = selection.map(item => String(item.knowledgeId))
+  selectedKnowledgeIds.value = selection.map(item => {
+    // 确保知识点ID使用字符串形式，避免精度丢失
+    return item.knowledgeId ? new BigNumber(item.knowledgeId).toString() : item.knowledgeId
+  })
 }
 
 // 确认知识点选择
 function confirmKnowledgeSelection() {
   // 根据选中的ID获取完整的知识点对象
   selectedKnowledge.value = knowledgeList.value.filter(item => 
-    selectedKnowledgeIds.value.includes(String(item.knowledgeId))
+    selectedKnowledgeIds.value.includes(
+      item.knowledgeId ? new BigNumber(item.knowledgeId).toString() : item.knowledgeId
+    )
   )
   
   // 关闭对话框
@@ -806,8 +824,15 @@ function confirmKnowledgeSelection() {
 
 // 移除已选择的知识点
 function removeKnowledge(knowledge) {
+  const knowledgeIdStr = knowledge.knowledgeId ? 
+    new BigNumber(knowledge.knowledgeId).toString() : knowledge.knowledgeId
+  
   selectedKnowledge.value = selectedKnowledge.value.filter(
-    item => String(item.knowledgeId) !== String(knowledge.knowledgeId)
+    item => {
+      const itemIdStr = item.knowledgeId ? 
+        new BigNumber(item.knowledgeId).toString() : item.knowledgeId
+      return itemIdStr !== knowledgeIdStr
+    }
   )
 }
 
@@ -828,7 +853,10 @@ async function createCourse() {
           category: newCourse.value.category,
           credit: newCourse.value.credit,
           status: 1, // 使用整数类型的状态
-          knowledgeIds: selectedKnowledge.value.map(item => String(item.knowledgeId)) // 确保ID为字符串
+          knowledgeIds: selectedKnowledge.value.map(item => {
+            // 确保知识点ID使用字符串形式，避免精度丢失
+            return item.knowledgeId ? new BigNumber(item.knowledgeId).toString() : item.knowledgeId
+          }) // 添加知识点ID列表
         }
 
         // 调用API创建课程
@@ -836,7 +864,7 @@ async function createCourse() {
 
         // 创建成功后，添加到课程列表
         const newCourseItem = {
-          id: response.id,
+          id: response.id ? new BigNumber(response.id).toString() : Date.now().toString(),
           name: response.name,
           description: response.description || '暂无描述',
           category: response.category || newCourse.value.category,
@@ -873,8 +901,8 @@ async function createCourse() {
 function enterCourse(course) {
   console.log('进入课程:', course)
   ElMessage.success(`进入课程: ${course.name}`)
-  // 跳转到课程详情页，使用课程ID作为路径参数
-  router.push(`/teacher/course/${course.id}`)
+  // 跳转到课程详情页，使用课程ID作为路径参数（确保是字符串形式）
+  router.push(`/teacher/course/${course.id.toString()}`)
 }
 
 // 表格引用

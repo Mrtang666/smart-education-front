@@ -405,7 +405,7 @@ export const courseAPI = {
     /**
      * 新增或更新课程（需要token）
      * @param {Object} courseData 课程信息
-     * @param {number} [courseData.id] 课程ID（可选，更新时填写）
+     * @param {string} [courseData.id] 课程ID（可选，更新时填写）
      * @param {string} courseData.name 课程名称
      * @param {string} courseData.code 课程编码
      * @param {string} [courseData.description] 课程描述（可选）
@@ -417,7 +417,7 @@ export const courseAPI = {
      * @param {string} [courseData.remark] 备注（可选）
      * @returns {Promise<Object>} 新增或更新后的课程信息
      * 返回字段：
-     *   - id: number 课程ID
+     *   - id: string 课程ID
      *   - name: string 课程名称
      *   - code: string 课程编码
      *   - description: string 课程描述
@@ -430,25 +430,86 @@ export const courseAPI = {
      */
     async saveOrUpdateCourse(courseData) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.post('/api/course/save', courseData);
-        return response.data;
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...courseData };
+            
+            // 确保ID是字符串形式
+            if (dataToSend.id !== undefined) {
+                try {
+                    const bn = new BigNumber(dataToSend.id);
+                    dataToSend.id = bn.toString();
+                } catch (error) {
+                    console.error('无法将课程ID转换为BigNumber:', error);
+                    dataToSend.id = String(dataToSend.id);
+                }
+            }
+            
+            // 如果有知识点ID列表，确保所有ID都是字符串形式
+            if (Array.isArray(dataToSend.knowledgeIds)) {
+                dataToSend.knowledgeIds = dataToSend.knowledgeIds.map(id => {
+                    try {
+                        return new BigNumber(id).toString();
+                    } catch (error) {
+                        console.error('无法将知识点ID转换为BigNumber:', error);
+                        return String(id);
+                    }
+                });
+            }
+            
+            const response = await axios.post('/api/course/save', dataToSend);
+            
+            // 确保返回的ID是字符串形式
+            if (response.data && response.data.id !== undefined) {
+                response.data.id = String(response.data.id);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('保存或更新课程失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
      * 根据课程ID获取课程信息（需要token）
-     * @param {number} courseId 课程ID
+     * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 课程信息
      * 返回字段：同 saveOrUpdateCourse 返回字段
      */
     async getCourseById(courseId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/course/${courseId}`);
-        return response.data;
+        try {
+            // 确保课程ID是字符串形式
+            const courseIdStr = String(courseId);
+            
+            // 调用API时将ID转换为BigNumber
+            let courseIdParam = courseIdStr;
+            
+            try {
+                const bn = new BigNumber(courseIdStr);
+                courseIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将课程ID转换为BigNumber:', error);
+            }
+            
+            const response = await axios.get(`/api/course/${courseIdParam}`);
+            
+            // 确保返回的ID是字符串形式
+            if (response.data && response.data.id !== undefined) {
+                response.data.id = String(response.data.id);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程信息失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
      * 删除课程（需要token）
-     * @param {number} courseId 课程ID
+     * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
      *   - success: boolean 是否删除成功
@@ -456,8 +517,26 @@ export const courseAPI = {
      */
     async deleteCourse(courseId) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.delete(`/api/course/${courseId}`);
-        return response.data;
+        try {
+            // 确保课程ID是字符串形式
+            const courseIdStr = String(courseId);
+            
+            // 调用API时将ID转换为BigNumber
+            let courseIdParam = courseIdStr;
+            
+            try {
+                const bn = new BigNumber(courseIdStr);
+                courseIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将课程ID转换为BigNumber:', error);
+            }
+            
+            const response = await axios.delete(`/api/course/${courseIdParam}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除课程失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
@@ -1027,6 +1106,131 @@ export const knowledgeAPI = {
             return response.data;
         } catch (error) {
             console.error('删除知识点API调用失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 移除知识点持久化（需要token）
+     * @param {string} knowledgeId 知识点ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     */
+    async deleteKnowledgeById(knowledgeId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            
+            console.log(`尝试移除知识点持久化，知识点ID: ${knowledgeIdStr}`);
+            
+            const response = await axios.delete(`/api/knowledge/${knowledgeIdStr}`);
+            console.log('移除知识点持久化响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('移除知识点持久化失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 从课程中移除一批知识点（需要token）
+     * @param {string} courseId 课程ID
+     * @param {Array<string>} knowledgeIds 知识点ID数组
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     *   - count: number 成功移除的知识点数量
+     */
+    async batchDeleteKnowledgeFromCourse(courseId, knowledgeIds) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保courseId是字符串类型
+            const courseIdStr = String(courseId);
+            
+            // 确保所有knowledgeId都是字符串类型
+            const knowledgeIdsStr = knowledgeIds.map(id => String(id));
+            
+            console.log(`尝试从课程中批量移除知识点，课程ID: ${courseIdStr}, 知识点数量: ${knowledgeIdsStr.length}`);
+            
+            const response = await axios.delete(`/api/knowledge/course/${courseIdStr}/batch`, {
+                data: knowledgeIdsStr
+            });
+            console.log('批量移除知识点响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('批量移除知识点失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 批量移除知识点持久化（需要token）
+     * @param {Array<string>} knowledgeIds 知识点ID数组
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     *   - count: number 成功移除的知识点数量
+     */
+    async batchDeleteKnowledge(knowledgeIds) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保所有knowledgeId都是字符串类型
+            const knowledgeIdsStr = knowledgeIds.map(id => String(id));
+            
+            console.log(`尝试批量移除知识点持久化，知识点数量: ${knowledgeIdsStr.length}`);
+            
+            const response = await axios.delete('/api/knowledge/batch', {
+                data: knowledgeIdsStr
+            });
+            console.log('批量移除知识点持久化响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('批量移除知识点持久化失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 查询与目标知识点相关联的所有课程（需要token）
+     * @param {string} knowledgeId 知识点ID
+     * @returns {Promise<Array<Object>>} 课程列表
+     * 每项字段：
+     *   - id: string 课程ID
+     *   - name: string 课程名称
+     *   - code: string 课程编码
+     *   - description: string 课程描述
+     *   - credit: number 学分
+     *   - category: string 课程类别
+     *   - createTime: string 创建时间（ISO格式）
+     *   - updateTime: string 更新时间（ISO格式）
+     *   - status: number 状态
+     *   - remark: string 备注
+     */
+    async getCoursesByKnowledgeId(knowledgeId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            
+            console.log(`查询与知识点相关联的课程，知识点ID: ${knowledgeIdStr}`);
+            
+            const response = await axios.get(`/api/course/knowledge/${knowledgeIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.id !== undefined) item.id = String(item.id);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('查询知识点相关课程失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     },
@@ -2339,6 +2543,123 @@ export const studentAssistantAPI = {
         const params = { courseName, questionCount };
         if (difficultyLevel) params.difficultyLevel = difficultyLevel;
         const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-course`, { params });
+        return response.data;
+    }
+};
+
+
+//后端待开发的课程资料接口，此处是模拟接口
+export const materialAPI = {
+    /**
+     * 上传课程资料（需要token）
+     * @param {FormData} formData 包含文件和元数据的FormData对象
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Object>} 上传结果
+     * 返回字段：
+     *   - id: string 资料ID
+     *   - name: string 资料名称
+     *   - size: string 资料大小
+     *   - courseId: string 课程ID
+     *   - uploadTime: string 上传时间
+     *   - fileUrl: string 文件URL
+     */
+    async uploadMaterial(formData, courseId) {
+        const axios = createTeacherAuthorizedAxios();
+        // 确保courseId是字符串形式
+        const courseIdStr = String(courseId);
+        
+        try {
+            const bn = new BigNumber(courseIdStr);
+            formData.append('courseId', bn.toString());
+        } catch (error) {
+            console.error('无法将课程ID转换为BigNumber:', error);
+            formData.append('courseId', courseIdStr);
+        }
+        
+        const response = await axios.post('/api/material/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return response.data;
+    },
+
+    /**
+     * 获取课程资料列表（需要token）
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Array<Object>>} 资料列表
+     * 每项字段：
+     *   - id: string 资料ID
+     *   - name: string 资料名称
+     *   - size: string 资料大小
+     *   - courseId: string 课程ID
+     *   - uploadTime: string 上传时间
+     *   - fileUrl: string 文件URL
+     */
+    async getMaterialsByCourseId(courseId) {
+        const axios = createStudentAuthorizedAxios();
+        // 确保courseId是字符串形式
+        const courseIdStr = String(courseId);
+        
+        let courseIdParam = courseIdStr;
+        try {
+            const bn = new BigNumber(courseIdStr);
+            courseIdParam = bn.toString();
+        } catch (error) {
+            console.error('无法将课程ID转换为BigNumber:', error);
+        }
+        
+        const response = await axios.get(`/api/material/course/${courseIdParam}`);
+        return response.data;
+    },
+
+    /**
+     * 删除课程资料（需要token）
+     * @param {string} materialId 资料ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     */
+    async deleteMaterial(materialId) {
+        const axios = createTeacherAuthorizedAxios();
+        // 确保materialId是字符串形式
+        const materialIdStr = String(materialId);
+        
+        let materialIdParam = materialIdStr;
+        try {
+            const bn = new BigNumber(materialIdStr);
+            materialIdParam = bn.toString();
+        } catch (error) {
+            console.error('无法将资料ID转换为BigNumber:', error);
+        }
+        
+        const response = await axios.delete(`/api/material/${materialIdParam}`);
+        return response.data;
+    },
+
+    /**
+     * 获取资料下载链接（需要token）
+     * @param {string} materialId 资料ID
+     * @returns {Promise<Object>} 下载信息
+     * 返回字段：
+     *   - downloadUrl: string 下载URL
+     *   - name: string 文件名
+     */
+    async getMaterialDownloadUrl(materialId) {
+        const axios = createStudentAuthorizedAxios();
+        // 确保materialId是字符串形式
+        const materialIdStr = String(materialId);
+        
+        let materialIdParam = materialIdStr;
+        try {
+            const bn = new BigNumber(materialIdStr);
+            materialIdParam = bn.toString();
+        } catch (error) {
+            console.error('无法将资料ID转换为BigNumber:', error);
+        }
+        
+        const response = await axios.get(`/api/material/download/${materialIdParam}`);
         return response.data;
     }
 };
