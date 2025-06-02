@@ -917,21 +917,20 @@ function handleRowClick(row) {
 
 <style scoped>
 .teacher-course {
-  padding: 0px;
   height: 100%;
+  overflow-y: auto;
+  padding-bottom: 24px;
 }
 
 .course-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
 }
 
 .section-title {
+  text-align: left;
   font-size: 22px;
   font-weight: 500;
-  margin: 0;
+  margin: 0 0 24px 0;
   color: #303133;
   position: relative;
   padding-left: 12px;
@@ -940,60 +939,14 @@ function handleRowClick(row) {
 
 .course-actions {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
   align-items: center;
-}
-
-.create-course-btn {
-  background-color: #409EFF;
-  border-color: #409EFF;
-  color: white;
-  border-radius: 4px;
-}
-
-.create-file-btn {
-  border-radius: 4px;
-}
-
-.search-container {
-  width: 200px;
-}
-
-.sort-options-left {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.sort-actions-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-/* 空课程提示 */
-.empty-course {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400px;
-}
-
-.empty-placeholder {
-  text-align: center;
-  color: #909399;
-}
-
-.empty-icon {
-  font-size: 60px;
   margin-bottom: 16px;
-  color: #DCDFE6;
 }
 
-/* 课程列表 */
 .course-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 24px;
   margin-top: 24px;
 }
@@ -1003,35 +956,41 @@ function handleRowClick(row) {
   border-radius: 8px;
   overflow: hidden;
   transition: all 0.3s;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   cursor: pointer;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
 }
 
 .course-item:hover {
   transform: translateY(-5px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
 .course-cover {
   height: 140px;
+  background: #409EFF;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 40px;
   position: relative;
+  overflow: hidden;
+}
+
+.course-cover .el-icon {
+  font-size: 50px;
+  opacity: 0.8;
 }
 
 .course-category {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.3);
-  color: white;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.2);
   padding: 4px 8px;
+  border-radius: 4px;
   font-size: 12px;
-  text-align: center;
 }
 
 .course-info {
@@ -1039,86 +998,60 @@ function handleRowClick(row) {
 }
 
 .course-title {
-  margin: 0 0 8px 0;
+  margin: 0 0 12px 0;
   font-size: 16px;
   font-weight: 500;
   color: #303133;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .course-desc {
   margin: 0;
   font-size: 13px;
   color: #909399;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .course-credit {
-  font-weight: 500;
+  color: #67C23A;
 }
 
-/* 创建课程对话框 */
-.category-selection {
+.empty-course {
+  margin-top: 60px;
+  text-align: center;
+}
+
+.empty-placeholder {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.auto-category {
-  display: flex;
   align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
+  justify-content: center;
+  color: #909399;
 }
 
-.auto-match-text {
-  color: #606266;
-  font-size: 14px;
-}
-
-.category-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-}
-
-.manual-select {
-  width: 100%;
-}
-
-.category-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.category-color-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.dialog-footer {
-  padding-top: 20px;
-  text-align: right;
+.empty-icon {
+  font-size: 60px;
+  margin-bottom: 16px;
+  opacity: 0.3;
 }
 
 /* 分类筛选样式 */
 .category-filter-container {
-  margin-bottom: 16px;
   background: #fff;
   border-radius: 8px;
   padding: 16px 20px;
+  margin-bottom: 20px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
 }
 
 .filter-section {
   display: flex;
-  margin-bottom: 16px;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .filter-section:last-child {
@@ -1126,17 +1059,16 @@ function handleRowClick(row) {
 }
 
 .filter-label {
-  width: 50px;
-  color: #606266;
+  width: 40px;
   font-size: 14px;
-  line-height: 32px;
+  color: #606266;
+  margin-right: 16px;
 }
 
 .filter-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  flex: 1;
+  gap: 12px;
 }
 
 .filter-tab {
@@ -1150,7 +1082,6 @@ function handleRowClick(row) {
 
 .filter-tab:hover {
   color: #409EFF;
-  background-color: rgba(64, 158, 255, 0.08);
 }
 
 .filter-tab-active {
@@ -1169,6 +1100,11 @@ function handleRowClick(row) {
   border-radius: 8px;
   padding: 12px 20px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.sort-options-left {
+  display: flex;
+  align-items: center;
 }
 
 .sort-option {
@@ -1200,6 +1136,11 @@ function handleRowClick(row) {
   height: 2px;
   background-color: #409EFF;
   border-radius: 1px;
+}
+
+.sort-actions-right {
+  display: flex;
+  align-items: center;
 }
 
 .course-filter-dropdown {

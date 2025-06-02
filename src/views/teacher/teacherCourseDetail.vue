@@ -881,6 +881,7 @@ function formatFileSize(size) {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .course-header {
@@ -916,6 +917,7 @@ function formatFileSize(size) {
   padding: 24px 32px;
   background-color: #f5f7fa;
   overflow-y: auto;
+  height: calc(100% - 76px); /* 减去header高度 */
 }
 
 .course-tabs {
@@ -923,6 +925,7 @@ function formatFileSize(size) {
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
 }
 
 .content-section {

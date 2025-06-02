@@ -24,6 +24,18 @@
             </div>
         </div>
 
+        <!-- 数据统计图表区域 -->
+        <div class="charts-container">
+            <div class="chart-wrapper">
+                <div class="chart-title">知识点难度分布</div>
+                <div id="difficultyChart" class="chart"></div>
+            </div>
+            <div class="chart-wrapper">
+                <div class="chart-title">课程知识点数量</div>
+                <div id="courseKnowledgeChart" class="chart"></div>
+            </div>
+        </div>
+
         <!-- 知识点列表 -->
         <div v-if="loading" class="loading-container">
             <el-skeleton :rows="5" animated />
@@ -31,46 +43,56 @@
         <div v-else-if="knowledgeList.length === 0" class="empty-container">
             <el-empty description="暂无知识点" />
         </div>
-        <div v-else class="knowledge-list">
-            <el-card v-for="item in knowledgeList" :key="item.knowledgeId" class="knowledge-card">
-                <div class="knowledge-header">
-                    <div class="knowledge-title">
-                        <span>{{ item.name }}</span>
-                        <el-tag size="small" :type="getDifficultyType(item.difficultyLevel)">{{ item.difficultyLevel }}</el-tag>
-                        <el-tag v-if="item.courseId === null" size="small" type="info">未分配课程</el-tag>
-                    </div>
-                    <div class="knowledge-actions">
-                        <el-button type="primary" text @click="editKnowledge(item)">
+        <div v-else class="knowledge-table-container">
+            <el-table 
+                :data="knowledgeList" 
+                style="width: 100%" 
+                border 
+                stripe
+                :header-cell-style="{background:'#f5f7fa'}"
+            >
+                <el-table-column prop="name" label="知识点名称" min-width="180">
+                    <template #default="scope">
+                        <div class="knowledge-name">
+                            <span>{{ scope.row.name }}</span>
+                            <el-tag size="small" :type="getDifficultyType(scope.row.difficultyLevel)">{{ scope.row.difficultyLevel }}</el-tag>
+                            <el-tag v-if="scope.row.courseId === null" size="small" type="info">未分配课程</el-tag>
+                        </div>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="description" label="描述" min-width="200">
+                    <template #default="scope">
+                        {{ scope.row.description || '暂无描述' }}
+                    </template>
+                </el-table-column>
+                <el-table-column prop="teachPlan" label="教学计划" min-width="220">
+                    <template #default="scope">
+                        {{ scope.row.teachPlan || '暂无教学计划' }}
+                    </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120" fixed="right">
+                    <template #default="scope">
+                        <el-button type="primary" link @click="editKnowledge(scope.row)">
                             <el-icon><Edit /></el-icon>
                         </el-button>
-                        <el-button type="danger" text @click="confirmDeleteKnowledge(item)">
+                        <el-button type="danger" link @click="confirmDeleteKnowledge(scope.row)">
                             <el-icon><Delete /></el-icon>
                         </el-button>
-                    </div>
-                </div>
-                <div class="knowledge-content">
-                    <div class="knowledge-description">
-                        <div class="label">描述：</div>
-                        <div class="content">{{ item.description || '暂无描述' }}</div>
-                    </div>
-                    <div class="knowledge-plan">
-                        <div class="label">教学计划：</div>
-                        <div class="content">{{ item.teachPlan || '暂无教学计划' }}</div>
-                    </div>
-                </div>
-            </el-card>
-        </div>
+                    </template>
+                </el-table-column>
+            </el-table>
 
-        <!-- 分页 -->
-        <div class="pagination-container" v-if="knowledgeList.length > 0">
-            <el-pagination 
-                background 
-                layout="prev, pager, next" 
-                :total="total" 
-                :page-size="pageSize"
-                :current-page="currentPage"
-                @current-change="handlePageChange" 
-            />
+            <!-- 分页 -->
+            <div class="pagination-container" v-if="knowledgeList.length > 0">
+                <el-pagination 
+                    background 
+                    layout="prev, pager, next" 
+                    :total="total" 
+                    :page-size="pageSize"
+                    :current-page="currentPage"
+                    @current-change="handlePageChange" 
+                />
+            </div>
         </div>
 
         <!-- 创建/编辑知识点对话框 -->
@@ -115,11 +137,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { knowledgeAPI } from '@/api/api'
 import { courseAPI } from '@/api/api'
 import { Plus, Edit, Delete, Search } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
 
 // 课程列表
 const courseList = ref([])
@@ -132,6 +155,10 @@ const loading = ref(false)
 const total = ref(0)
 const pageSize = ref(10)
 const currentPage = ref(1)
+
+// 图表实例
+let difficultyChart = null
+let courseKnowledgeChart = null
 
 // 对话框相关
 const dialogVisible = ref(false)
@@ -246,6 +273,11 @@ const fetchKnowledgeList = async () => {
         }
         
         total.value = knowledgeList.value.length
+
+        // 更新图表数据
+        nextTick(() => {
+            updateCharts()
+        })
     } catch (error) {
         console.error('获取知识点列表失败:', error)
         ElMessage.error('获取知识点列表失败')
@@ -277,6 +309,11 @@ const filterKnowledgeList = () => {
         item.name.toLowerCase().includes(keyword) || 
         (item.description && item.description.toLowerCase().includes(keyword))
     )
+
+    // 更新图表
+    nextTick(() => {
+        updateCharts()
+    })
 }
 
 // 处理分页
@@ -430,16 +467,198 @@ const getDifficultyType = (difficulty) => {
     }
 }
 
+// 计算难度分布数据
+const difficultyDistribution = computed(() => {
+    const distribution = {
+        '简单': 0,
+        '中等': 0,
+        '困难': 0
+    }
+    
+    knowledgeList.value.forEach(item => {
+        if (item.difficultyLevel in distribution) {
+            distribution[item.difficultyLevel]++
+        }
+    })
+    
+    return distribution
+})
+
+// 计算课程知识点分布
+const courseKnowledgeDistribution = computed(() => {
+    const distribution = {}
+    
+    // 为每个课程创建一个条目
+    courseList.value.forEach(course => {
+        distribution[course.name] = 0
+    })
+    
+    // 统计每个课程的知识点数量
+    knowledgeList.value.forEach(item => {
+        if (item.courseId) {
+            const course = courseList.value.find(c => c.id === item.courseId)
+            if (course && course.name) {
+                distribution[course.name] = (distribution[course.name] || 0) + 1
+            }
+        }
+    })
+    
+    return distribution
+})
+
+// 初始化图表
+const initCharts = () => {
+    // 初始化难度分布图表
+    difficultyChart = echarts.init(document.getElementById('difficultyChart'))
+    
+    // 初始化课程知识点分布图表
+    courseKnowledgeChart = echarts.init(document.getElementById('courseKnowledgeChart'))
+    
+    // 更新图表数据
+    updateCharts()
+    
+    // 监听窗口大小变化，调整图表大小
+    window.addEventListener('resize', () => {
+        difficultyChart && difficultyChart.resize()
+        courseKnowledgeChart && courseKnowledgeChart.resize()
+    })
+}
+
+// 更新图表数据
+const updateCharts = () => {
+    // 更新难度分布图表
+    const difficultyData = difficultyDistribution.value
+    difficultyChart && difficultyChart.setOption({
+        title: {
+            text: '知识点难度分布',
+            left: 'center',
+            show: false
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'horizontal',
+            bottom: 'bottom',
+            data: Object.keys(difficultyData)
+        },
+        color: ['#67C23A', '#E6A23C', '#F56C6C'],
+        series: [
+            {
+                name: '难度分布',
+                type: 'pie',
+                radius: ['40%', '70%'],
+                avoidLabelOverlap: false,
+                itemStyle: {
+                    borderRadius: 10,
+                    borderColor: '#fff',
+                    borderWidth: 2
+                },
+                label: {
+                    show: false,
+                    position: 'center'
+                },
+                emphasis: {
+                    label: {
+                        show: true,
+                        fontSize: '18',
+                        fontWeight: 'bold'
+                    }
+                },
+                labelLine: {
+                    show: false
+                },
+                data: [
+                    { value: difficultyData['简单'], name: '简单' },
+                    { value: difficultyData['中等'], name: '中等' },
+                    { value: difficultyData['困难'], name: '困难' }
+                ]
+            }
+        ]
+    })
+    
+    // 更新课程知识点分布图表
+    const courseData = courseKnowledgeDistribution.value
+    const courseNames = Object.keys(courseData)
+    const courseValues = courseNames.map(name => courseData[name])
+    
+    courseKnowledgeChart && courseKnowledgeChart.setOption({
+        title: {
+            text: '课程知识点数量',
+            left: 'center',
+            show: false
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '10%',
+            top: '3%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: courseNames,
+            axisLabel: {
+                interval: 0,
+                rotate: 30,
+                textStyle: {
+                    fontSize: 12
+                }
+            }
+        },
+        yAxis: {
+            type: 'value'
+        },
+        series: [
+            {
+                name: '知识点数量',
+                type: 'bar',
+                barWidth: '60%',
+                data: courseValues,
+                itemStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#83bff6' },
+                        { offset: 0.5, color: '#188df0' },
+                        { offset: 1, color: '#188df0' }
+                    ])
+                },
+                emphasis: {
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#2378f7' },
+                            { offset: 0.7, color: '#2378f7' },
+                            { offset: 1, color: '#83bff6' }
+                        ])
+                    }
+                }
+            }
+        ]
+    })
+}
+
 // 页面加载时获取数据
 onMounted(() => {
     fetchCourses()
     fetchKnowledgeList()
+    nextTick(() => {
+        initCharts()
+    })
 })
 </script>
 
 <style scoped>
 .knowledge-container {
     padding: 0;
+    height: 100%;
+    overflow-y: auto;
+    position: relative;
 }
 
 .section-title {
@@ -461,7 +680,7 @@ onMounted(() => {
     background: #fff;
     padding: 16px 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .search-area {
@@ -487,75 +706,76 @@ onMounted(() => {
     color: #409EFF;
 }
 
-.knowledge-list {
+/* 图表容器样式 */
+.charts-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
 }
 
-.knowledge-card {
+.chart-wrapper {
+    background-color: #fff;
     border-radius: 8px;
-    transition: all 0.3s;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
-.knowledge-card:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-}
-
-.knowledge-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.chart-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #303133;
     margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #ebeef5;
+    text-align: center;
 }
 
-.knowledge-title {
+.chart {
+    height: 300px;
+    width: 100%;
+}
+
+/* 表格容器样式 */
+.knowledge-table-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
+}
+
+.knowledge-name {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 16px;
-    font-weight: 500;
-}
-
-.knowledge-content {
-    font-size: 14px;
-    color: #606266;
-}
-
-.knowledge-description, .knowledge-plan {
-    margin-bottom: 8px;
-    display: flex;
-}
-
-.label {
-    font-weight: 500;
-    width: 80px;
-    flex-shrink: 0;
-}
-
-.content {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
 }
 
 .pagination-container {
     margin-top: 24px;
     display: flex;
     justify-content: center;
+    margin-bottom: 24px;
 }
 
 .loading-container, .empty-container {
     padding: 40px 0;
     background: #fff;
     border-radius: 8px;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* 响应式布局 */
+@media (max-width: 992px) {
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-bar {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .search-area {
+        width: 100%;
+    }
 }
 </style>

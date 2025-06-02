@@ -171,6 +171,8 @@ const navigateTo = (route) => {
     padding: 24px;
     max-width: 1200px;
     margin: 0 auto;
+    height: 100%;
+    overflow-y: auto;
 }
 
 .welcome-section {
@@ -232,6 +234,7 @@ const navigateTo = (route) => {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 20px;
+    margin-bottom: 24px;
 }
 
 .function-card {

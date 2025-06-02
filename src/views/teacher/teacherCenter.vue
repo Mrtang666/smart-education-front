@@ -302,7 +302,7 @@ function sendChat() {
   display: flex;
   flex-direction: column;
   background: #f5f7fa;
-  overflow: hidden; /* Prevent any potential scrollbars */
+  overflow: hidden;
 }
 
 /* 覆盖Element Plus按钮样式 */
@@ -351,6 +351,7 @@ function sendChat() {
   position: relative;
   z-index: 5;
   margin-top: 0; /* Remove any top margin */
+  overflow-y: auto;
 }
 
 .sidebar-divider {
@@ -423,6 +424,8 @@ function sendChat() {
   padding: 32px;
   background: #f5f7fa;
   min-width: 0;
+  overflow-y: auto;
+  height: calc(100vh - 60px); /* 假设顶部导航栏高度为60px */
 }
 
 .content-placeholder {
