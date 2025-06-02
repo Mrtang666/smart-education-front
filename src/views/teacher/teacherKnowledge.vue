@@ -37,6 +37,7 @@
                     <div class="knowledge-title">
                         <span>{{ item.name }}</span>
                         <el-tag size="small" :type="getDifficultyType(item.difficultyLevel)">{{ item.difficultyLevel }}</el-tag>
+                        <el-tag v-if="item.courseId === null" size="small" type="info">未分配课程</el-tag>
                     </div>
                     <div class="knowledge-actions">
                         <el-button type="primary" text @click="editKnowledge(item)">
@@ -85,6 +86,7 @@
                 </el-form-item>
                 <el-form-item label="所属课程" prop="courseId">
                     <el-select v-model="knowledgeForm.courseId" placeholder="请选择课程">
+                        <el-option label="无所属课程" value="" />
                         <el-option v-for="course in courseList" :key="course.id" :label="course.name" :value="course.id" />
                     </el-select>
                 </el-form-item>
@@ -149,9 +151,6 @@ const rules = {
         { required: true, message: '请输入知识点名称', trigger: 'blur' },
         { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
     ],
-    courseId: [
-        { required: true, message: '请选择课程', trigger: 'change' }
-    ],
     difficultyLevel: [
         { required: true, message: '请选择难度等级', trigger: 'change' }
     ]
@@ -206,7 +205,6 @@ const fetchKnowledgeList = async () => {
                 response = await knowledgeAPI.getKnowledgeByTeacherId(teacherId)
             } else {
                 // 如果没有教师ID，则尝试获取所有课程的知识点
-                // 这种情况可能需要额外的API支持，这里我们通过获取所有课程然后获取每个课程的知识点来实现
                 try {
                     const allKnowledgePoints = []
                     // 获取所有课程
@@ -241,12 +239,13 @@ const fetchKnowledgeList = async () => {
         }
         
         knowledgeList.value = Array.isArray(response) ? response : []
-        total.value = knowledgeList.value.length
         
         // 如果有搜索关键词，则过滤结果
         if (searchKeyword.value) {
             filterKnowledgeList()
         }
+        
+        total.value = knowledgeList.value.length
     } catch (error) {
         console.error('获取知识点列表失败:', error)
         ElMessage.error('获取知识点列表失败')
@@ -294,7 +293,7 @@ const showCreateDialog = () => {
         description: '',
         difficultyLevel: '中等',
         teacherId: getTeacherId(),
-        courseId: selectedCourse.value || '',
+        courseId: '',
         teachPlan: ''
     }
     dialogVisible.value = true
@@ -304,12 +303,12 @@ const showCreateDialog = () => {
 const editKnowledge = (knowledge) => {
     isEdit.value = true
     knowledgeForm.value = {
-        knowledgeId: knowledge.knowledgeId,
+        knowledgeId: String(knowledge.knowledgeId),
         name: knowledge.name,
         description: knowledge.description || '',
         difficultyLevel: knowledge.difficultyLevel,
-        teacherId: knowledge.teacherId,
-        courseId: knowledge.courseId,
+        teacherId: knowledge.teacherId ? String(knowledge.teacherId) : null,
+        courseId: knowledge.courseId ? String(knowledge.courseId) : '',
         teachPlan: knowledge.teachPlan || ''
     }
     dialogVisible.value = true
@@ -322,18 +321,47 @@ const submitKnowledge = () => {
             try {
                 // 确保设置了teacherId
                 if (!knowledgeForm.value.teacherId) {
-                    knowledgeForm.value.teacherId = getTeacherId();
+                    knowledgeForm.value.teacherId = String(getTeacherId());
                 }
+                
+                // 准备提交的数据，不包含courseId
+                const knowledgeData = {
+                    name: knowledgeForm.value.name,
+                    description: knowledgeForm.value.description || '',
+                    difficultyLevel: knowledgeForm.value.difficultyLevel,
+                    teacherId: knowledgeForm.value.teacherId,
+                    teachPlan: knowledgeForm.value.teachPlan || ''
+                };
+                
+                // 如果是编辑模式，添加知识点ID
+                if (isEdit.value && knowledgeForm.value.knowledgeId) {
+                    knowledgeData.knowledgeId = knowledgeForm.value.knowledgeId;
+                }
+                
+                console.log('提交知识点数据:', knowledgeData);
                 
                 if (isEdit.value) {
                     // 更新知识点
-                    await knowledgeAPI.updateKnowledge(knowledgeForm.value)
+                    await knowledgeAPI.updateKnowledge(knowledgeData)
                     ElMessage.success('知识点更新成功')
                 } else {
                     // 创建知识点
-                    await knowledgeAPI.saveKnowledge(knowledgeForm.value)
+                    const result = await knowledgeAPI.saveKnowledge(knowledgeData)
+                    console.log('创建知识点结果:', result)
                     ElMessage.success('知识点创建成功')
+                    
+                    // 如果有选择课程，则将新创建的知识点添加到该课程
+                    if (knowledgeForm.value.courseId) {
+                        try {
+                            await knowledgeAPI.appendKnowledgeToCourse(result.knowledgeId, knowledgeForm.value.courseId)
+                            ElMessage.success('知识点已关联到所选课程')
+                        } catch (error) {
+                            console.error('关联知识点到课程失败:', error)
+                            ElMessage.warning('知识点创建成功，但未能关联到所选课程')
+                        }
+                    }
                 }
+                
                 dialogVisible.value = false
                 fetchKnowledgeList()
             } catch (error) {
@@ -346,8 +374,25 @@ const submitKnowledge = () => {
 
 // 确认删除知识点
 const confirmDeleteKnowledge = (knowledge) => {
+    // 由于知识点对象不再包含courseId字段，我们需要从当前选择的课程获取courseId
+    if (!selectedCourse.value) {
+        ElMessageBox.alert(
+            '请先选择一个课程，才能删除其中的知识点。',
+            '操作提示',
+            {
+                confirmButtonText: '确定',
+                type: 'warning'
+            }
+        );
+    } else {
+        showDeleteConfirmation(knowledge);
+    }
+}
+
+// 显示删除确认对话框
+const showDeleteConfirmation = (knowledge) => {
     ElMessageBox.confirm(
-        `确定要删除知识点"${knowledge.name}"吗？`,
+        `确定要从当前课程中删除知识点"${knowledge.name}"吗？`,
         '删除确认',
         {
             confirmButtonText: '确定',
@@ -357,16 +402,18 @@ const confirmDeleteKnowledge = (knowledge) => {
     ).then(async () => {
         try {
             console.log('删除知识点参数:', {
-                courseId: knowledge.courseId,
-                knowledgeId: knowledge.knowledgeId,
+                courseId: selectedCourse.value,
+                knowledgeId: String(knowledge.knowledgeId),
                 knowledge: knowledge
             });
-            await knowledgeAPI.deleteKnowledgeFromCourseById(knowledge.courseId, knowledge.knowledgeId)
+            
+            // 使用当前选择的课程ID
+            await knowledgeAPI.deleteKnowledgeFromCourseById(selectedCourse.value, String(knowledge.knowledgeId))
             ElMessage.success('知识点删除成功')
             fetchKnowledgeList()
         } catch (error) {
             console.error('删除知识点失败:', error)
-            ElMessage.error('删除知识点失败')
+            ElMessage.error('删除知识点失败: ' + (error.message || '未知错误'))
         }
     }).catch(() => {
         // 取消删除，不执行任何操作

@@ -776,7 +776,7 @@ async function fetchKnowledgeList() {
     
     // 预选已选择的知识点
     if (selectedKnowledge.value.length > 0) {
-      selectedKnowledgeIds.value = selectedKnowledge.value.map(item => item.knowledgeId)
+      selectedKnowledgeIds.value = selectedKnowledge.value.map(item => String(item.knowledgeId))
     }
   } catch (error) {
     console.error('获取知识点列表失败:', error)
@@ -788,14 +788,14 @@ async function fetchKnowledgeList() {
 
 // 处理知识点选择变化
 function handleKnowledgeSelectionChange(selection) {
-  selectedKnowledgeIds.value = selection.map(item => item.knowledgeId)
+  selectedKnowledgeIds.value = selection.map(item => String(item.knowledgeId))
 }
 
 // 确认知识点选择
 function confirmKnowledgeSelection() {
   // 根据选中的ID获取完整的知识点对象
   selectedKnowledge.value = knowledgeList.value.filter(item => 
-    selectedKnowledgeIds.value.includes(item.knowledgeId)
+    selectedKnowledgeIds.value.includes(String(item.knowledgeId))
   )
   
   // 关闭对话框
@@ -807,7 +807,7 @@ function confirmKnowledgeSelection() {
 // 移除已选择的知识点
 function removeKnowledge(knowledge) {
   selectedKnowledge.value = selectedKnowledge.value.filter(
-    item => item.knowledgeId !== knowledge.knowledgeId
+    item => String(item.knowledgeId) !== String(knowledge.knowledgeId)
   )
 }
 
@@ -828,7 +828,7 @@ async function createCourse() {
           category: newCourse.value.category,
           credit: newCourse.value.credit,
           status: 1, // 使用整数类型的状态
-          knowledgeIds: selectedKnowledge.value.map(item => item.knowledgeId) // 添加知识点ID列表
+          knowledgeIds: selectedKnowledge.value.map(item => String(item.knowledgeId)) // 确保ID为字符串
         }
 
         // 调用API创建课程

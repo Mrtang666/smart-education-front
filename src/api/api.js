@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getValidToken, getRefreshToken, setToken, setRefreshToken } from '@/utils/auth';
+import BigNumber from 'bignumber.js';
 
 // 学生端 Axios 实例
 const studentAxios = axios.create({
@@ -862,83 +863,142 @@ export const learningProgressAPI = {
 // 知识点api模块（教师端）
 export const knowledgeAPI = {
     /**
-     * 更新知识点（需要token）
-     * @param {Object} updateKnowledgeData 知识点信息
-     * @param {number} updateKnowledgeData.knowledgeId 知识点ID
+     * 更新知识点信息（需要token）
+     * @param {Object} updateKnowledgeData 更新的知识点数据
+     * @param {string} updateKnowledgeData.knowledgeId 知识点ID
      * @param {string} updateKnowledgeData.name 知识点名称
      * @param {string} updateKnowledgeData.description 知识点描述
+     * @param {string} updateKnowledgeData.teacherId 教师ID
      * @param {string} updateKnowledgeData.difficultyLevel 难度等级
      * @param {string} updateKnowledgeData.teachPlan 教学计划
      * @returns {Promise<Object>} 更新后的知识点信息
-     * 返回字段：
-     *   - knowledgeId: number 知识点ID
-     *   - name: string 知识点名称
-     *   - description: string 知识点描述
-     *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
-     *   - teachPlan: string 教学计划
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
      */
     async updateKnowledge(updateKnowledgeData) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.put('/api/knowledge/update', updateKnowledgeData);
-        return response.data;
+        try {
+            console.log('更新知识点数据:', updateKnowledgeData);
+            
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...updateKnowledgeData };
+            
+            // 确保ID是字符串类型
+            if (dataToSend.knowledgeId !== undefined) {
+                dataToSend.knowledgeId = String(dataToSend.knowledgeId);
+            }
+            if (dataToSend.teacherId !== undefined) {
+                dataToSend.teacherId = String(dataToSend.teacherId);
+            }
+            
+            // 调用API时将ID转换为BigNumber
+            if (dataToSend.knowledgeId) {
+                try {
+                    const bn = new BigNumber(dataToSend.knowledgeId);
+                    dataToSend.knowledgeId = bn.toString();
+                } catch (error) {
+                    console.error('无法将知识点ID转换为BigNumber:', error);
+                }
+            }
+            
+            if (dataToSend.teacherId) {
+                try {
+                    const bn = new BigNumber(dataToSend.teacherId);
+                    dataToSend.teacherId = bn.toString();
+                } catch (error) {
+                    console.error('无法将教师ID转换为BigNumber:', error);
+                }
+            }
+            
+            const response = await axios.put('/api/knowledge/update', dataToSend);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (response.data) {
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('更新知识点失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
-     * 新增知识点（需要token）
-     * @param {Object} knowledgeData 知识点信息
+     * 保存新的知识点（需要token）
+     * @param {Object} knowledgeData 知识点数据
+     
      * @param {string} knowledgeData.name 知识点名称
      * @param {string} knowledgeData.description 知识点描述
      * @param {string} knowledgeData.difficultyLevel 难度等级
-     * @param {number} knowledgeData.teacherId 教师ID
-     * @param {number} knowledgeData.courseId 课程ID
+     * @param {string} knowledgeData.teacherId 教师ID
      * @param {string} knowledgeData.teachPlan 教学计划
-     * @returns {Promise<Object>} 新增后的知识点信息
-     * 返回字段：
-     *   - knowledgeId: number 知识点ID
-     *   - name: string 知识点名称
-     *   - description: string 知识点描述
-     *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
-     *   - teachPlan: string 教学计划
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * @returns {Promise<Object>} 创建的知识点信息
      */
     async saveKnowledge(knowledgeData) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.post('/api/knowledge/save', knowledgeData);
-        return response.data;
+        try {
+            console.log('创建知识点数据:', knowledgeData);
+            
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...knowledgeData };
+            
+            // 确保ID是字符串类型
+            if (dataToSend.teacherId !== undefined) {
+                dataToSend.teacherId = String(dataToSend.teacherId);
+            }
+            
+            // 调用API时将ID转换为BigNumber
+            if (dataToSend.teacherId) {
+                try {
+                    const bn = new BigNumber(dataToSend.teacherId);
+                    dataToSend.teacherId = bn.toString();
+                } catch (error) {
+                    console.error('无法将教师ID转换为BigNumber:', error);
+                }
+            }
+            
+            const response = await axios.post('/api/knowledge/save', dataToSend);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (response.data) {
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('创建知识点失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
-     * 根据知识点ID获取知识点信息（需要token）
-     * @param {number} id 知识点ID
-     * @returns {Promise<Object>} 知识点信息
-     * 返回字段：
-     *   - knowledgeId: number 知识点ID
-     *   - name: string 知识点名称
-     *   - description: string 知识点描述
-     *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
-     *   - teachPlan: string 教学计划
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 根据ID获取知识点详情（需要token）
+     * @param {string} id 知识点ID
+     * @returns {Promise<Object>} 知识点详情
+     * 返回字段同getKnowledgeByCourseId方法中的每项
      */
     async getKnowledgeById(id) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/knowledge/${id}`);
+        
+        // 确保ID是字符串类型
+        const idStr = String(id);
+        
+        const response = await axios.get(`/api/knowledge/${idStr}`);
+        
+        // 确保返回的所有ID字段都是字符串类型
+        if (response.data) {
+            if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+            if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+        }
+        
         return response.data;
     },
 
     /**
      * 根据课程ID和知识点ID删除知识点（需要token）
-     * @param {number} courseId 课程ID
-     * @param {number} id 知识点ID
+     * @param {string} courseId 课程ID
+     * @param {string} id 知识点ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
      *   - success: boolean 是否删除成功
@@ -947,8 +1007,22 @@ export const knowledgeAPI = {
     async deleteKnowledgeFromCourseById(courseId, id) {
         const axios = createTeacherAuthorizedAxios();
         try {
-            console.log(`尝试删除知识点，课程ID: ${courseId}, 知识点ID: ${id}`);
-            const response = await axios.delete(`/api/knowledge/course/${courseId}/knowledge/${id}`);
+            // 如果courseId为null，直接抛出错误，不调用API
+            if (courseId === null || courseId === undefined) {
+                throw new Error('删除知识点需要指定课程ID，请选择一个课程');
+            }
+            
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(id);
+            const courseIdStr = String(courseId);
+            
+            console.log(`尝试删除知识点，课程ID: ${courseIdStr}, 知识点ID: ${knowledgeIdStr}`);
+            
+            // 直接使用字符串形式的ID构建URL
+            const url = `/api/knowledge/course/${courseIdStr}/knowledge/${knowledgeIdStr}`;
+            
+            console.log('删除知识点URL:', url);
+            const response = await axios.delete(url);
             console.log('删除知识点响应:', response.data);
             return response.data;
         } catch (error) {
@@ -959,88 +1033,139 @@ export const knowledgeAPI = {
     
     /**
      * 根据教师ID获取知识点列表（需要token）
-     * @param {number} teacherId 教师ID
+     * @param {string} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 知识点列表
      * 每项字段：
-     *   - knowledgeId: number 知识点ID
+     *   - knowledgeId: string 知识点ID (返回时转为字符串)
      *   - name: string 知识点名称
      *   - description: string 知识点描述
      *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
+     *   - teacherId: string 教师ID (返回时转为字符串)
+     *   - courseId: string 课程ID (返回时转为字符串)
      *   - teachPlan: string 教学计划
      *   - createdAt: string 创建时间（ISO格式）
      *   - updatedAt: string 更新时间（ISO格式）
      */
     async getKnowledgeByTeacherId(teacherId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/knowledge/teacher/${teacherId}`);
+        
+        // 确保ID是字符串类型
+        const teacherIdStr = String(teacherId);
+        
+        const response = await axios.get(`/api/knowledge/teacher/${teacherIdStr}`);
+        
+        // 确保返回的所有ID字段都是字符串类型
+        if (Array.isArray(response.data)) {
+            response.data.forEach(item => {
+                if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+            });
+        }
+        
         return response.data;
     },
 
     /**
      * 根据课程ID获取知识点列表（需要token）
-     * @param {number} courseId 课程ID
+     * @param {string} courseId 课程ID
      * @returns {Promise<Array<Object>>} 知识点列表
      * 每项字段：
-     *   - knowledgeId: number 知识点ID
+     *   - knowledgeId: string 知识点ID (返回时转为字符串)
      *   - name: string 知识点名称
      *   - description: string 知识点描述
      *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
+     *   - teacherId: string 教师ID (返回时转为字符串)
      *   - teachPlan: string 教学计划
      *   - createdAt: string 创建时间（ISO格式）
      *   - updatedAt: string 更新时间（ISO格式）
      */
     async getKnowledgeByCourseId(courseId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/knowledge/course/${courseId}`);
+        
+        // 确保ID是字符串类型
+        const courseIdStr = String(courseId);
+        
+        const response = await axios.get(`/api/knowledge/course/${courseIdStr}`);
+        
+        // 确保返回的所有ID字段都是字符串类型
+        if (Array.isArray(response.data)) {
+            response.data.forEach(item => {
+                if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+            });
+        }
+        
         return response.data;
     },
 
     /**
-     * 根据课程ID和教师ID获取知识点列表（需要token）
-     * @param {number} courseId 课程ID
-     * @param {number} teacherId 教师ID
+     * 获取教师在特定课程中的知识点列表（需要token）
+     * @param {string} courseId 课程ID
+     * @param {string} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 知识点列表
-     * 每项字段：
-     *   - knowledgeId: number 知识点ID
-     *   - name: string 知识点名称
-     *   - description: string 知识点描述
-     *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
-     *   - teachPlan: string 教学计划
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 每项字段同getKnowledgeByCourseId方法
      */
     async getKnowledgeByTeacherInCourse(courseId, teacherId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/knowledge/course/${courseId}/teacher/${teacherId}`);
+        
+        // 确保ID是字符串类型
+        const courseIdStr = String(courseId);
+        const teacherIdStr = String(teacherId);
+        
+        const response = await axios.get(`/api/knowledge/course/${courseIdStr}/teacher/${teacherIdStr}`);
+        
+        // 确保返回的所有ID字段都是字符串类型
+        if (Array.isArray(response.data)) {
+            response.data.forEach(item => {
+                if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+            });
+        }
+        
         return response.data;
     },
 
     /**
-     * 复制知识点到指定课程（需要token）
-     * @param {number} knowledgeId 知识点ID
-     * @param {number} courseId 目标课程ID
+     * 复制知识点到课程（需要token）
+     * @param {string} knowledgeId 知识点ID
+     * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 复制后的知识点信息
-     * 返回字段：
-     *   - knowledgeId: number 知识点ID
-     *   - name: string 知识点名称
-     *   - description: string 知识点描述
-     *   - difficultyLevel: string 难度等级
-     *   - teacherId: number 教师ID
-     *   - courseId: number 课程ID
-     *   - teachPlan: string 教学计划
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
      */
     async copyKnowledgeToCourse(knowledgeId, courseId) {
         const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.post(`/api/knowledge/${knowledgeId}/copy/course/${courseId}`);
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            const courseIdStr = String(courseId);
+            
+            console.log(`尝试复制知识点(${knowledgeIdStr})到课程(${courseIdStr})`);
+            
+            // 调用API时将ID转换为BigNumber
+            let knowledgeIdParam = knowledgeIdStr;
+            let courseIdParam = courseIdStr;
+            
+            try {
+                const bn = new BigNumber(knowledgeIdStr);
+                knowledgeIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将知识点ID转换为BigNumber:', error);
+            }
+            
+            try {
+                const bn = new BigNumber(courseIdStr);
+                courseIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将课程ID转换为BigNumber:', error);
+            }
+            
+            const response = await axios.post(`/api/knowledge/${knowledgeIdParam}/copy/course/${courseIdParam}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (response.data) {
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+            }
+            
             return response.data;
         } catch (error) {
             console.error('复制知识点失败:', error.response ? error.response.data : error.message);
@@ -1050,203 +1175,78 @@ export const knowledgeAPI = {
 
     /**
      * 添加已有知识点到指定课程（需要token）
-     * @param {number} knowledgeId 知识点ID
-     * @param {number} courseId 目标课程ID
+     * @param {string} knowledgeId 知识点ID
+     * @param {string} courseId 目标课程ID
      * @returns {Promise<Object>} 操作结果
      * 返回字段：由后端定义，通常包含成功状态和消息
      */
     async appendKnowledgeToCourse(knowledgeId, courseId) {
         const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.post(`/api/knowledge/${knowledgeId}/append/course/${courseId}`);
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            const courseIdStr = String(courseId);
+            
+            console.log(`尝试将知识点(${knowledgeIdStr})添加到课程(${courseIdStr})`);
+            const response = await axios.post(`/api/knowledge/${knowledgeIdStr}/append/course/${courseIdStr}`);
+            console.log('添加知识点到课程响应:', response.data);
             return response.data;
         } catch (error) {
             console.error('添加知识点到课程失败:', error.response ? error.response.data : error.message);
             throw error;
         }
-    }
-};
-
-export const teachingAssistantAPI = {
-    /**
-     * 生成智能备课方案（需要token）
-     * @param {Object} lessonData 备课参数
-     * @param {string} lessonData.subjectType 学科类型
-     * @param {string} lessonData.courseOutline 课程大纲
-     * @param {Array<string>} lessonData.courseDocuments 课程相关文档（字符串数组）
-     * @param {number} lessonData.duration 课程时长（分钟）
-     * @param {string} lessonData.difficultyLevel 难度等级
-     * @param {string} lessonData.teachingStyle 教学风格
-     * @returns {Promise<Object>} 智能备课生成结果
-     * 返回字段：
-     *   - additionalProp1: Object 备课相关内容（具体结构由后端返回）
-     *   - additionalProp2: Object 备课相关内容（具体结构由后端返回）
-     *   - additionalProp3: Object 备课相关内容（具体结构由后端返回）
-     */
-    async generateLesson(lessonData) {
-        const axios = createTeacherAuthorizedAxios();
-        const response = await axios.post('/api/teaching-assistant/lesson/generate', lessonData);
-        return response.data;
-    }
-};
-
-export const questionAPI = {
-    /**
-     * 更新问题（需要token）
-     * @param {Object} updateQuestionData 问题信息
-     * @param {number} updateQuestionData.questionId 问题ID
-     * @param {string} updateQuestionData.content 问题内容
-     * @param {string} updateQuestionData.questionType 问题类型
-     * @param {string} updateQuestionData.difficulty 难度
-     * @param {string} updateQuestionData.referenceAnswer 参考答案
-     * @param {number} updateQuestionData.scorePoints 分值
-     * @param {string} updateQuestionData.answer 答案
-     * @returns {Promise<Object>} 更新后的问题信息
-     * 返回字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
-     */
-    async updateQuestion(updateQuestionData) {
-        const axios = createTeacherAuthorizedAxios();
-        const response = await axios.put('/api/question/update', updateQuestionData);
-        return response.data;
     },
 
     /**
-     * 新增问题（需要token）
-     * @param {Object} questionData 问题信息
-     * @param {number} questionData.teacherId 教师ID
-     * @param {string} questionData.content 问题内容
-     * @param {string} questionData.questionType 问题类型
-     * @param {string} questionData.difficulty 难度
-     * @param {number} questionData.knowledgeId 知识点ID
-     * @param {string} questionData.referenceAnswer 参考答案
-     * @param {number} questionData.scorePoints 分值
-     * @param {string} questionData.answer 答案
-     * @returns {Promise<Object>} 新增后的问题信息
-     * 返回字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
-     */
-    async saveQuestion(questionData) {
-        const axios = createTeacherAuthorizedAxios();
-        const response = await axios.post('/api/question/save', questionData);
-        return response.data;
-    },
-
-    /**
-     * 根据问题ID获取问题信息（需要token）
-     * @param {number} id 问题ID
-     * @returns {Promise<Object>} 问题信息
-     * 返回字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
-     */
-    async getQuestionById(id) {
-        const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/question/${id}`);
-        return response.data;
-    },
-
-    /**
-     * 删除问题（需要token）
-     * @param {number} id 问题ID
-     * @returns {Promise<Object>} 删除结果
-     * 返回字段：
-     *   - success: boolean 是否删除成功
-     *   - message: string 提示信息
-     */
-    async deleteQuestionById(id) {
-        const axios = createTeacherAuthorizedAxios();
-        const response = await axios.delete(`/api/question/${id}`);
-        return response.data;
-    },
-
-    /**
-     * 根据教师ID获取问题列表（需要token）
-     * @param {number} teacherId 教师ID
-     * @returns {Promise<Array<Object>>} 问题列表
-     * 每项字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
-     */
-    async getQuestionsByTeacherId(teacherId) {
-        const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/question/teacher/${teacherId}`);
-        return response.data;
-    },
-
-    /**
-     * 根据知识点ID获取问题列表（需要token）
-     * @param {number} knowledgeId 知识点ID
-     * @returns {Promise<Array<Object>>} 问题列表
-     * 每项字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 根据知识点ID获取题目列表（需要token）
+     * @param {string} knowledgeId 知识点ID
+     * @returns {Promise<Array<Object>>} 题目列表
      */
     async getQuestionsByKnowledgeId(knowledgeId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/question/knowledge/${knowledgeId}`);
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            
+            // 调用API时将ID转换为BigNumber
+            let knowledgeIdParam = knowledgeIdStr;
+            
+            try {
+                const bn = new BigNumber(knowledgeIdStr);
+                knowledgeIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将知识点ID转换为BigNumber:', error);
+            }
+            
+            const response = await axios.get(`/api/question/knowledge/${knowledgeIdParam}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取知识点题目列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
-     * 根据知识点ID和内容关键词搜索问题（需要token）
-     * @param {number} knowledgeId 知识点ID
-     * @param {string} keyword 关键词
+     * 根据知识点ID和内容关键词搜索题目（需要token）
+     * @param {string} knowledgeId 知识点ID
      * @returns {Promise<Array<Object>>} 问题列表
      * 每项字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
+     *   - questionId: string 问题ID (返回时转为字符串)
+     *   - teacherId: string 教师ID (返回时转为字符串)
      *   - content: string 问题内容
      *   - questionType: string 问题类型
      *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
+     *   - knowledgeId: string 知识点ID (返回时转为字符串)
      *   - referenceAnswer: string 参考答案
      *   - scorePoints: number 分值
      *   - answer: string 答案
@@ -1255,40 +1255,82 @@ export const questionAPI = {
      */
     async searchQuestionsInKnowledge(knowledgeId, keyword) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/question/knowledge/${knowledgeId}/search/content`, {
-            params: { keyword }
-        });
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            
+            // 调用API时将ID转换为BigNumber
+            let knowledgeIdParam = knowledgeIdStr;
+            
+            try {
+                const bn = new BigNumber(knowledgeIdStr);
+                knowledgeIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将知识点ID转换为BigNumber:', error);
+            }
+            
+            const response = await axios.get(`/api/question/knowledge/${knowledgeIdParam}/search/content`, {
+                params: { keyword }
+            });
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('搜索知识点题目失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
-     * 根据知识点ID和条件查询问题（需要token）
-     * @param {number} knowledgeId 知识点ID
-     * @param {Object} questionQueryDTO 查询条件对象
-     * @param {string} [questionQueryDTO.questionType] 问题类型
-     * @param {string} [questionQueryDTO.difficulty] 难度
-     * @param {string} [questionQueryDTO.startTime] 起始时间（可选，日期字符串）
-     * @param {string} [questionQueryDTO.endTime] 结束时间（可选，日期字符串）
-     * @returns {Promise<Array<Object>>} 问题列表
-     * 每项字段：
-     *   - questionId: number 问题ID
-     *   - teacherId: number 教师ID
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: number 知识点ID
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 根据条件搜索知识点下的题目（需要token）
+     * @param {string} knowledgeId 知识点ID
+     * @param {Object} questionQueryDTO 查询条件
+     * @param {string} [questionQueryDTO.questionType] 题目类型（可选）
+     * @param {string} [questionQueryDTO.difficulty] 难度等级（可选）
+     * @param {string} [questionQueryDTO.startTime] 开始时间（可选，YYYY-MM-DD）
+     * @param {string} [questionQueryDTO.endTime] 结束时间（可选，YYYY-MM-DD）
+     * @returns {Promise<Array<Object>>} 题目列表
      */
     async searchQuestionsInKnowledgeConditionally(knowledgeId, questionQueryDTO) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/question/knowledge/${knowledgeId}/conditions`, {
-            params: questionQueryDTO
-        });
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const knowledgeIdStr = String(knowledgeId);
+            
+            // 调用API时将ID转换为BigNumber
+            let knowledgeIdParam = knowledgeIdStr;
+            
+            try {
+                const bn = new BigNumber(knowledgeIdStr);
+                knowledgeIdParam = bn.toString();
+            } catch (error) {
+                console.error('无法将知识点ID转换为BigNumber:', error);
+            }
+            
+            const response = await axios.get(`/api/question/knowledge/${knowledgeIdParam}/conditions`, { params: questionQueryDTO });
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('条件搜索知识点题目失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     }
 };
 
@@ -2300,3 +2342,4 @@ export const studentAssistantAPI = {
         return response.data;
     }
 };
+
