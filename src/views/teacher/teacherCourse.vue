@@ -13,9 +13,11 @@
       <div class="filter-section direction-filter">
         <span class="filter-label">方 向</span>
         <div class="filter-tabs">
-          <div v-for="item in directionFilters" :key="item.value" class="filter-tab"
-            :class="{ 'filter-tab-active': currentDirection === item.value }" @click="selectDirection(item.value)">
-            {{ item.label }}
+          <div v-for="filter in directionFilters" :key="filter.value"
+            class="filter-tab"
+            :class="{ 'filter-tab-active': currentDirection === filter.value }"
+            @click="selectDirection(filter.value)">
+            {{ filter.label }}
           </div>
         </div>
       </div>
@@ -24,9 +26,11 @@
       <div class="filter-section category-filter">
         <span class="filter-label">子 类</span>
         <div class="filter-tabs">
-          <div v-for="item in categoryFilters" :key="item.value" class="filter-tab"
-            :class="{ 'filter-tab-active': currentCategory === item.value }" @click="selectCategory(item.value)">
-            {{ item.label }}
+          <div v-for="filter in categoryFilters" :key="filter.value"
+            class="filter-tab"
+            :class="{ 'filter-tab-active': currentCategory === filter.value }"
+            @click="selectCategory(filter.value)">
+            {{ filter.label }}
           </div>
         </div>
       </div>
@@ -36,11 +40,11 @@
     <div class="sort-options">
       <div class="sort-options-left">
         <div class="sort-option" :class="{ 'sort-option-active': sortOption === 'latest' }"
-          @click="setSortOption('latest')">
+          @click="selectSortOption('latest')">
           最新
         </div>
         <div class="sort-option" :class="{ 'sort-option-active': sortOption === 'popular' }"
-          @click="setSortOption('popular')">
+          @click="selectSortOption('popular')">
           最热
         </div>
       </div>
@@ -67,32 +71,49 @@
 
     </div>
 
-    <!-- 课程为空时的提示 -->
-    <div v-if="displayCourseList.length === 0" class="empty-course">
-      <div class="empty-placeholder">
-        <el-icon class="empty-icon">
-          <Reading />
-        </el-icon>
-        <p>暂无课程</p>
+    <!-- 修改课程列表显示 -->
+    <div v-if="loading" class="course-loading">
+      <el-skeleton :rows="3" animated />
+    </div>
+    <div v-else-if="displayCourseList.length === 0" class="empty-course">
+      <div class="empty-course-content">
+        <el-icon class="empty-icon"><Plus /></el-icon>
+        <p class="empty-text">您还没有创建过课程</p>
+        <el-button type="primary" @click="createCourse">创建课程</el-button>
       </div>
     </div>
-
-    <!-- 课程列表 -->
     <div v-else class="course-list">
+      <!-- 课程卡片 -->
       <div v-for="course in displayCourseList" :key="course.id" class="course-item" @click="enterCourse(course)">
-        <div class="course-cover" :style="{ backgroundColor: course.color }">
+        <div class="course-cover" :style="{ backgroundColor: getCategoryColor(course.category) }">
           <el-icon>
             <Reading />
           </el-icon>
-          <div class="course-category">{{ course.category || '未分类' }}</div>
         </div>
         <div class="course-info">
-          <h3 class="course-title">{{ course.name }}</h3>
-          <p class="course-desc">
-            <span class="course-credit">{{ course.credit || 0 }}学分</span> ·
-            <span>{{ course.studentCount || 0 }}名学生</span> ·
-            <span>{{ course.updateTime }}</span>
-          </p>
+          <h3 class="course-name">{{ course.name }}</h3>
+          <div class="course-content-row">
+            <div class="course-tags-container">
+              <div 
+                v-for="(tag, index) in extractTags(course.description)" 
+                :key="index"
+                class="rendered-tag"
+                :style="{ 
+                  backgroundColor: getCategoryColor(tag) + '30', 
+                  color: getCategoryColor(tag)
+                }"
+              >
+                {{ tag }}
+              </div>
+            </div>
+            <p class="course-desc">{{ formatDescription(course.description) }}</p>
+          </div>
+          <div class="course-meta">
+            <span class="category-tag" :style="{ backgroundColor: getCategoryColor(course.category) + '20', color: getCategoryColor(course.category) }">
+              {{ course.category }}
+            </span>
+            <span class="update-time">更新于: {{ formatDate(course.updateTime) }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -104,7 +125,34 @@
           <el-input v-model="newCourse.name" placeholder="请输入课程名称" @change="handleNameChange" />
         </el-form-item>
         <el-form-item label="课程描述">
-          <el-input v-model="newCourse.description" type="textarea" placeholder="请输入课程描述" :rows="3" />
+          <!-- 使用Element Plus的文本框，但添加标签显示区域 -->
+          <el-input
+            v-model="newCourse.description"
+            type="textarea"
+            placeholder="请输入课程描述"
+            :rows="3"
+            @input="processTextareaContent"
+          />
+          
+          <!-- 显示检测到的标签 -->
+          <div class="detected-tags" v-if="contentSegments.filter(seg => seg.type === 'tag').length > 0">
+            <span class="tag-label">检测到的标签：</span>
+            <div class="tag-list">
+              <div
+                v-for="(segment, index) in contentSegments.filter(seg => seg.type === 'tag')"
+                :key="index"
+                class="tag-item"
+                :style="{ backgroundColor: getCategoryColor(segment.content) + '30' }"
+              >
+                <span class="tag-text">{{ segment.content }}</span>
+                <span class="tag-delete" @click="removeTag(segment.content)">×</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="description-tips">
+            <p>tip：使用 #标签名# 添加子类标签，如：#前端开发#</p>
+          </div>
         </el-form-item>
         <el-form-item label="课程分类">
           <div class="category-selection">
@@ -257,9 +305,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElLoading } from 'element-plus'
-import { Plus, Reading, /*Document,*/ Search, } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Plus, Reading, Search } from '@element-plus/icons-vue'
 import { courseAPI, knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 
@@ -276,88 +324,110 @@ const sortOption = ref('latest') // 'latest' 或 'popular'
 const searchKeyword = ref('') // 搜索关键词
 
 // 方向筛选选项
-const directionFilters = [
-  { label: '全部', value: '全部' },
-  { label: 'AI通识课专栏', value: 'AI通识' },
-  { label: '程序设计语言', value: '程序设计语言' },
-  { label: '计算机基础', value: '计算机基础' },
-  { label: '算法设计', value: '算法设计' },
-  { label: '网络与安全', value: '网络与安全' },
-  { label: '教学与统计', value: '教学与统计' },
-  { label: '数学', value: '数学' }
-]
+const directionFilters = computed(() => {
+  // 基础的"全部"选项始终存在
+  const baseFilters = [{ label: '全部', value: '全部', color: '#DCDFE6' }]
+  
+  // 如果还没有课程数据，则只返回"全部"选项
+  if (!originalCourseList.value || originalCourseList.value.length === 0) {
+    return baseFilters
+  }
+  
+  // 从原始课程数据中提取所有唯一的category
+  const uniqueDirections = new Set()
+  
+  // 添加所有课程的分类作为方向
+  originalCourseList.value.forEach(course => {
+    if (course.category) {
+      uniqueDirections.add(course.category)
+    }
+  })
+  
+  // 将所有唯一的category转换为选项格式
+  return [
+    ...baseFilters,
+    ...Array.from(uniqueDirections).map(direction => ({
+      label: direction,
+      value: direction,
+      color: getCategoryColor(direction)
+    }))
+  ]
+})
 
 // 子类筛选选项 - 根据当前选择的方向动态生成
 const categoryFilters = computed(() => {
   // 基础的"全部"选项始终存在
-  const baseFilters = [{ label: '全部', value: '全部' }]
+  const baseFilters = [{ label: '全部', value: '全部', color: '#DCDFE6' }]
 
-  // 根据当前选择的方向，返回相应的子类选项
-  if (currentDirection.value === '全部') {
-    // 如果选择了"全部"方向，则显示所有可用的课程类别
-    const allCategories = new Set()
-    courseList.value.forEach(course => {
-      if (course.category) {
-        allCategories.add(course.category)
-      }
-    })
-
-    // 将所有类别转换为选项格式
-    return [
-      ...baseFilters,
-      ...Array.from(allCategories).map(category => ({
-        label: category,
-        value: category
-      }))
-    ]
-  } else if (currentDirection.value === 'AI通识') {
-    // AI通识课专栏的子类
-    return [
-      ...baseFilters,
-      { label: 'AI通识基础课', value: 'AI通识基础课' },
-      { label: 'AI通识核心课', value: 'AI通识核心课' },
-      { label: 'AI通识案例课', value: 'AI通识案例课' }
-    ]
-  } else if (currentDirection.value === '程序设计语言') {
-    // 程序设计语言的子类
-    return [
-      ...baseFilters,
-      { label: 'Python程序设计', value: 'Python程序设计' },
-      { label: 'C/C++程序设计', value: 'C/C++程序设计' },
-      { label: 'Java程序设计', value: 'Java程序设计' },
-      { label: 'C#程序设计', value: 'C#程序设计' }
-    ]
-  } else if (currentDirection.value === '数学') {
-    return [
-      ...baseFilters,
-      { label: '高等数学', value: '高等数学' },
-      { label: '线性代数', value: '线性代数' },
-      { label: '概率论与数理统计', value: '概率论与数理统计' }
-    ]
-  } else if (currentDirection.value === '物理') {
-    return [
-      ...baseFilters,
-      { label: '大学物理', value: '大学物理' },
-      { label: '量子物理', value: '量子物理' },
-    ]
-  } else {
-    // 其他方向暂时只返回基础选项
-    return baseFilters
+  // 如果没有课程数据，只返回"全部"选项
+  if (!originalCourseList.value || originalCourseList.value.length === 0) {
+    return baseFilters;
   }
+
+  // 从课程描述中提取子类
+  const subcategories = new Set();
+  
+  // 只处理当前选中方向的课程
+  const coursesToProcess = currentDirection.value === '全部' 
+    ? originalCourseList.value 
+    : originalCourseList.value.filter(course => course.category === currentDirection.value);
+  
+  // 正则表达式匹配以#开头，以#或|结尾的内容
+  const regex = /#([^#|]+)(#|\|)/g;
+  
+  coursesToProcess.forEach(course => {
+    // 如果课程有描述，则从描述中提取子类
+    if (course.description) {
+      let match;
+      // 使用正则表达式全局匹配
+      while ((match = regex.exec(course.description)) !== null) {
+        // match[1]是第一个捕获组，即#和结束符之间的内容
+        if (match[1]) {
+          subcategories.add(match[1]);
+        }
+      }
+    }
+  });
+  
+  // 如果没有提取到子类，则只返回"全部"选项
+  if (subcategories.size === 0) {
+    return baseFilters;
+  }
+  
+  // 将提取到的子类转换为选项格式
+  return [
+    ...baseFilters,
+    ...Array.from(subcategories).map(subcat => ({
+      label: subcat,
+      value: subcat,
+      color: getCategoryColor(subcat)
+    }))
+  ];
 })
+
+// 定义一个新的变量用于存储原始课程数据
+const originalCourseList = ref([])
 
 // 选择方向
 async function selectDirection(direction) {
   currentDirection.value = direction
-  // 重置子类选择为"全部"
-  currentCategory.value = '全部'
+  currentCategory.value = '全部' // 重置子类选择
 
-  // 如果选择了特定方向，则通过getCoursesByCategory API获取该方向的课程
   if (direction !== '全部') {
-    await fetchCoursesByCategory(direction)
+    try {
+      loading.value = true
+      // 筛选指定类别的课程
+      courseList.value = originalCourseList.value.filter(course => course.category === direction);
+    } catch (error) {
+      console.error('筛选课程失败:', error)
+      ElMessage.error('筛选课程失败，请稍后重试')
+      courseList.value = []
+    } finally {
+      loading.value = false
+    }
   } else {
-    // 如果选择了"全部"，则获取所有课程
-    await fetchCourses()
+    // 如果选择了"全部"，则恢复原始课程列表
+    courseList.value = [...originalCourseList.value]
   }
 }
 
@@ -365,125 +435,187 @@ async function selectDirection(direction) {
 async function selectCategory(category) {
   currentCategory.value = category
 
-  // 如果选择了特定子类，则作为关键词使用searchCourses API
+  // 如果选择了特定子类，则使用筛选逻辑
   if (category !== '全部') {
-    // 如果同时选择了方向，则将方向作为category参数传入
-    const categoryParam = currentDirection.value !== '全部' ? currentDirection.value : null
-    await searchCoursesByKeyword(category, categoryParam)
+    if (currentDirection.value !== '全部') {
+      // 如果同时选择了方向，则筛选该方向下包含指定子类标签的课程
+      const filteredCourses = originalCourseList.value.filter(course => {
+        // 首先检查课程是否属于当前选中的方向
+        if (course.category !== currentDirection.value) {
+          return false;
+        }
+        
+        // 然后检查课程描述中是否包含当前选中的子类标签
+        if (!course.description) {
+          return false;
+        }
+        
+        // 使用正则表达式检查
+        const regex = new RegExp(`#${category}(#|\\|)`, 'g');
+        return regex.test(course.description);
+      });
+      
+      courseList.value = filteredCourses;
+    } else {
+      // 如果方向是"全部"，则筛选所有课程中包含指定子类标签的课程
+      // 确保我们有原始数据
+      if (originalCourseList.value.length === 0) {
+        await fetchCourses();
+      }
+      
+      // 筛选包含指定子类标签的课程
+      courseList.value = originalCourseList.value.filter(course => {
+        if (!course.description) {
+          return false;
+        }
+        
+        // 使用正则表达式检查
+        const regex = new RegExp(`#${category}(#|\\|)`, 'g');
+        return regex.test(course.description);
+      });
+    }
   } else if (currentDirection.value !== '全部') {
     // 如果选择了"全部"子类，但有特定方向，则获取该方向的课程
-    await fetchCoursesByCategory(currentDirection.value)
+    courseList.value = originalCourseList.value.filter(course => 
+      course.category === currentDirection.value
+    );
   } else {
     // 如果方向和子类都是"全部"，则获取所有课程
-    await fetchCourses()
-  }
-}
-
-
-// 根据类别获取课程 - 使用getCoursesByCategory API
-async function fetchCoursesByCategory(category) {
-  loading.value = true
-  try {
-    const loadingInstance = ElLoading.service({
-      target: '.teacher-course',
-      text: '加载课程中...',
-      background: 'rgba(255, 255, 255, 0.7)'
-    })
-
-    // 使用API获取指定类别的课程
-    const response = await courseAPI.getCoursesByCategory(category)
-
-    // 处理API返回的课程数据
-    processCoursesData(response)
-
-    loadingInstance.close()
-  } catch (error) {
-    console.error('获取课程列表失败:', error)
-    ElMessage.error('获取课程列表失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 根据关键词搜索课程，可选择指定分类 - 使用searchCourses API
-async function searchCoursesByKeyword(keyword, category = null) {
-  loading.value = true
-  try {
-    const loadingInstance = ElLoading.service({
-      target: '.teacher-course',
-      text: '搜索课程中...',
-      background: 'rgba(255, 255, 255, 0.7)'
-    })
-
-    // 使用API搜索课程，同时传入关键词和类别
-    const response = await courseAPI.searchCourses(keyword, category)
-
-    // 处理API返回的课程数据
-    processCoursesData(response)
-
-    loadingInstance.close()
-  } catch (error) {
-    console.error('搜索课程失败:', error)
-    ElMessage.error('搜索课程失败，请稍后重试')
-  } finally {
-    loading.value = false
+    courseList.value = [...originalCourseList.value];
   }
 }
 
 // 处理搜索
 async function handleSearch() {
   if (searchKeyword.value.trim() === '') {
-    // 如果搜索关键词为空，恢复到当前分类的所有课程
-    if (currentCategory.value !== '全部') {
-      // 如果选中了子类，则将子类作为关键词，方向作为分类
-      const categoryParam = currentDirection.value !== '全部' ? currentDirection.value : null
-      await searchCoursesByKeyword(currentCategory.value, categoryParam)
-    } else if (currentDirection.value !== '全部') {
-      // 如果只选中了方向，则获取该方向的课程
-      await fetchCoursesByCategory(currentDirection.value)
-    } else {
-      // 如果没有选中任何分类，则获取所有课程
-      await fetchCourses()
-    }
-    return
+    // 如果搜索关键词为空，恢复到当前筛选状态
+    await selectCategory(currentCategory.value);
+    return;
   }
 
-  // 使用API进行搜索，如果有方向选择，则将方向作为category参数传入
-  const categoryParam = currentDirection.value !== '全部' ? currentDirection.value : null
-  await searchCoursesByKeyword(searchKeyword.value, categoryParam)
+  // 搜索关键词不为空时，在当前筛选结果的基础上进行搜索
+  const keyword = searchKeyword.value.toLowerCase();
+  
+  // 先根据当前的方向和子类筛选
+  let filteredCourses = [];
+  
+  if (currentDirection.value !== '全部') {
+    // 如果选择了特定方向
+    filteredCourses = originalCourseList.value.filter(course => 
+      course.category === currentDirection.value
+    );
+  } else {
+    // 如果方向是"全部"
+    filteredCourses = [...originalCourseList.value];
+  }
+  
+  // 如果选择了特定子类，进一步筛选
+  if (currentCategory.value !== '全部') {
+    filteredCourses = filteredCourses.filter(course => {
+      if (!course.description) {
+        return false;
+      }
+      
+      // 使用正则表达式检查是否包含当前子类标签
+      const regex = new RegExp(`#${currentCategory.value}(#|\\|)`, 'g');
+      return regex.test(course.description);
+    });
+  }
+  
+  // 最后根据关键词搜索
+  courseList.value = filteredCourses.filter(course => 
+    course.name.toLowerCase().includes(keyword) || 
+    (course.description && course.description.toLowerCase().includes(keyword))
+  );
 }
 
-// 处理API返回的课程数据
-function processCoursesData(response) {
-  courseList.value = Array.isArray(response) ? response.map(course => {
-    // 使用BigNumber处理ID以避免精度丢失
-    const courseId = course.id ? new BigNumber(course.id).toString() : Date.now().toString();
+// 获取课程列表
+async function fetchCourses() {
+  try {
+    loading.value = true
     
-    // 根据category获取颜色，如果category为null或不存在，则使用ID生成随机颜色
-    let courseColor
-    if (course.category) {
-      const categoryObj = categoryOptions.find(cat => cat.value === course.category)
-      courseColor = categoryObj ? categoryObj.color : getRandomColor(courseId)
+    // 从localstorage中获取教师ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      throw new Error('未找到用户信息，请重新登录')
+    }
+    
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.teacherId) {
+      throw new Error('用户信息不完整或不是教师账号')
+    }
+    
+    // 获取教师所有课程
+    const courses = await courseAPI.getAllCourses()
+    
+    if (Array.isArray(courses)) {
+      courseList.value = courses
+      // 更新原始课程列表
+      originalCourseList.value = [...courses]
+      
+      // 重置筛选条件，确保方向选项更新
+      if (currentDirection.value !== '全部') {
+        currentDirection.value = '全部'
+      }
+      currentCategory.value = '全部'
     } else {
-      courseColor = getRandomColor(courseId)
+      courseList.value = []
+      originalCourseList.value = []
     }
-
-    // 确保每个字段都有合适的默认值
-    return {
-      id: courseId, // 使用字符串形式的ID
-      name: course.name || '未命名课程',
-      description: course.description || '暂无描述',
-      category: course.category || '其他',
-      credit: typeof course.credit === 'number' ? course.credit : 0,
-      studentCount: 0, // API中没有返回studentCount字段，默认为0
-      updateTime: formatDate(course.updateTime || course.createTime || new Date()),
-      color: courseColor
-    }
-  }) : []
-
-  // 应用排序
-  sortCourses()
+  } catch (error) {
+    console.error('获取教师课程失败:', error)
+    ElMessage.error('获取课程列表失败，请稍后重试')
+    courseList.value = []
+    originalCourseList.value = []
+  } finally {
+    loading.value = false
+  }
 }
+
+// 格式化日期
+function formatDate(dateString) {
+  if (!dateString) return '未知时间'
+
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString()
+  } catch (e) {
+    return '未知时间'
+  }
+}
+
+// 处理课程描述显示，只显示第一个|后面的内容，并去掉所有#标签#
+function formatDescription(description) {
+  if (!description) return '暂无描述';
+  
+  // 查找第一个|符号的位置
+  const pipeIndex = description.indexOf('|');
+  
+  // 如果找到|符号，则获取|后面的内容
+  let processedDesc = description;
+  if (pipeIndex !== -1 && pipeIndex < description.length - 1) {
+    processedDesc = description.substring(pipeIndex + 1).trim();
+  }
+  
+  // 去掉所有#标签#内容
+  return processedDesc.replace(/#([^#]+)#/g, '').trim() || '暂无描述';
+}
+
+// 在组件挂载时获取课程列表
+onMounted(async () => {
+  try {
+    loading.value = true
+    // 获取教师自己的所有课程
+    await fetchCourses()
+    // 初始化原始课程数据
+    originalCourseList.value = [...courseList.value]
+  } catch (error) {
+    console.error('获取课程列表失败:', error)
+    ElMessage.error('获取课程列表失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+})
 
 // 根据排序选项对课程进行排序
 function sortCourses() {
@@ -502,65 +634,10 @@ function sortCourses() {
   }
 }
 
-// 获取课程列表
-async function fetchCourses() {
-  console.log('获取课程列表数据')
-  loading.value = true
-  try {
-    const loadingInstance = ElLoading.service({
-      target: '.teacher-course',
-      text: '加载课程中...',
-      background: 'rgba(255, 255, 255, 0.7)'
-    })
-
-    const response = await courseAPI.getAllCourses()
-    console.log('API返回的课程数据:', response)
-
-    // 处理API返回的课程数据
-    processCoursesData(response)
-
-    loadingInstance.close()
-  } catch (error) {
-    console.error('获取课程列表失败:', error)
-    ElMessage.error('获取课程列表失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 生成随机颜色，但对同一ID总是返回相同颜色
-function getRandomColor(id) {
-  const colors = [
-    '#409EFF', '#67C23A', '#E6A23C', '#F56C6C',
-    '#909399', '#9B59B6', '#3498DB', '#1ABC9C'
-  ]
-
-  // 将ID转换为数字（如果是字符串）以用作索引
-  const numericId = typeof id === 'string' ? parseInt(id.slice(-8), 10) : id
-  // 使用ID作为索引，确保同一ID总是得到相同颜色
-  return colors[numericId % colors.length]
-}
-
-// 格式化日期
-function formatDate(dateString) {
-  if (!dateString) return '未知时间'
-
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleDateString()
-  } catch (e) {
-    return '未知时间'
-  }
-}
-
-// 页面加载时获取课程列表
-onMounted(() => {
-  fetchCourses()
-})
-
-// 设置排序选项
-function setSortOption(option) {
+// 选择排序方式
+function selectSortOption(option) {
   sortOption.value = option
+  // 应用排序
   sortCourses()
 }
 
@@ -569,9 +646,11 @@ const displayCourseList = computed(() => {
   // 先应用搜索过滤
   let result = courseList.value
 
+  // 应用搜索关键词过滤
   if (searchKeyword.value) {
     result = result.filter(course =>
-      course.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
+      course.name.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
+      (course.description && course.description.toLowerCase().includes(searchKeyword.value.toLowerCase()))
     )
   }
 
@@ -589,85 +668,65 @@ const newCourse = ref({
   color: '#409EFF'
 })
 
-// 课程分类选项与关键词映射
-const categoryOptions = [
-  { label: '计算机科学', value: '计算机科学', color: '#409EFF', keywords: ['计算机', '编程', '软件', '网络', '数据库', '算法', 'Java', 'Python', 'C++', '人工智能', 'AI', '机器学习'] },
-  { label: '数学', value: '数学', color: '#67C23A', keywords: ['数学', '微积分', '代数', '几何', '统计', '概率', '线性代数', '离散数学'] },
-  { label: '物理', value: '物理', color: '#E6A23C', keywords: ['物理', '力学', '电磁', '热学', '光学', '量子', '相对论', '核物理'] },
-  { label: '化学', value: '化学', color: '#F56C6C', keywords: ['化学', '有机', '无机', '分析', '物理化学', '生物化学', '化工'] },
-  { label: '生物', value: '生物', color: '#909399', keywords: ['生物', '遗传', '生态', '细胞', '分子', '微生物', '动物', '植物'] },
-  { label: '文学', value: '文学', color: '#9B59B6', keywords: ['文学', '古代', '现代', '诗歌', '小说', '散文', '文言文', '写作'] },
-  { label: '历史', value: '历史', color: '#3498DB', keywords: ['历史', '中国史', '世界史', '古代', '近代', '现代', '考古'] },
-  { label: '艺术', value: '艺术', color: '#1ABC9C', keywords: ['艺术', '音乐', '美术', '设计', '绘画', '雕塑', '建筑', '摄影'] },
-  { label: '其他', value: '其他', color: '#DCDFE6', keywords: [] }
-]
+// 文本区域相关
+const contentSegments = ref([])
 
-// 学分选项
-const creditOptions = [
-  { label: '1学分', value: 1 },
-  { label: '2学分', value: 2 },
-  { label: '3学分', value: 3 },
-  { label: '4学分', value: 4 },
-  { label: '5学分', value: 5 }
-]
-
-const courseRules = {
-  name: [
-    { required: true, message: '请输入课程名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-  ],
-  credit: [
-    { required: true, message: '请选择学分', trigger: 'change' }
-  ]
-}
-
-// 根据课程名称自动匹配课程分类
-function autoMatchCategory(courseName) {
-  if (!courseName) {
-    newCourse.value.category = '其他'
-    newCourse.value.color = '#DCDFE6' // 浅灰色
-    return '其他'
-  }
-
-  const lowerName = courseName.toLowerCase()
-
-  // 遍历所有分类，检查课程名称是否包含关键词
-  for (const category of categoryOptions) {
-    // 跳过"其他"分类，因为它没有关键词
-    if (category.value === '其他') continue
-
-    for (const keyword of category.keywords) {
-      if (lowerName.includes(keyword.toLowerCase())) {
-        newCourse.value.category = category.value
-        newCourse.value.color = category.color
-        return category.value
-      }
+// 处理文本框内容，解析标签和普通文本
+function processTextareaContent() {
+  const text = newCourse.value.description
+  const segments = []
+  const regex = /#([^#]+)#/g
+  
+  let lastIndex = 0
+  let match
+  
+  // 查找所有标签
+  while ((match = regex.exec(text)) !== null) {
+    // 添加标签前的普通文本
+    if (match.index > lastIndex) {
+      segments.push({
+        type: 'text',
+        content: text.substring(lastIndex, match.index)
+      })
     }
+    
+    // 添加标签
+    segments.push({
+      type: 'tag',
+      content: match[1].trim()
+    })
+    
+    lastIndex = match.index + match[0].length
   }
-
-  // 如果没有匹配到任何分类，设置为"其他"
-  const otherCategory = categoryOptions.find(c => c.value === '其他')
-  if (otherCategory) {
-    newCourse.value.category = '其他'
-    newCourse.value.color = otherCategory.color
+  
+  // 添加最后一段普通文本
+  if (lastIndex < text.length) {
+    segments.push({
+      type: 'text',
+      content: text.substring(lastIndex)
+    })
   }
-  return '其他'
+  
+  contentSegments.value = segments
 }
 
-// 当课程名称改变时自动匹配分类
-function handleNameChange(name) {
-  const category = autoMatchCategory(name)
-  console.log(`自动匹配课程分类: ${category}`)
+// 删除标签
+function removeTag(tag) {
+  // 从描述中删除标签
+  const regex = new RegExp(`#${tag}#`, 'g')
+  newCourse.value.description = newCourse.value.description.replace(regex, '')
+  
+  // 重新处理文本内容
+  processTextareaContent()
 }
 
-// 当用户手动选择分类时更新颜色
-function handleManualCategoryChange(category) {
-  const selectedCategory = categoryOptions.find(item => item.value === category)
-  if (selectedCategory) {
-    newCourse.value.color = selectedCategory.color
-  }
-}
+// 在组件挂载后初始化
+onMounted(() => {
+  // 初始处理文本内容
+  processTextareaContent()
+})
 
+// 在创建课程对话框打开时重置
 function showCreateCourseDialog() {
   createCourseDialogVisible.value = true
   // 重置表单
@@ -680,6 +739,8 @@ function showCreateCourseDialog() {
   }
   // 清空已选知识点
   selectedKnowledge.value = []
+  // 清空内容片段
+  contentSegments.value = []
 }
 
 // 知识点相关
@@ -846,10 +907,13 @@ async function createCourse() {
   courseFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
+        // 保存原始描述，包含标签信息
+        const originalDescription = newCourse.value.description || '';
+        
         const courseData = {
           name: newCourse.value.name,
           code: `COURSE-${Date.now()}`, // 生成临时课程编码
-          description: newCourse.value.description || '',
+          description: originalDescription, // 保存完整描述，包含标签
           category: newCourse.value.category,
           credit: newCourse.value.credit,
           status: 1, // 使用整数类型的状态
@@ -866,15 +930,16 @@ async function createCourse() {
         const newCourseItem = {
           id: response.id ? new BigNumber(response.id).toString() : Date.now().toString(),
           name: response.name,
-          description: response.description || '暂无描述',
+          description: response.description || originalDescription, // 使用原始描述
           category: response.category || newCourse.value.category,
           credit: response.credit || newCourse.value.credit,
           studentCount: 0, // API中没有返回studentCount字段，默认为0
-          updateTime: formatDate(response.updateTime || response.createTime),
+          updateTime: response.updateTime || response.createTime,
           color: newCourse.value.color
         }
 
         courseList.value.push(newCourseItem)
+        originalCourseList.value.push(newCourseItem)
 
         // 关闭对话框并重置表单
         createCourseDialogVisible.value = false
@@ -912,6 +977,128 @@ const knowledgeTableRef = ref(null)
 function handleRowClick(row) {
   // 直接调用表格的toggleRowSelection方法来切换行的选择状态
   knowledgeTableRef.value.toggleRowSelection(row)
+}
+
+// 根据分类名生成确定的随机颜色
+function getCategoryColor(category) {
+  if (!category) return '#DCDFE6'; // 默认浅灰色
+  
+  // 预定义的颜色列表
+  const colors = [
+    '#409EFF', '#67C23A', '#E6A23C', '#F56C6C', 
+    '#909399', '#9B59B6', '#3498DB', '#1ABC9C',
+    '#27AE60', '#F39C12', '#D35400', '#8E44AD',
+    '#16A085', '#2980B9', '#C0392B', '#7F8C8D'
+  ];
+  
+  // 使用分类名的字符串哈希值来确定颜色索引
+  let hashCode = 0;
+  for (let i = 0; i < category.length; i++) {
+    hashCode = ((hashCode << 5) - hashCode) + category.charCodeAt(i);
+    hashCode = hashCode & hashCode; // 转换为32位整数
+  }
+  
+  // 确保hashCode为正数
+  hashCode = Math.abs(hashCode);
+  
+  // 使用哈希值对颜色数组取模，得到确定的颜色索引
+  const colorIndex = hashCode % colors.length;
+  
+  
+  return colors[colorIndex];
+}
+
+// 根据课程名称自动匹配课程分类
+function autoMatchCategory(courseName) {
+  if (!courseName) {
+    newCourse.value.category = '其他'
+    newCourse.value.color = '#DCDFE6' // 浅灰色
+    return '其他'
+  }
+
+  const lowerName = courseName.toLowerCase()
+
+  // 遍历所有分类，检查课程名称是否包含关键词
+  for (const category of categoryOptions) {
+    // 跳过"其他"分类，因为它没有关键词
+    if (category.value === '其他') continue
+
+    for (const keyword of category.keywords || []) {
+      if (keyword && lowerName.includes(keyword.toLowerCase())) {
+        newCourse.value.category = category.value
+        newCourse.value.color = category.color
+        return category.value
+      }
+    }
+  }
+
+  // 如果没有匹配到任何分类，设置为"其他"
+  const otherCategory = categoryOptions.find(c => c.value === '其他')
+  if (otherCategory) {
+    newCourse.value.category = '其他'
+    newCourse.value.color = otherCategory.color
+  }
+  return '其他'
+}
+
+// 当课程名称改变时自动匹配分类
+function handleNameChange(name) {
+  const category = autoMatchCategory(name)
+  console.log(`自动匹配课程分类: ${category}`)
+}
+
+// 当用户手动选择分类时更新颜色
+function handleManualCategoryChange(category) {
+  const selectedCategory = categoryOptions.find(item => item.value === category)
+  if (selectedCategory) {
+    newCourse.value.color = selectedCategory.color
+  }
+}
+
+// 确保categoryOptions变量存在，用于预定义一些分类选项
+const categoryOptions = [
+  { label: '计算机科学', value: '计算机科学', color: '#409EFF' },
+  { label: '数学', value: '数学', color: '#67C23A' },
+  { label: '物理', value: '物理', color: '#E6A23C' },
+  { label: '化学', value: '化学', color: '#F56C6C' },
+  { label: '生物', value: '生物', color: '#909399' },
+  { label: 'AI通识', value: 'AI通识', color: '#9B59B6' },
+  { label: '程序设计语言', value: '程序设计语言', color: '#3498DB' },
+  { label: '其他', value: '其他', color: '#DCDFE6' }
+]
+
+// 学分选项
+const creditOptions = [
+  { label: '1学分', value: 1 },
+  { label: '2学分', value: 2 },
+  { label: '3学分', value: 3 },
+  { label: '4学分', value: 4 },
+  { label: '5学分', value: 5 }
+]
+
+const courseRules = {
+  name: [
+    { required: true, message: '请输入课程名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  credit: [
+    { required: true, message: '请选择学分', trigger: 'change' }
+  ]
+}
+
+// 提取描述中的标签
+function extractTags(description) {
+  if (!description) return [];
+  
+  const tags = [];
+  const regex = /#([^#]+)#/g;
+  let match;
+  
+  while ((match = regex.exec(description)) !== null) {
+    tags.push(match[1].trim());
+  }
+  
+  return tags;
 }
 </script>
 
@@ -983,21 +1170,12 @@ function handleRowClick(row) {
   opacity: 0.8;
 }
 
-.course-category {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
 .course-info {
   padding: 16px;
+  
 }
 
-.course-title {
+.course-name {
   margin: 0 0 12px 0;
   font-size: 16px;
   font-weight: 500;
@@ -1007,36 +1185,96 @@ function handleRowClick(row) {
   white-space: nowrap;
 }
 
+.course-content-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.course-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  margin-right: 10px;
+}
+
+.course-tags-container .rendered-tag {
+  display: inline-block;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  padding: 4px 15px;
+  border-radius: 30px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 400;
+  transition: all 0.3s ease;
+}
+
 .course-desc {
+  flex: 1;
+  min-width: 0; /* 确保文本可以正确截断 */
   margin: 0;
   font-size: 13px;
   color: #909399;
+  display: block;
+  line-height: 36px;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.course-meta {
   display: flex;
   align-items: center;
-  gap: 5px;
-}
-
-.course-credit {
-  color: #67C23A;
-}
-
-.empty-course {
-  margin-top: 60px;
-  text-align: center;
-}
-
-.empty-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  margin-top: 10px;
+  font-size: 12px;
   color: #909399;
 }
 
+.category-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.update-time {
+  flex: 1;
+}
+
+.empty-course {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.empty-course-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+}
+
 .empty-icon {
-  font-size: 60px;
-  margin-bottom: 16px;
-  opacity: 0.3;
+  font-size: 48px;
+  color: #909399;
+  margin-bottom: 20px;
+}
+
+.empty-text {
+  font-size: 16px;
+  color: #606266;
+  margin-bottom: 20px;
 }
 
 /* 分类筛选样式 */
@@ -1072,22 +1310,24 @@ function handleRowClick(row) {
 }
 
 .filter-tab {
-  padding: 6px 12px;
-  font-size: 14px;
-  color: #606266;
-  cursor: pointer;
+  padding: 6px 16px;
   border-radius: 4px;
+  margin-right: 10px;
+  cursor: pointer;
   transition: all 0.3s;
-}
-
-.filter-tab:hover {
-  color: #409EFF;
+  background-color: #ffffff;
+  color: #606266;
+  font-size: 14px;
 }
 
 .filter-tab-active {
-  color: #409EFF;
-  background-color: rgba(64, 158, 255, 0.1);
+  background-color: #409EFF;
+  color: #ffffff;
   font-weight: 500;
+}
+
+.color-indicator {
+  display: none;
 }
 
 /* 排序选项样式 */
@@ -1179,6 +1419,74 @@ function handleRowClick(row) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.description-tips {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #606266;
+}
+
+.description-tips p {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.description-tips p:first-child {
+  color: #409EFF;
+  font-weight: 500;
+}
+
+/* 检测到的标签样式 */
+.detected-tags {
+  margin: 10px 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.tag-label {
+  font-size: 13px;
+  color: #606266;
+  margin-right: 10px;
+  white-space: nowrap;
+  line-height: 28px;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.tag-text {
+  margin-right: 6px;
+  color: #303133;
+}
+
+.tag-delete {
+  font-size: 14px;
+  color: #909399;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+  padding: 2px;
+}
+
+.tag-delete:hover {
+  color: #F56C6C;
 }
 
 .selected-knowledge-list {
@@ -1292,5 +1600,10 @@ function handleRowClick(row) {
   white-space: nowrap;
   max-width: 100%;
   cursor: pointer;
+}
+
+/* 删除之前添加的重复样式 */
+.filter-item, .filter-item-active {
+  display: none;
 }
 </style>

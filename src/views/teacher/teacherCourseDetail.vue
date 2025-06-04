@@ -1,11 +1,13 @@
 <template>
   <div class="course-detail">
-    <div class="course-header" :style="{ backgroundColor: courseColor }">
-      <div class="back-button" @click="goBack">
-        <el-icon><ArrowLeft /></el-icon>
-        <span>返回</span>
+    <div class="course-header">
+      <div class="header-content">
+        <div class="back-button" @click="goBack">
+          <el-icon><ArrowLeft /></el-icon>
+          <span>返回</span>
+        </div>
+        <h1 class="course-title">{{ courseName }} 课程详情</h1>
       </div>
-      <h1 class="course-title">{{ courseName }}</h1>
       <div class="course-actions">
         <el-button type="primary" plain @click="showEditCourseDialog">
           <el-icon><Edit /></el-icon>
@@ -57,7 +59,22 @@
                 <h3>课程介绍</h3>
               </div>
               <div class="section-body">
-                <p>{{ courseDescription || '暂无课程介绍' }}</p>
+                <div class="course-description-container">
+                  <div class="course-tags-container">
+                    <div 
+                      v-for="(tag, index) in extractTags(courseDescription)" 
+                      :key="index"
+                      class="rendered-tag"
+                      :style="{ 
+                        backgroundColor: getCategoryColor(tag) + '30', 
+                        color: getCategoryColor(tag)
+                      }"
+                    >
+                      {{ tag }}
+                    </div>
+                  </div>
+                  <p class="course-desc">{{ formatDescription(courseDescription) || '暂无课程介绍' }}</p>
+                </div>
               </div>
             </div>
 
@@ -188,34 +205,89 @@
     </el-dialog>
 
     <!-- 添加知识点对话框 -->
-    <el-dialog v-model="addKnowledgeDialogVisible" title="创建知识点" width="500px">
-      <el-form :model="newKnowledge" label-width="80px" :rules="knowledgeRules" ref="knowledgeFormRef">
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="newKnowledge.name" placeholder="请输入知识点名称" />
-        </el-form-item>
-        <el-form-item label="所属课程">
-          <el-input v-model="courseName" disabled />
-        </el-form-item>
-        <el-form-item label="难度等级" prop="difficultyLevel">
-          <el-select v-model="newKnowledge.difficultyLevel" placeholder="请选择难度等级">
-            <el-option label="简单" value="简单"></el-option>
-            <el-option label="中等" value="中等"></el-option>
-            <el-option label="困难" value="困难"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="newKnowledge.description" type="textarea" placeholder="请输入知识点描述" :rows="3" />
-        </el-form-item>
-        <el-form-item label="教学计划">
-          <el-input v-model="newKnowledge.teachPlan" type="textarea" placeholder="请输入教学计划" :rows="3" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="addKnowledgeDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveKnowledge">确认</el-button>
-        </div>
-      </template>
+    <el-dialog v-model="addKnowledgeDialogVisible" title="知识点管理" width="600px">
+      <el-tabs v-model="knowledgeDialogTab">
+        <el-tab-pane label="添加已有知识点" name="add">
+          <el-form label-width="100px">
+            <el-form-item label="搜索知识点">
+              <el-input v-model="knowledgeSearchKeyword" placeholder="输入关键词搜索知识点" clearable>
+                <template #append>
+                  <el-button @click="searchExistingKnowledge">
+                    <el-icon><Search /></el-icon>
+                  </el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+            
+            <div class="knowledge-search-results" v-if="searchedKnowledges.length > 0">
+              <el-table :data="searchedKnowledges" style="width: 100%" @row-click="selectKnowledge" :row-class-name="getRowClassName">
+                <el-table-column prop="name" label="名称" width="180" />
+                <el-table-column prop="difficultyLevel" label="难度" width="100">
+                  <template #default="scope">
+                    <el-tag :type="getDifficultyTagType(scope.row.difficultyLevel)">{{ scope.row.difficultyLevel }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="description" label="描述" />
+              </el-table>
+            </div>
+            <div v-else-if="knowledgeSearchKeyword && !isSearching" class="empty-search-results">
+              没有找到匹配的知识点
+            </div>
+            
+            <div v-if="selectedKnowledges.length > 0" class="selected-knowledge-list">
+              <h4>已选择的知识点</h4>
+              <el-tag 
+                v-for="knowledge in selectedKnowledges" 
+                :key="knowledge.knowledgeId" 
+                closable 
+                @close="removeSelectedKnowledge(knowledge)"
+                class="selected-knowledge-tag"
+                :type="getDifficultyTagType(knowledge.difficultyLevel)"
+              >
+                {{ knowledge.name }}
+              </el-tag>
+            </div>
+          </el-form>
+          <template #footer>
+            <div class="dialog-footer">
+              <el-button @click="addKnowledgeDialogVisible = false">取消</el-button>
+              <el-button type="primary" @click="addSelectedKnowledgesToCourse" :disabled="selectedKnowledges.length === 0">
+                添加到课程
+              </el-button>
+            </div>
+          </template>
+        </el-tab-pane>
+        
+        <el-tab-pane label="创建新知识点" name="create">
+          <el-form :model="newKnowledge" label-width="100px" :rules="knowledgeRules" ref="knowledgeFormRef">
+            <el-form-item label="名称" prop="name">
+              <el-input v-model="newKnowledge.name" placeholder="请输入知识点名称" />
+            </el-form-item>
+            <el-form-item label="所属课程">
+              <el-input v-model="courseName" disabled />
+            </el-form-item>
+            <el-form-item label="难度等级" prop="difficultyLevel">
+              <el-select v-model="newKnowledge.difficultyLevel" placeholder="请选择难度等级">
+                <el-option label="简单" value="简单"></el-option>
+                <el-option label="中等" value="中等"></el-option>
+                <el-option label="困难" value="困难"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="描述">
+              <el-input v-model="newKnowledge.description" type="textarea" placeholder="请输入知识点描述" :rows="3" />
+            </el-form-item>
+            <el-form-item label="教学计划">
+              <el-input v-model="newKnowledge.teachPlan" type="textarea" placeholder="请输入教学计划" :rows="3" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <div class="dialog-footer">
+              <el-button @click="addKnowledgeDialogVisible = false">取消</el-button>
+              <el-button type="primary" @click="saveKnowledge">创建并添加</el-button>
+            </div>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
     </el-dialog>
 
     <!-- 上传资料对话框 -->
@@ -256,7 +328,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Edit, Plus, Document, Upload, Download, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Plus, Document, Upload, Download, Delete, Search } from '@element-plus/icons-vue'
 import { courseAPI, knowledgeAPI, materialAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 
@@ -363,6 +435,17 @@ const uploadRules = {
     { required: true, message: '请选择要上传的文件', trigger: 'change' }
   ]
 }
+
+// 知识点对话框tab
+const knowledgeDialogTab = ref('add')
+// 知识点搜索关键词
+const knowledgeSearchKeyword = ref('')
+// 搜索到的知识点列表
+const searchedKnowledges = ref([])
+// 已选择的知识点列表
+const selectedKnowledges = ref([])
+// 是否正在搜索
+const isSearching = ref(false)
 
 // 获取课程信息
 onMounted(async () => {
@@ -510,25 +593,50 @@ async function saveCourseEdit() {
     const response = await courseAPI.saveOrUpdateCourse(updatedCourseData)
     
     if (response) {
-      // 更新页面上的课程信息
-      courseName.value = response.name || '未命名课程'
-      courseDescription.value = response.description || '暂无课程介绍'
-      
-      // 更新课程颜色
-      const categoryColors = {
-        '计算机科学': '#409EFF',
-        '数学': '#67C23A',
-        '物理': '#E6A23C',
-        '化学': '#F56C6C',
-        '生物': '#909399',
-        'AI通识': '#9B59B6',
-        '程序设计语言': '#3498DB'
-      }
-      
-      courseColor.value = categoryColors[response.category] || '#409EFF'
-      
       ElMessage.success('课程更新成功')
       editCourseDialogVisible.value = false
+      
+      // 重新加载课程数据
+      const loadingInstance = ElLoading.service({
+        target: '.course-detail',
+        text: '刷新课程信息...',
+        background: 'rgba(255, 255, 255, 0.7)'
+      })
+      
+      try {
+        // 重新获取课程信息
+        const refreshedResponse = await courseAPI.getCourseById(courseId)
+        
+        if (refreshedResponse) {
+          courseData.value = refreshedResponse
+          courseName.value = refreshedResponse.name || '未命名课程'
+          courseDescription.value = refreshedResponse.description || '暂无课程介绍'
+          
+          // 设置课程颜色
+          const categoryColors = {
+            '计算机科学': '#409EFF',
+            '数学': '#67C23A',
+            '物理': '#E6A23C',
+            '化学': '#F56C6C',
+            '生物': '#909399',
+            'AI通识': '#9B59B6',
+            '程序设计语言': '#3498DB'
+          }
+          
+          courseColor.value = categoryColors[refreshedResponse.category] || '#409EFF'
+          
+          // 重新获取课程知识点
+          await fetchCourseKnowledges()
+          
+          // 重新获取课程资料
+          await fetchCourseMaterials()
+        }
+      } catch (error) {
+        console.error('刷新课程信息失败:', error)
+        ElMessage.error('课程已更新，但刷新信息失败，请手动刷新页面')
+      } finally {
+        loadingInstance.close()
+      }
     } else {
       ElMessage.error('课程更新失败')
     }
@@ -549,7 +657,121 @@ function showAddKnowledgeDialog() {
     knowledgeId: null // 确保清除之前可能存在的ID
   }
   
+  // 重置搜索和选择状态
+  knowledgeSearchKeyword.value = ''
+  searchedKnowledges.value = []
+  selectedKnowledges.value = []
+  knowledgeDialogTab.value = 'add'
+  
   addKnowledgeDialogVisible.value = true
+}
+
+// 搜索已有知识点
+async function searchExistingKnowledge() {
+  if (!knowledgeSearchKeyword.value.trim()) {
+    ElMessage.warning('请输入搜索关键词')
+    return
+  }
+  
+  try {
+    isSearching.value = true
+    
+    // 从localstorage中获取教师ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      throw new Error('未找到用户信息，请重新登录')
+    }
+    
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.teacherId) {
+      throw new Error('用户信息不完整或不是教师账号')
+    }
+    
+    // 确保教师ID是字符串形式
+    const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+    
+    // 搜索知识点
+    const results = await knowledgeAPI.getKnowledgeByTeacherId(knowledgeSearchKeyword.value, teacherId)
+    
+    // 过滤掉已经在课程中的知识点
+    const courseKnowledgeIds = courseKnowledges.value.map(k => k.knowledgeId)
+    searchedKnowledges.value = results.filter(knowledge => 
+      !courseKnowledgeIds.includes(knowledge.knowledgeId)
+    )
+    
+    if (searchedKnowledges.value.length === 0 && results.length > 0) {
+      ElMessage.info('搜索到的知识点已全部在当前课程中')
+    }
+  } catch (error) {
+    console.error('搜索知识点失败:', error)
+    ElMessage.error(`搜索知识点失败: ${error.message || '请稍后重试'}`)
+    searchedKnowledges.value = []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+// 选择知识点
+function selectKnowledge(row) {
+  // 检查是否已经选择了该知识点
+  const index = selectedKnowledges.value.findIndex(k => k.knowledgeId === row.knowledgeId)
+  
+  if (index === -1) {
+    // 添加到已选择列表
+    selectedKnowledges.value.push(row)
+  } else {
+    // 从已选择列表中移除
+    selectedKnowledges.value.splice(index, 1)
+  }
+}
+
+// 获取行样式类名
+function getRowClassName(row) {
+  return selectedKnowledges.value.some(k => k.knowledgeId === row.row.knowledgeId) ? 'selected-row' : ''
+}
+
+// 移除已选择的知识点
+function removeSelectedKnowledge(knowledge) {
+  const index = selectedKnowledges.value.findIndex(k => k.knowledgeId === knowledge.knowledgeId)
+  if (index !== -1) {
+    selectedKnowledges.value.splice(index, 1)
+  }
+}
+
+// 添加选中的知识点到课程
+async function addSelectedKnowledgesToCourse() {
+  if (selectedKnowledges.value.length === 0) {
+    ElMessage.warning('请选择至少一个知识点')
+    return
+  }
+  const loadingInstance = ElLoading.service({
+    target: '.el-dialog',
+    text: '添加知识点中...',
+    background: 'rgba(255, 255, 255, 0.7)'
+  })
+  try {
+    
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+    
+    // 批量添加知识点到课程
+    const promises = selectedKnowledges.value.map(knowledge => 
+      knowledgeAPI.appendKnowledgeToCourse(knowledge.knowledgeId, courseIdStr)
+    )
+    
+    await Promise.all(promises)
+    
+    // 重新获取课程知识点列表
+    await fetchCourseKnowledges()
+    
+    ElMessage.success(`成功添加 ${selectedKnowledges.value.length} 个知识点到课程`)
+    addKnowledgeDialogVisible.value = false
+  } catch (error) {
+    console.error('添加知识点失败:', error)
+    ElMessage.error(`添加知识点失败: ${error.message || '请稍后重试'}`)
+  } finally {
+    loadingInstance.close()
+  }
 }
 
 // 保存知识点
@@ -874,6 +1096,57 @@ function formatFileSize(size) {
     return (sizeNum / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
   }
 }
+
+// 提取描述中的标签
+function extractTags(description) {
+  if (!description) return [];
+  
+  const tags = [];
+  const regex = /#([^#]+)#/g;
+  let match;
+  
+  while ((match = regex.exec(description)) !== null) {
+    tags.push(match[1].trim());
+  }
+  
+  return tags;
+}
+
+// 处理课程描述显示，去掉所有#标签#
+function formatDescription(description) {
+  if (!description) return '';
+  
+  // 去掉所有#标签#内容
+  return description.replace(/#([^#]+)#/g, '').trim() || '暂无描述';
+}
+
+// 根据分类名生成确定的随机颜色
+function getCategoryColor(category) {
+  if (!category) return '#DCDFE6'; // 默认浅灰色
+  
+  // 预定义的颜色列表
+  const colors = [
+    '#409EFF', '#67C23A', '#E6A23C', '#F56C6C', 
+    '#909399', '#9B59B6', '#3498DB', '#1ABC9C',
+    '#27AE60', '#F39C12', '#D35400', '#8E44AD',
+    '#16A085', '#2980B9', '#C0392B', '#7F8C8D'
+  ];
+  
+  // 使用分类名的字符串哈希值来确定颜色索引
+  let hashCode = 0;
+  for (let i = 0; i < category.length; i++) {
+    hashCode = ((hashCode << 5) - hashCode) + category.charCodeAt(i);
+    hashCode = hashCode & hashCode; // 转换为32位整数
+  }
+  
+  // 确保hashCode为正数
+  hashCode = Math.abs(hashCode);
+  
+  // 使用哈希值对颜色数组取模，得到确定的颜色索引
+  const colorIndex = hashCode % colors.length;
+  
+  return colors[colorIndex];
+}
 </script>
 
 <style scoped>
@@ -885,82 +1158,125 @@ function formatFileSize(size) {
 }
 
 .course-header {
-  padding: 24px 32px;
-  color: white;
+  padding: 0 10px;
+  color: #303133;
   position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  background-color: transparent;
+  text-align: left;
+  min-height: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  line-height: 32px;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  height: 32px;
 }
 
 .back-button {
   display: flex;
   align-items: center;
   cursor: pointer;
-  position: absolute;
-  left: 32px;
-  top: 24px;
+  color: #409EFF;
+  margin-right: 16px;
+  position: static;
+  transition: transform 0.3s;
+  line-height: 32px;
+  height: 32px;
 }
 
 .back-button:hover {
   opacity: 0.8;
+  transform: translateX(-5px);
 }
 
 .course-title {
-  font-size: 24px;
+  font-size: 16px;
   font-weight: 500;
-  margin: 0 auto;
+  margin: 0;
+  text-shadow: none;
+  color: #303133;
+  line-height: 32px;
+  height: 32px;
+  font-size: 22px;
 }
 
 .course-content {
   flex: 1;
-  padding: 24px 32px;
+  padding: 32px 40px;
   background-color: #f5f7fa;
   overflow-y: auto;
-  height: calc(100% - 76px); /* 减去header高度 */
 }
 
 .course-tabs {
   background-color: #fff;
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-  margin-bottom: 24px;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  margin-bottom: 30px;
+  transform: scale(1.05);
+  transform-origin: top center;
 }
 
 .content-section {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  text-align: left;
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  border-left: 4px solid #409EFF;
+  padding-left: 15px;
+  text-align: left;
 }
 
 .section-header h3 {
   margin: 0;
   font-size: 18px;
-  font-weight: 500;
+  font-weight: 600;
+  color: #303133;
+  text-align: left;
+}
+
+.section-body {
+  padding-left: 19px;
+  text-align: left;
 }
 
 .empty-tip {
   color: #909399;
-  text-align: center;
-  padding: 32px 0;
+  text-align: left;
+  padding: 20px 0;
+  font-size: 14px;
 }
 
 .materials-list {
   border: 1px solid #ebeef5;
-  border-radius: 4px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .material-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid #ebeef5;
+  transition: background-color 0.3s;
+}
+
+.material-item:hover {
+  background-color: #f5f7fa;
 }
 
 .material-item:last-child {
@@ -969,35 +1285,43 @@ function formatFileSize(size) {
 
 .material-name {
   flex: 1;
-  margin-left: 12px;
+  margin-left: 16px;
+  font-size: 15px;
 }
 
 .material-size {
   color: #909399;
-  margin-right: 16px;
+  margin-right: 20px;
 }
 
 .homework-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
 }
 
 .homework-item {
   border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 16px;
+  border-radius: 8px;
+  padding: 20px;
   display: flex;
   justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.homework-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .homework-info h4 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+  margin: 0 0 10px 0;
+  font-size: 18px;
 }
 
 .homework-info p {
-  margin: 4px 0;
+  margin: 6px 0;
   color: #606266;
   font-size: 14px;
 }
@@ -1005,55 +1329,57 @@ function formatFileSize(size) {
 /* 知识点列表样式 */
 .knowledge-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
 }
 
 .knowledge-item {
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  padding: 16px;
-  background-color: #fafafa;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
 }
 
 .knowledge-item:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
 }
 
 .knowledge-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .knowledge-header h4 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .knowledge-description {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .knowledge-description p {
   margin: 0;
   color: #606266;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .knowledge-footer {
-  margin-bottom: 12px;
-  font-size: 13px;
+  margin-bottom: 16px;
+  font-size: 14px;
 }
 
 .teach-plan-label {
   color: #909399;
-  margin-right: 4px;
+  margin-right: 6px;
+  font-weight: 500;
 }
 
 .teach-plan-content {
@@ -1064,8 +1390,8 @@ function formatFileSize(size) {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid #ebeef5;
-  padding-top: 12px;
-  margin-top: 8px;
+  padding-top: 16px;
+  margin-top: 10px;
 }
 
 .dialog-footer {
@@ -1076,12 +1402,86 @@ function formatFileSize(size) {
 .category-option {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .category-color-dot {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
+}
+
+.knowledge-search-results {
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.empty-search-results {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.selected-knowledge-list {
+  margin-top: 20px;
+  border-top: 1px solid #EBEEF5;
+  padding-top: 15px;
+}
+
+.selected-knowledge-list h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.selected-knowledge-tag {
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+:deep(.selected-row) {
+  background-color: #F0F9EB;
+}
+
+.el-tabs {
+  margin-bottom: 20px;
+}
+
+.course-description-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.course-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.course-tags-container .rendered-tag {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 4px 15px;
+  border-radius: 30px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 400;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.course-tags-container .rendered-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+}
+
+.course-desc {
+  margin: 0;
+  font-size: 15px;
+  color: #606266;
+  line-height: 1.6;
 }
 </style> 
