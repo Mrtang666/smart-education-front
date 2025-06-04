@@ -113,27 +113,62 @@
             <div class="content-section">
               <div class="section-header">
                 <h3>学生列表</h3>
-                <el-button type="primary" size="small">
-                  <el-icon><Plus /></el-icon>
-                  添加学生
-                </el-button>
+                <div class="header-actions">
+                  <el-button type="danger" size="small" v-if="selectedStudents.length > 0" @click="batchRemoveStudents">
+                    <el-icon><Delete /></el-icon>
+                    批量删除 ({{ selectedStudents.length }})
+                  </el-button>
+                  <el-button type="primary" size="small" @click="showAddStudentDialog">
+                    <el-icon><Plus /></el-icon>
+                    添加学生
+                  </el-button>
+                </div>
               </div>
               <div class="section-body">
-                <div v-if="students.length === 0" class="empty-tip">
-                  暂无学生
+                <div class="table-toolbar" v-if="courseStudents.length > 0">
+                  <el-input
+                    v-model="studentSearchKeyword"
+                    placeholder="搜索学生姓名或学号"
+                    prefix-icon="Search"
+                    clearable
+                    @clear="handleSearchClear"
+                    @input="handleSearchInput"
+                    style="width: 250px;"
+                  />
                 </div>
-                <el-table v-else :data="students" style="width: 100%">
-                  <el-table-column prop="id" label="学号" width="120" />
-                  <el-table-column prop="name" label="姓名" width="120" />
-                  <el-table-column prop="gender" label="性别" width="80" />
-                  <el-table-column prop="class" label="班级" />
-                  <el-table-column label="操作">
+                <div v-if="courseStudents.length === 0" class="empty-tip">
+                  暂无学生，请点击"添加学生"按钮添加
+                </div>
+                <el-table
+                  v-else
+                  :data="filteredStudents"
+                  style="width: 100%"
+                  @selection-change="handleSelectionChange"
+                  v-loading="isLoadingStudents"
+                >
+                  <el-table-column type="selection" width="55" />
+                  <el-table-column prop="studentId" label="学号" width="120" />
+                  <el-table-column prop="fullName" label="姓名" width="120" />
+                  <el-table-column prop="email" label="邮箱" />
+                  <el-table-column prop="phone" label="电话" width="120" />
+                  <el-table-column prop="grade" label="年级" width="100" />
+                  <el-table-column prop="className" label="班级" width="120" />
+                  <el-table-column label="操作" width="150" fixed="right">
                     <template #default="scope">
                       <el-button link type="primary" @click="viewStudent(scope.row)">查看</el-button>
                       <el-button link type="danger" @click="removeStudent(scope.row)">移除</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
+                <div class="pagination-container" v-if="courseStudents.length > pageSize">
+                  <el-pagination
+                    v-model:current-page="currentPage"
+                    v-model:page-size="pageSize"
+                    :page-sizes="[10, 20, 50, 100]"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="filteredStudents.length"
+                  />
+                </div>
               </div>
             </div>
           </el-tab-pane>
@@ -163,6 +198,71 @@
                       <el-button link type="danger">删除</el-button>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </el-tab-pane>
+          
+          <el-tab-pane label="考试管理" name="exams">
+            <div class="content-section">
+              <div class="section-header">
+                <h3>考试列表</h3>
+                <el-button type="primary" size="small" @click="showAddExamDialog">
+                  <el-icon><Plus /></el-icon>
+                  创建考试
+                </el-button>
+              </div>
+              <div class="section-body">
+                <div class="table-toolbar" v-if="exams.length > 0">
+                  <el-input
+                    v-model="examSearchKeyword"
+                    placeholder="搜索考试标题或描述"
+                    prefix-icon="Search"
+                    clearable
+                    @clear="handleExamSearchClear"
+                    @input="handleExamSearchInput"
+                    style="width: 250px;"
+                  />
+                </div>
+                <div v-if="exams.length === 0" class="empty-tip">
+                  暂无考试，请点击"创建考试"按钮添加
+                </div>
+                <el-table
+                  v-else
+                  :data="filteredExams"
+                  style="width: 100%"
+                  v-loading="isLoadingExams"
+                >
+                  <el-table-column prop="title" label="考试标题" min-width="180" />
+                  <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+                  <el-table-column prop="totalScore" label="总分" width="80" />
+                  <el-table-column prop="durationMinutes" label="时长(分钟)" width="120" />
+                  <el-table-column label="考试时间" width="200">
+                    <template #default="scope">
+                      {{ formatDate(scope.row.startTime) }} 至 {{ formatDate(scope.row.endTime) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="status" label="状态" width="100">
+                    <template #default="scope">
+                      <el-tag :type="getExamStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="200" fixed="right">
+                    <template #default="scope">
+                      <el-button link type="primary" @click="viewExamScores(scope.row)">查看成绩</el-button>
+                      <el-button link type="primary" @click="editExam(scope.row)">编辑</el-button>
+                      <el-button link type="danger" @click="removeExam(scope.row)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div class="pagination-container" v-if="exams.length > examPageSize">
+                  <el-pagination
+                    v-model:current-page="examCurrentPage"
+                    v-model:page-size="examPageSize"
+                    :page-sizes="[10, 20, 50, 100]"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="filteredExams.length"
+                  />
                 </div>
               </div>
             </div>
@@ -321,15 +421,244 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 添加学生对话框 -->
+    <el-dialog v-model="addStudentDialogVisible" title="添加学生" width="600px">
+      <el-tabs v-model="studentDialogTab">
+        <el-tab-pane label="搜索已有学生" name="search">
+          <el-form label-width="100px">
+            <el-form-item label="搜索学生">
+              <el-input v-model="studentSearchInput" placeholder="输入学号、姓名或班级搜索" clearable>
+                <template #append>
+                  <el-button @click="searchStudents" :loading="isSearchingStudents">
+                    <el-icon><Search /></el-icon>
+                  </el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+            
+            <div class="student-search-results" v-if="searchedStudents.length > 0">
+              <el-alert
+                v-if="!selectedStudentsToAdd.length"
+                type="info"
+                :closable="false"
+                show-icon
+              >
+                点击下方学生行可选择学生，选中后将显示在下方的已选择列表中
+              </el-alert>
+              <el-table 
+                :data="searchedStudents" 
+                style="width: 100%" 
+                @row-click="selectStudent" 
+                :row-class-name="getStudentRowClassName"
+                highlight-current-row
+              >
+                <el-table-column type="selection" width="55" :selectable="isStudentSelectable" />
+                <el-table-column prop="studentId" label="学号" width="120" />
+                <el-table-column prop="fullName" label="姓名" width="120" />
+                <el-table-column prop="grade" label="年级" width="100" />
+                <el-table-column prop="className" label="班级" />
+              </el-table>
+            </div>
+            <div v-else-if="studentSearchInput && !isSearchingStudents && searchTriggered" class="empty-search-results">
+              没有找到匹配的学生
+            </div>
+            
+            <div v-if="selectedStudentsToAdd.length > 0" class="selected-students-list">
+              <div class="selected-header">
+                <h4>已选择的学生 ({{ selectedStudentsToAdd.length }})</h4>
+                <el-button type="primary" size="small" @click="addSelectedStudentsToCourse" :disabled="selectedStudentsToAdd.length === 0">
+                  确认添加到课程
+                </el-button>
+              </div>
+              <el-tag 
+                v-for="student in selectedStudentsToAdd" 
+                :key="student.studentId" 
+                closable 
+                @close="removeSelectedStudent(student)"
+                class="selected-student-tag"
+              >
+                {{ student.fullName }} ({{ student.studentId }})
+              </el-tag>
+            </div>
+          </el-form>
+          <template #footer>
+            <div class="dialog-footer">
+              <el-button @click="addStudentDialogVisible = false">取消</el-button>
+              <el-button type="primary" @click="addSelectedStudentsToCourse" :disabled="selectedStudentsToAdd.length === 0">
+                确认添加到课程 <span v-if="selectedStudentsToAdd.length > 0">({{ selectedStudentsToAdd.length }})</span>
+              </el-button>
+            </div>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+
+    <!-- 学生详情对话框 -->
+    <el-dialog v-model="studentDetailDialogVisible" title="学生详情" width="500px">
+      <div v-if="currentStudent" class="student-detail">
+        <div class="detail-item">
+          <span class="label">学号:</span>
+          <span class="value">{{ currentStudent.studentId }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">姓名:</span>
+          <span class="value">{{ currentStudent.fullName }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">邮箱:</span>
+          <span class="value">{{ currentStudent.email || '未设置' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">电话:</span>
+          <span class="value">{{ currentStudent.phone || '未设置' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">年级:</span>
+          <span class="value">{{ currentStudent.grade || '未设置' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">班级:</span>
+          <span class="value">{{ currentStudent.className || '未设置' }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="studentDetailDialogVisible = false">关闭</el-button>
+          <el-button type="danger" @click="removeCurrentStudent">从课程中移除</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 添加考试对话框 -->
+    <el-dialog v-model="addExamDialogVisible" :title="examFormTitle" width="600px">
+      <el-form :model="examForm" label-width="100px" :rules="examRules" ref="examFormRef">
+        <el-form-item label="考试标题" prop="title">
+          <el-input v-model="examForm.title" placeholder="请输入考试标题" />
+        </el-form-item>
+        <el-form-item label="所属课程">
+          <el-input v-model="courseName" disabled />
+        </el-form-item>
+        <el-form-item label="考试描述">
+          <el-input v-model="examForm.description" type="textarea" :rows="3" placeholder="请输入考试描述" />
+        </el-form-item>
+        <el-form-item label="总分" prop="totalScore">
+          <el-input-number v-model="examForm.totalScore" :min="1" :max="1000" />
+        </el-form-item>
+        <el-form-item label="考试时长" prop="durationMinutes">
+          <el-input-number v-model="examForm.durationMinutes" :min="1" :max="1440" />
+          <span class="form-hint">分钟</span>
+        </el-form-item>
+        <el-form-item label="开始时间" prop="startTime">
+          <el-date-picker
+            v-model="examForm.startTime"
+            type="datetime"
+            placeholder="选择开始时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间" prop="endTime">
+          <el-date-picker
+            v-model="examForm.endTime"
+            type="datetime"
+            placeholder="选择结束时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+          />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="examForm.status" placeholder="请选择考试状态">
+            <el-option label="未开始" value="未开始" />
+            <el-option label="进行中" value="进行中" />
+            <el-option label="已结束" value="已结束" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addExamDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveExam" :loading="isSavingExam">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 考试成绩对话框 -->
+    <el-dialog v-model="examScoresDialogVisible" :title="`${currentExam?.title || ''} - 学生成绩`" width="800px">
+      <div class="exam-scores-container">
+        <div class="table-toolbar">
+          <el-input
+            v-model="scoreSearchKeyword"
+            placeholder="搜索学生姓名或学号"
+            prefix-icon="Search"
+            clearable
+            @clear="handleScoreSearchClear"
+            @input="handleScoreSearchInput"
+            style="width: 250px;"
+          />
+        </div>
+        <div v-if="examScores.length === 0 && !isLoadingScores" class="empty-tip">
+          暂无学生成绩数据
+        </div>
+        <el-table
+          v-else
+          :data="filteredScores"
+          style="width: 100%"
+          v-loading="isLoadingScores"
+        >
+          <el-table-column prop="studentId" label="学号" width="120" />
+          <el-table-column prop="fullName" label="姓名" width="120" />
+          <el-table-column prop="score" label="得分" width="100">
+            <template #default="scope">
+              <span :class="{ 'high-score': scope.row.score >= currentExam.totalScore * 0.8, 'low-score': scope.row.score < currentExam.totalScore * 0.6 }">
+                {{ scope.row.score }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="得分率" width="100">
+            <template #default="scope">
+              <el-progress 
+                :percentage="Math.round((scope.row.score / currentExam.totalScore) * 100)" 
+                :status="getScoreStatus(scope.row.score, currentExam.totalScore)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column prop="submitTime" label="提交时间" width="180">
+            <template #default="scope">
+              {{ formatDate(scope.row.submitTime) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" fixed="right">
+            <template #default="scope">
+              <el-button link type="primary" @click="viewStudentAnswers(scope.row)">查看答卷</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="pagination-container" v-if="examScores.length > scorePageSize">
+          <el-pagination
+            v-model:current-page="scoreCurrentPage"
+            v-model:page-size="scorePageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="filteredScores.length"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="examScoresDialogVisible = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit, Plus, Document, Upload, Download, Delete, Search } from '@element-plus/icons-vue'
-import { courseAPI, knowledgeAPI, materialAPI } from '@/api/api'
+import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, studentExamAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 
 const route = useRoute()
@@ -368,8 +697,29 @@ const fileList = ref([])
 const isUploading = ref(false)
 const uploadFormRef = ref(null)
 
-// 学生列表
-const students = ref([])
+// 课程学生列表
+const courseStudents = ref([])
+const selectedStudents = ref([])
+const currentStudent = ref(null)
+const isLoadingStudents = ref(false)
+const studentSearchKeyword = ref('')
+const filteredStudents = computed(() => {
+  if (!studentSearchKeyword.value) {
+    return courseStudents.value
+  }
+  const keyword = studentSearchKeyword.value.toLowerCase()
+  return courseStudents.value.filter(student => 
+    (student.studentId && student.studentId.toString().includes(keyword)) ||
+    (student.fullName && student.fullName.toLowerCase().includes(keyword)) ||
+    (student.email && student.email.toLowerCase().includes(keyword)) ||
+    (student.className && student.className.toLowerCase().includes(keyword)) ||
+    (student.grade && student.grade.toLowerCase().includes(keyword))
+  )
+})
+
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
 
 // 作业列表
 const homeworks = ref([])
@@ -447,6 +797,72 @@ const selectedKnowledges = ref([])
 // 是否正在搜索
 const isSearching = ref(false)
 
+// 添加学生对话框
+const addStudentDialogVisible = ref(false)
+const studentDialogTab = ref('search')
+const studentSearchInput = ref('')
+const searchedStudents = ref([])
+const selectedStudentsToAdd = ref([])
+const isSearchingStudents = ref(false)
+const searchTriggered = ref(false)
+const studentDetailDialogVisible = ref(false)
+
+// 考试列表
+const exams = ref([])
+const isLoadingExams = ref(false)
+const examSearchKeyword = ref('')
+const examCurrentPage = ref(1)
+const examPageSize = ref(10)
+
+// 考试表单
+const addExamDialogVisible = ref(false)
+const examFormRef = ref(null)
+const examForm = ref({
+  title: '',
+  description: '',
+  totalScore: 100,
+  durationMinutes: 120,
+  startTime: '',
+  endTime: '',
+  status: '未开始',
+  examId: null
+})
+const examFormTitle = ref('创建考试')
+const isSavingExam = ref(false)
+
+// 考试成绩
+const examScoresDialogVisible = ref(false)
+const currentExam = ref(null)
+const examScores = ref([])
+const isLoadingScores = ref(false)
+const scoreSearchKeyword = ref('')
+const scoreCurrentPage = ref(1)
+const scorePageSize = ref(10)
+
+// 过滤考试列表
+const filteredExams = computed(() => {
+  if (!examSearchKeyword.value) {
+    return exams.value
+  }
+  const keyword = examSearchKeyword.value.toLowerCase()
+  return exams.value.filter(exam => 
+    (exam.title && exam.title.toLowerCase().includes(keyword)) ||
+    (exam.description && exam.description.toLowerCase().includes(keyword))
+  )
+})
+
+// 过滤成绩列表
+const filteredScores = computed(() => {
+  if (!scoreSearchKeyword.value) {
+    return examScores.value
+  }
+  const keyword = scoreSearchKeyword.value.toLowerCase()
+  return examScores.value.filter(score => 
+    (score.studentId && score.studentId.toString().includes(keyword)) ||
+    (score.fullName && score.fullName.toLowerCase().includes(keyword))
+  )
+})
+
 // 获取课程信息
 onMounted(async () => {
   if (!courseId) {
@@ -500,10 +916,11 @@ onMounted(async () => {
       // 加载课程资料
       await fetchCourseMaterials()
       
-      students.value = [
-        { id: '2021001', name: '张三', gender: '男', class: '计算机科学与技术1班' },
-        { id: '2021002', name: '李四', gender: '女', class: '计算机科学与技术1班' },
-      ]
+      // 加载课程学生
+      await fetchCourseStudents()
+      
+      // 加载课程考试
+      await fetchCourseExams()
       
       homeworks.value = [
         { id: 1, title: '第一章习题', deadline: '2023-06-01', submitRate: '85%' },
@@ -555,14 +972,15 @@ async function fetchCourseMaterials() {
     const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
     console.log('获取课程资料，课程ID:', courseIdStr)
     
-    const response = await materialAPI.getMaterialsByCourseId(courseIdStr)
+    const response = await courseFileAPI.getCourseFiles(courseIdStr)
     console.log('获取到的课程资料:', response)
     
     if (Array.isArray(response)) {
       // 确保所有资料ID都是字符串形式
       materials.value = response.map(material => ({
         ...material,
-        id: material.id ? new BigNumber(material.id).toString() : material.id
+        id: material.fileId ? new BigNumber(material.fileId).toString() : material.fileId,
+        name: material.fileName
       }));
     } else {
       materials.value = []
@@ -571,6 +989,64 @@ async function fetchCourseMaterials() {
     console.error('获取课程资料失败:', error)
     ElMessage.error('获取课程资料失败，请稍后重试')
     materials.value = []
+  }
+}
+
+// 获取课程学生
+async function fetchCourseStudents() {
+  try {
+    isLoadingStudents.value = true
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+    console.log('获取课程学生，课程ID:', courseIdStr)
+    
+    const response = await courseSelectionAPI.getCourseStudents(courseIdStr)
+    console.log('获取到的课程学生:', response)
+    
+    if (Array.isArray(response)) {
+      // 确保所有ID都是字符串形式
+      courseStudents.value = response.map(student => ({
+        ...student,
+        studentId: student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
+      }));
+    } else {
+      courseStudents.value = []
+    }
+  } catch (error) {
+    console.error('获取课程学生失败:', error)
+    ElMessage.error('获取课程学生失败，请稍后重试')
+    courseStudents.value = []
+  } finally {
+    isLoadingStudents.value = false
+  }
+}
+
+// 获取课程考试
+async function fetchCourseExams() {
+  try {
+    isLoadingExams.value = true
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+    console.log('获取课程考试，课程ID:', courseIdStr)
+    
+    const response = await examAPI.getExamsInCourse(courseIdStr)
+    console.log('获取到的考试数据:', response)
+    
+    if (Array.isArray(response)) {
+      // 确保所有ID都是字符串形式
+      exams.value = response.map(exam => ({
+        ...exam,
+        examId: exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
+      }));
+    } else {
+      exams.value = []
+    }
+  } catch (error) {
+    console.error('获取课程考试失败:', error)
+    ElMessage.error('获取课程考试失败，请稍后重试')
+    exams.value = []
+  } finally {
+    isLoadingExams.value = false
   }
 }
 
@@ -878,7 +1354,7 @@ function removeKnowledge(knowledge) {
     }
   ).then(async () => {
     try {
-      // 确保课程ID和知识点ID都是字符串形式
+      // 确保courseId和knowledgeId都是字符串形式
       const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
       const knowledgeIdStr = knowledge.knowledgeId ? new BigNumber(knowledge.knowledgeId).toString() : knowledge.knowledgeId;
       
@@ -912,165 +1388,6 @@ function getDifficultyTagType(level) {
 // 返回上一页
 function goBack() {
   router.push('/teacher/course')
-}
-
-// 查看学生
-function viewStudent(student) {
-  ElMessage.success(`查看学生: ${student.name}`)
-}
-
-// 移除学生
-function removeStudent(student) {
-  ElMessage.warning(`移除学生: ${student.name}`)
-}
-
-// 显示上传资料对话框
-function showUploadDialog() {
-  uploadForm.value = {
-    file: null,
-    name: '',
-    description: ''
-  }
-  fileList.value = []
-  uploadDialogVisible.value = true
-}
-
-// 文件上传前的验证
-function beforeUpload(file) {
-  // 限制文件大小为50MB
-  const maxSize = 50 * 1024 * 1024
-  if (file.size > maxSize) {
-    ElMessage.error('文件大小不能超过50MB')
-    return false
-  }
-  
-  // 保存文件到表单
-  uploadForm.value.file = file
-  uploadForm.value.name = file.name
-  
-  return false // 阻止自动上传
-}
-
-// 文件选择变化处理
-function handleChange(file) {
-  // 更新文件列表
-  fileList.value = [file]
-  
-  // 保存文件到表单
-  uploadForm.value.file = file.raw
-  uploadForm.value.name = file.name
-}
-
-// 文件移除处理
-function handleRemove() {
-  // 清空文件列表
-  fileList.value = []
-  
-  // 清空表单中的文件
-  uploadForm.value.file = null
-}
-
-// 上传文件
-async function uploadMaterial() {
-  // 表单验证
-  if (!uploadFormRef.value) return
-  
-  uploadFormRef.value.validate(async (valid) => {
-    if (!valid) {
-      ElMessage.warning('请填写完整的表单信息')
-      return
-    }
-    
-    if (!uploadForm.value.file) {
-      ElMessage.warning('请选择要上传的文件')
-      return
-    }
-    
-    try {
-      isUploading.value = true
-      
-      // 创建FormData对象
-      const formData = new FormData()
-      formData.append('file', uploadForm.value.file)
-      formData.append('name', uploadForm.value.name)
-      formData.append('description', uploadForm.value.description || '')
-      
-      // 确保courseId是字符串形式
-      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
-      
-      // 上传文件
-      await materialAPI.uploadMaterial(formData, courseIdStr)
-      
-      ElMessage.success('资料上传成功')
-      uploadDialogVisible.value = false
-      
-      // 重新获取课程资料列表
-      await fetchCourseMaterials()
-    } catch (error) {
-      console.error('上传资料失败:', error)
-      ElMessage.error('上传资料失败，请稍后重试')
-    } finally {
-      isUploading.value = false
-    }
-  })
-}
-
-// 下载资料
-async function downloadMaterial(material) {
-  try {
-    // 确保资料ID是字符串形式
-    const materialIdStr = material.id ? new BigNumber(material.id).toString() : material.id.toString()
-    
-    // 获取下载链接
-    const downloadInfo = await materialAPI.getMaterialDownloadUrl(materialIdStr)
-    
-    if (downloadInfo && downloadInfo.downloadUrl) {
-      // 创建一个临时链接并触发下载
-      const link = document.createElement('a')
-      link.href = downloadInfo.downloadUrl
-      link.download = downloadInfo.name || material.name
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-      ElMessage.success('资料下载中...')
-    } else {
-      throw new Error('获取下载链接失败')
-    }
-  } catch (error) {
-    console.error('下载资料失败:', error)
-    ElMessage.error('下载资料失败，请稍后重试')
-  }
-}
-
-// 删除资料
-function removeMaterial(material) {
-  ElMessageBox.confirm(
-    `确定要删除资料"${material.name}"吗？`,
-    '删除确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(async () => {
-    try {
-      // 确保资料ID是字符串形式
-      const materialIdStr = material.id ? new BigNumber(material.id).toString() : material.id.toString()
-      
-      await materialAPI.deleteMaterial(materialIdStr)
-      
-      // 重新获取课程资料列表
-      await fetchCourseMaterials()
-      
-      ElMessage.success('资料删除成功')
-    } catch (error) {
-      console.error('删除资料失败:', error)
-      ElMessage.error('删除资料失败，请稍后重试')
-    }
-  }).catch(() => {
-    // 用户取消删除
-  })
 }
 
 // 格式化文件大小
@@ -1146,6 +1463,684 @@ function getCategoryColor(category) {
   const colorIndex = hashCode % colors.length;
   
   return colors[colorIndex];
+}
+
+// 显示添加学生对话框
+function showAddStudentDialog() {
+  // 重置表单
+  studentSearchInput.value = ''
+  searchedStudents.value = []
+  selectedStudentsToAdd.value = []
+  studentDialogTab.value = 'search'
+  searchTriggered.value = false
+  
+  addStudentDialogVisible.value = true
+}
+
+// 搜索学生
+async function searchStudents() {
+  if (!studentSearchInput.value.trim()) {
+    ElMessage.warning('请输入搜索关键词')
+    return
+  }
+  
+  try {
+    isSearchingStudents.value = true
+    searchTriggered.value = true
+    
+    const response = await studentAPI.searchStudents({
+      keywords: studentSearchInput.value
+    })
+    console.log('搜索到的学生:', response)
+    
+    if (Array.isArray(response)) {
+      // 过滤掉已经在课程中的学生
+      const courseStudentIds = courseStudents.value.map(s => s.studentId)
+      searchedStudents.value = response.filter(student => 
+        !courseStudentIds.includes(student.studentId)
+      )
+      
+      if (searchedStudents.value.length === 0 && response.length > 0) {
+        ElMessage.info('搜索到的学生已全部在当前课程中')
+      }
+    } else {
+      searchedStudents.value = []
+    }
+  } catch (error) {
+    console.error('搜索学生失败:', error)
+    ElMessage.error(`搜索学生失败: ${error.message || '请稍后重试'}`)
+    searchedStudents.value = []
+  } finally {
+    isSearchingStudents.value = false
+  }
+}
+
+// 选择学生
+function selectStudent(row) {
+  // 检查是否已经选择了该学生
+  const index = selectedStudentsToAdd.value.findIndex(s => s.studentId === row.studentId)
+  
+  if (index === -1) {
+    // 添加到已选择列表
+    selectedStudentsToAdd.value.push(row)
+  } else {
+    // 从已选择列表中移除
+    selectedStudentsToAdd.value.splice(index, 1)
+  }
+}
+
+// 获取学生行样式类名
+function getStudentRowClassName(row) {
+  return selectedStudentsToAdd.value.some(s => s.studentId === row.row.studentId) ? 'selected-row' : ''
+}
+
+// 判断学生是否可选择
+function isStudentSelectable(row) {
+  // 过滤掉已经在课程中的学生
+  const courseStudentIds = courseStudents.value.map(s => s.studentId)
+  return !courseStudentIds.includes(row.studentId)
+}
+
+// 移除已选择的学生
+function removeSelectedStudent(student) {
+  const index = selectedStudentsToAdd.value.findIndex(s => s.studentId === student.studentId)
+  if (index !== -1) {
+    selectedStudentsToAdd.value.splice(index, 1)
+  }
+}
+
+// 添加选中的学生到课程
+async function addSelectedStudentsToCourse() {
+  if (selectedStudentsToAdd.value.length === 0) {
+    ElMessage.warning('请选择至少一个学生')
+    return
+  }
+  
+  const loadingInstance = ElLoading.service({
+    target: '.el-dialog',
+    text: '添加学生中...',
+    background: 'rgba(255, 255, 255, 0.7)'
+  })
+  
+  try {
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+    
+    // 批量添加学生到课程
+    const promises = selectedStudentsToAdd.value.map(student => 
+      courseSelectionAPI.selectCourse(student.studentId, courseIdStr)
+    )
+    
+    await Promise.all(promises)
+    
+    // 重新获取课程学生列表
+    await fetchCourseStudents()
+    
+    ElMessage.success(`成功添加 ${selectedStudentsToAdd.value.length} 个学生到课程`)
+    addStudentDialogVisible.value = false
+  } catch (error) {
+    console.error('添加学生失败:', error)
+    ElMessage.error(`添加学生失败: ${error.message || '请稍后重试'}`)
+  } finally {
+    loadingInstance.close()
+  }
+}
+
+// 查看学生详情
+function viewStudent(student) {
+  currentStudent.value = student
+  studentDetailDialogVisible.value = true
+}
+
+// 移除当前学生
+function removeCurrentStudent() {
+  if (!currentStudent.value) return
+  
+  removeStudent(currentStudent.value)
+  studentDetailDialogVisible.value = false
+}
+
+// 移除学生
+function removeStudent(student) {
+  ElMessageBox.confirm(
+    `确定要将学生"${student.fullName}"从课程中移除吗？`,
+    '移除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保ID是字符串形式
+      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+      const studentIdStr = student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
+      
+      // 修正API参数顺序：应该是从课程中移除学生，而不是从学生中移除课程
+      await courseSelectionAPI.batchDeleteCourseStudents(courseIdStr, [studentIdStr])
+      
+      // 重新获取课程学生列表
+      await fetchCourseStudents()
+      
+      // 如果当前正在查看该学生的详情，则关闭详情对话框
+      if (currentStudent.value && currentStudent.value.studentId === student.studentId) {
+        studentDetailDialogVisible.value = false
+      }
+      
+      ElMessage.success('已成功将学生从课程中移除')
+    } catch (error) {
+      console.error('移除学生失败:', error)
+      ElMessage.error('移除学生失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消移除
+  })
+}
+
+// 批量移除学生
+function batchRemoveStudents() {
+  if (selectedStudents.value.length === 0) {
+    ElMessage.warning('请先选择要移除的学生')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要将选中的 ${selectedStudents.value.length} 名学生从课程中移除吗？`,
+    '批量移除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保courseId是字符串形式
+      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+      
+      // 获取所有学生ID
+      const studentIds = selectedStudents.value.map(student => 
+        student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
+      )
+      
+      // 批量移除学生
+      await courseSelectionAPI.batchDeleteCourseStudents(courseIdStr, studentIds)
+      
+      // 重新获取课程学生列表
+      await fetchCourseStudents()
+      
+      // 清空选中状态
+      selectedStudents.value = []
+      
+      ElMessage.success(`已成功将 ${studentIds.length} 名学生从课程中移除`)
+    } catch (error) {
+      console.error('批量移除学生失败:', error)
+      ElMessage.error('批量移除学生失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消移除
+  })
+}
+
+// 处理表格选择变化
+function handleSelectionChange(selection) {
+  selectedStudents.value = selection
+}
+
+// 处理搜索输入
+function handleSearchInput() {
+  // 重置分页到第一页
+  currentPage.value = 1
+}
+
+// 处理清除搜索
+function handleSearchClear() {
+  studentSearchKeyword.value = ''
+  currentPage.value = 1
+}
+
+// 显示上传资料对话框
+function showUploadDialog() {
+  uploadForm.value = {
+    file: null,
+    name: '',
+    description: ''
+  }
+  fileList.value = []
+  uploadDialogVisible.value = true
+}
+
+// 文件上传前的验证
+function beforeUpload(file) {
+  // 限制文件大小为50MB
+  const maxSize = 50 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.error('文件大小不能超过50MB')
+    return false
+  }
+  
+  // 保存文件到表单
+  uploadForm.value.file = file
+  uploadForm.value.name = file.name
+  
+  return false // 阻止自动上传
+}
+
+// 文件选择变化处理
+function handleChange(file) {
+  // 更新文件列表
+  fileList.value = [file]
+  
+  // 保存文件到表单
+  uploadForm.value.file = file.raw
+  uploadForm.value.name = file.name
+}
+
+// 文件移除处理
+function handleRemove() {
+  // 清空文件列表
+  fileList.value = []
+  
+  // 清空表单中的文件
+  uploadForm.value.file = null
+}
+
+// 上传文件
+async function uploadMaterial() {
+  // 表单验证
+  if (!uploadFormRef.value) return
+  
+  uploadFormRef.value.validate(async (valid) => {
+    if (!valid) {
+      ElMessage.warning('请填写完整的表单信息')
+      return
+    }
+    
+    if (!uploadForm.value.file) {
+      ElMessage.warning('请选择要上传的文件')
+      return
+    }
+    
+    try {
+      isUploading.value = true
+      
+      // 创建FormData对象
+      const formData = new FormData()
+      formData.append('file', uploadForm.value.file)
+      formData.append('fileName', uploadForm.value.name)
+      formData.append('description', uploadForm.value.description || '')
+      
+      // 确保courseId是字符串形式
+      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+      
+      // 上传文件
+      await courseFileAPI.uploadCourseFile(courseIdStr, formData)
+      
+      ElMessage.success('资料上传成功')
+      uploadDialogVisible.value = false
+      
+      // 重新获取课程资料列表
+      await fetchCourseMaterials()
+    } catch (error) {
+      console.error('上传资料失败:', error)
+      ElMessage.error('上传资料失败，请稍后重试')
+    } finally {
+      isUploading.value = false
+    }
+  })
+}
+
+// 下载资料
+async function downloadMaterial(material) {
+  try {
+    // 确保资料ID是字符串形式
+    const fileIdStr = material.id || material.fileId
+    
+    // 获取下载链接并下载文件
+    const blob = await courseFileAPI.downloadCourseFile(fileIdStr)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = material.name || material.fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('资料下载中...')
+  } catch (error) {
+    console.error('下载资料失败:', error)
+    ElMessage.error('下载资料失败，请稍后重试')
+  }
+}
+
+// 删除资料
+function removeMaterial(material) {
+  ElMessageBox.confirm(
+    `确定要删除文件"${material.name || material.fileName}"吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保资料ID是字符串形式
+      const fileIdStr = material.id || material.fileId
+      
+      await courseFileAPI.deleteCourseFile(fileIdStr)
+      
+      // 重新获取课程资料列表
+      await fetchCourseMaterials()
+      
+      ElMessage.success('资料已删除')
+    } catch (error) {
+      console.error('删除资料失败:', error)
+      ElMessage.error('删除资料失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除操作
+  })
+}
+
+// 显示添加考试对话框
+function showAddExamDialog() {
+  examFormTitle.value = '创建考试'
+  // 重置表单
+  examForm.value = {
+    title: '',
+    description: '',
+    totalScore: 100,
+    durationMinutes: 120,
+    startTime: '',
+    endTime: '',
+    status: '未开始',
+    examId: null
+  }
+  
+  addExamDialogVisible.value = true
+}
+
+// 编辑考试
+function editExam(exam) {
+  examFormTitle.value = '编辑考试'
+  // 填充表单数据
+  examForm.value = {
+    title: exam.title,
+    description: exam.description || '',
+    totalScore: exam.totalScore,
+    durationMinutes: exam.durationMinutes,
+    startTime: exam.startTime,
+    endTime: exam.endTime,
+    status: exam.status,
+    examId: exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
+  }
+  
+  addExamDialogVisible.value = true
+}
+
+// 保存考试
+async function saveExam() {
+  examFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        isSavingExam.value = true
+        
+        // 从localstorage中获取教师ID
+        const userInfoStr = localStorage.getItem('user_info')
+        if (!userInfoStr) {
+          throw new Error('未找到用户信息，请重新登录')
+        }
+        
+        const userInfo = JSON.parse(userInfoStr)
+        if (!userInfo || !userInfo.teacherId) {
+          throw new Error('用户信息不完整或不是教师账号')
+        }
+        
+        // 确保教师ID是字符串形式
+        const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+        
+        // 确保courseId是字符串形式
+        const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+        
+        if (examForm.value.examId) {
+          // 更新考试
+          const examData = {
+            examId: examForm.value.examId,
+            title: examForm.value.title,
+            description: examForm.value.description,
+            courseId: courseIdStr,
+            teacherId: teacherId,
+            totalScore: examForm.value.totalScore,
+            durationMinutes: examForm.value.durationMinutes,
+            startTime: examForm.value.startTime,
+            endTime: examForm.value.endTime,
+            status: examForm.value.status
+          }
+          
+          await examAPI.updateExam(examData)
+          ElMessage.success('考试更新成功')
+        } else {
+          // 创建新考试
+          const examData = {
+            title: examForm.value.title,
+            description: examForm.value.description,
+            courseId: courseIdStr,
+            teacherId: teacherId,
+            totalScore: examForm.value.totalScore,
+            durationMinutes: examForm.value.durationMinutes,
+            startTime: examForm.value.startTime,
+            endTime: examForm.value.endTime,
+            status: examForm.value.status
+          }
+          
+          await examAPI.saveExam(examData)
+          ElMessage.success('考试创建成功')
+        }
+        
+        // 重新获取考试列表
+        await fetchCourseExams()
+        
+        // 关闭对话框
+        addExamDialogVisible.value = false
+      } catch (error) {
+        console.error('保存考试失败:', error)
+        ElMessage.error(`保存考试失败: ${error.message || '请稍后重试'}`)
+      } finally {
+        isSavingExam.value = false
+      }
+    }
+  })
+}
+
+// 删除考试
+function removeExam(exam) {
+  ElMessageBox.confirm(
+    `确定要删除考试"${exam.title}"吗？删除后将无法恢复。`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保examId是字符串形式
+      const examIdStr = exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
+      
+      await examAPI.deleteExamById(examIdStr)
+      
+      // 重新获取考试列表
+      await fetchCourseExams()
+      
+      ElMessage.success('考试删除成功')
+    } catch (error) {
+      console.error('删除考试失败:', error)
+      ElMessage.error('删除考试失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
+}
+
+// 查看考试成绩
+async function viewExamScores(exam) {
+  try {
+    currentExam.value = exam
+    examScoresDialogVisible.value = true
+    isLoadingScores.value = true
+    
+    // 确保examId是字符串形式
+    const examIdStr = exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
+    
+    // 获取课程中所有学生的ID
+    const studentIds = courseStudents.value.map(student => 
+      student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
+    )
+    
+    // 为每个学生获取考试成绩
+    const scorePromises = studentIds.map(async (studentId) => {
+      try {
+        // 调用API获取学生在该考试的成绩
+        const scoreData = await studentExamAPI.getExamScore(studentId, examIdStr)
+        if (scoreData) {
+          // 查找对应的学生信息
+          const student = courseStudents.value.find(s => s.studentId === studentId)
+          return {
+            studentId: studentId,
+            fullName: student ? student.fullName : '未知学生',
+            score: scoreData.score || 0,
+            totalScore: exam.totalScore,
+            submitTime: scoreData.submitTime || '',
+            examId: examIdStr,
+            // 添加其他可能需要的成绩信息
+            graded: scoreData.graded || false,
+            feedback: scoreData.feedback || ''
+          }
+        }
+        return null
+      } catch (error) {
+        console.error(`获取学生 ${studentId} 的成绩失败:`, error)
+        return null
+      }
+    })
+    
+    // 等待所有请求完成
+    const results = await Promise.all(scorePromises)
+    
+    // 过滤掉null结果并保存到examScores
+    examScores.value = results.filter(score => score !== null)
+    
+    if (examScores.value.length === 0) {
+      ElMessage.info('暂无学生成绩数据')
+    }
+  } catch (error) {
+    console.error('获取考试成绩失败:', error)
+    ElMessage.error('获取考试成绩失败，请稍后重试')
+    examScores.value = []
+  } finally {
+    isLoadingScores.value = false
+  }
+}
+
+// 查看学生答卷
+function viewStudentAnswers(studentScore) {
+  ElMessage.info(`查看学生 ${studentScore.fullName} 的答卷功能正在开发中...`)
+}
+
+// 处理考试搜索输入
+function handleExamSearchInput() {
+  // 重置分页到第一页
+  examCurrentPage.value = 1
+}
+
+// 处理考试搜索清除
+function handleExamSearchClear() {
+  examSearchKeyword.value = ''
+  examCurrentPage.value = 1
+}
+
+// 处理成绩搜索输入
+function handleScoreSearchInput() {
+  // 重置分页到第一页
+  scoreCurrentPage.value = 1
+}
+
+// 处理成绩搜索清除
+function handleScoreSearchClear() {
+  scoreSearchKeyword.value = ''
+  scoreCurrentPage.value = 1
+}
+
+// 格式化日期
+function formatDate(dateString) {
+  if (!dateString) return '未设置'
+  
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleString('zh-CN', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (error) {
+    return dateString
+  }
+}
+
+// 获取考试状态类型
+function getExamStatusType(status) {
+  switch(status) {
+    case '未开始':
+      return 'info'
+    case '进行中':
+      return 'warning'
+    case '已结束':
+      return 'success'
+    default:
+      return 'info'
+  }
+}
+
+// 获取成绩状态
+function getScoreStatus(score, totalScore) {
+  const percentage = (score / totalScore) * 100
+  if (percentage >= 80) {
+    return 'success'
+  } else if (percentage >= 60) {
+    return 'warning'
+  } else {
+    return 'exception'
+  }
+}
+
+// 考试表单验证规则
+const examRules = {
+  title: [
+    { required: true, message: '请输入考试标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  totalScore: [
+    { required: true, message: '请输入总分', trigger: 'blur' },
+    { type: 'number', min: 1, message: '总分必须大于0', trigger: 'blur' }
+  ],
+  durationMinutes: [
+    { required: true, message: '请输入考试时长', trigger: 'blur' },
+    { type: 'number', min: 1, message: '考试时长必须大于0', trigger: 'blur' }
+  ],
+  startTime: [
+    { required: true, message: '请选择开始时间', trigger: 'change' }
+  ],
+  endTime: [
+    { required: true, message: '请选择结束时间', trigger: 'change' }
+  ],
+  status: [
+    { required: true, message: '请选择考试状态', trigger: 'change' }
+  ]
 }
 </script>
 
@@ -1287,11 +2282,21 @@ function getCategoryColor(category) {
   flex: 1;
   margin-left: 16px;
   font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .material-size {
   color: #909399;
   margin-right: 20px;
+  font-size: 13px;
+  min-width: 60px;
+}
+
+.material-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .homework-list {
@@ -1483,5 +2488,107 @@ function getCategoryColor(category) {
   font-size: 15px;
   color: #606266;
   line-height: 1.6;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.table-toolbar {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.student-search-results {
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.empty-search-results {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.selected-students-list {
+  margin-top: 20px;
+  border-top: 1px solid #EBEEF5;
+  padding-top: 15px;
+}
+
+.selected-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.selected-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.selected-student-tag {
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+:deep(.selected-row) {
+  background-color: #F0F9EB !important;
+}
+
+:deep(.el-alert) {
+  margin-bottom: 10px;
+}
+
+.student-detail {
+  padding: 10px;
+}
+
+.detail-item {
+  margin-bottom: 15px;
+  display: flex;
+}
+
+.detail-item .label {
+  font-weight: bold;
+  width: 80px;
+  color: #606266;
+}
+
+.detail-item .value {
+  flex: 1;
+  color: #303133;
+}
+
+.form-hint {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 14px;
+}
+
+.high-score {
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.low-score {
+  color: #F56C6C;
+  font-weight: bold;
+}
+
+.exam-scores-container {
+  min-height: 300px;
 }
 </style> 

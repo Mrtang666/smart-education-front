@@ -800,14 +800,14 @@ const showKnowledgeCourses = async (knowledge) => {
             courseSelectDialogVisible.value = true;
         } else {
             // 没有找到课程
-            ElMessageBox.alert(
+        ElMessageBox.alert(
                 '该知识点未被分配到任何课程，无法执行从课程中删除操作。',
                 '提示',
-                {
-                    confirmButtonText: '确定',
+            {
+                confirmButtonText: '确定',
                     type: 'info'
-                }
-            );
+            }
+        );
         }
     } catch (error) {
         console.error('获取知识点所在课程失败:', error);
@@ -885,21 +885,21 @@ const deleteKnowledgePermanently = async (knowledge) => {
         await ElMessageBox.confirm(
             `确定要永久删除知识点"${knowledge.name}"吗？此操作将不可恢复！`,
             '永久删除确认',
-            {
+        {
                 confirmButtonText: '确定删除',
-                cancelButtonText: '取消',
+            cancelButtonText: '取消',
                 type: 'error'
-            }
+        }
         );
         
         console.log('永久删除知识点:', {
             knowledgeId: String(knowledge.knowledgeId)
-        });
-        
+            });
+            
         await knowledgeAPI.deleteKnowledgeById(String(knowledge.knowledgeId));
         ElMessage.success('永久删除知识点成功');
         fetchKnowledgeList();
-    } catch (error) {
+        } catch (error) {
         // 检查是否是用户取消操作
         if (error !== 'cancel' && error.toString() !== 'cancel') {
             console.error('永久删除知识点失败:', error);
@@ -949,7 +949,7 @@ const courseKnowledgeDistribution = computed(() => {
     // 为所有课程创建条目，确保所有课程都有初始值0
     courseList.value.forEach(course => {
         if (course && course.name) {
-            distribution[course.name] = 0
+        distribution[course.name] = 0
         }
     })
     
@@ -963,16 +963,16 @@ const courseKnowledgeDistribution = computed(() => {
         distribution[courseName] = knowledgeList.value.length
     } else {
         // 如果是全部课程视图，则基于查询结果的courseName属性来分配
-        knowledgeList.value.forEach(item => {
+    knowledgeList.value.forEach(item => {
             // 方法1：如果知识点有courseName属性（从API返回或之前赋值）
             if (item.courseName) {
                 distribution[item.courseName] = (distribution[item.courseName] || 0) + 1
             } 
             // 方法2：如果有courseId属性（可能是之前附加的）
             else if (item.courseId) {
-                const course = courseList.value.find(c => c.id === item.courseId)
-                if (course && course.name) {
-                    distribution[course.name] = (distribution[course.name] || 0) + 1
+            const course = courseList.value.find(c => c.id === item.courseId)
+            if (course && course.name) {
+                distribution[course.name] = (distribution[course.name] || 0) + 1
                 } else {
                     // 找不到对应课程名称，计入未分配
                     distribution['未分配课程'] = distribution['未分配课程'] + 1
@@ -981,8 +981,8 @@ const courseKnowledgeDistribution = computed(() => {
             // 方法3：没有课程信息的知识点，计入未分配
             else {
                 distribution['未分配课程'] = distribution['未分配课程'] + 1
-            }
-        })
+        }
+    })
     }
     
     // 如果未分配课程为0，则不显示该柱子
@@ -1017,20 +1017,20 @@ const initCharts = () => {
             return
         }
         
-        // 初始化难度分布图表
+    // 初始化难度分布图表
         const difficultyChartDom = document.getElementById('difficultyChart')
         if (difficultyChartDom) {
             difficultyChart = echarts.init(difficultyChartDom)
         }
-        
-        // 初始化课程知识点分布图表
+    
+    // 初始化课程知识点分布图表
         const courseKnowledgeChartDom = document.getElementById('courseKnowledgeChart')
         if (courseKnowledgeChartDom) {
             courseKnowledgeChart = echarts.init(courseKnowledgeChartDom)
         }
-        
-        // 更新图表数据
-        updateCharts()
+    
+    // 更新图表数据
+    updateCharts()
     } catch (error) {
         console.error('初始化图表失败:', error)
     }
@@ -1071,66 +1071,66 @@ const updateCharts = () => {
     }
     
     try {
-        // 更新难度分布图表
+    // 更新难度分布图表
         if (difficultyChart) {
-            const difficultyData = difficultyDistribution.value
+    const difficultyData = difficultyDistribution.value
             difficultyChart.setOption({
-                title: {
-                    text: '知识点难度分布',
-                    left: 'center',
+        title: {
+            text: '知识点难度分布',
+            left: 'center',
+            show: false
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'horizontal',
+            bottom: 'bottom',
+            data: Object.keys(difficultyData)
+        },
+        color: ['#67C23A', '#E6A23C', '#F56C6C'],
+        series: [
+            {
+                name: '难度分布',
+                type: 'pie',
+                radius: ['40%', '70%'],
+                avoidLabelOverlap: false,
+                itemStyle: {
+                    borderRadius: 10,
+                    borderColor: '#fff',
+                    borderWidth: 2
+                },
+                label: {
+                    show: false,
+                    position: 'center'
+                },
+                emphasis: {
+                    label: {
+                        show: true,
+                        fontSize: '18',
+                        fontWeight: 'bold'
+                    }
+                },
+                labelLine: {
                     show: false
                 },
-                tooltip: {
-                    trigger: 'item',
-                    formatter: '{a} <br/>{b}: {c} ({d}%)'
-                },
-                legend: {
-                    orient: 'horizontal',
-                    bottom: 'bottom',
-                    data: Object.keys(difficultyData)
-                },
-                color: ['#67C23A', '#E6A23C', '#F56C6C'],
-                series: [
-                    {
-                        name: '难度分布',
-                        type: 'pie',
-                        radius: ['40%', '70%'],
-                        avoidLabelOverlap: false,
-                        itemStyle: {
-                            borderRadius: 10,
-                            borderColor: '#fff',
-                            borderWidth: 2
-                        },
-                        label: {
-                            show: false,
-                            position: 'center'
-                        },
-                        emphasis: {
-                            label: {
-                                show: true,
-                                fontSize: '18',
-                                fontWeight: 'bold'
-                            }
-                        },
-                        labelLine: {
-                            show: false
-                        },
-                        data: [
+                data: [
                             { value: difficultyData['简单'] || 0, name: '简单' },
                             { value: difficultyData['中等'] || 0, name: '中等' },
                             { value: difficultyData['困难'] || 0, name: '困难' }
-                        ]
-                    }
                 ]
-            })
+            }
+        ]
+    })
         }
-        
-        // 更新课程知识点分布图表
+    
+    // 更新课程知识点分布图表
         if (courseKnowledgeChart) {
-            const courseData = courseKnowledgeDistribution.value
-            const courseNames = Object.keys(courseData)
-            const courseValues = courseNames.map(name => courseData[name])
-
+    const courseData = courseKnowledgeDistribution.value
+    const courseNames = Object.keys(courseData)
+    const courseValues = courseNames.map(name => courseData[name])
+    
             // 更详细的日志，帮助调试
             console.log('课程知识点图表数据详情:', { 
                 课程列表: courseList.value.map(c => ({ id: c.id, name: c.name })),
@@ -1158,40 +1158,40 @@ const updateCharts = () => {
             }
             
             courseKnowledgeChart.setOption({
-                title: {
-                    text: '课程知识点数量',
-                    left: 'center',
-                    show: false
-                },
-                tooltip: {
-                    trigger: 'axis',
-                    axisPointer: {
-                        type: 'shadow'
+        title: {
+            text: '课程知识点数量',
+            left: 'center',
+            show: false
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
                     },
                     formatter: function(params) {
                         const data = params[0];
                         return `${data.name}<br/>知识点数量: ${data.value || 0}`;
-                    }
-                },
-                grid: {
-                    left: '3%',
-                    right: '4%',
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
                     bottom: '15%',
                     top: '10%',
-                    containLabel: true
-                },
-                xAxis: {
-                    type: 'category',
-                    data: courseNames,
-                    axisLabel: {
-                        interval: 0,
-                        rotate: 30,
-                        textStyle: {
-                            fontSize: 12
-                        }
-                    }
-                },
-                yAxis: {
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: courseNames,
+            axisLabel: {
+                interval: 0,
+                rotate: 30,
+                textStyle: {
+                    fontSize: 12
+                }
+            }
+        },
+        yAxis: {
                     type: 'value',
                     minInterval: 1, // 设置最小间隔为1，确保显示整数
                     min: 0, // 从0开始
@@ -1205,22 +1205,22 @@ const updateCharts = () => {
                             type: 'dashed'
                         }
                     }
-                },
-                series: [
-                    {
-                        name: '知识点数量',
-                        type: 'bar',
-                        barWidth: '60%',
+        },
+        series: [
+            {
+                name: '知识点数量',
+                type: 'bar',
+                barWidth: '60%',
                         data: courseValues.map((value, index) => {
                             return {
                                 value: value,
-                                itemStyle: {
+                itemStyle: {
                                     color: colors[index % colors.length]
                                 }
                             };
                         }),
-                        emphasis: {
-                            itemStyle: {
+                emphasis: {
+                    itemStyle: {
                                 shadowBlur: 10,
                                 shadowOffsetX: 0,
                                 shadowColor: 'rgba(0, 0, 0, 0.5)'
@@ -1232,10 +1232,10 @@ const updateCharts = () => {
                             formatter: '{c}',
                             fontSize: 12,
                             fontWeight: 'bold'
-                        }
-                    }
-                ]
-            })
+                }
+            }
+        ]
+    })
         }
     } catch (error) {
         console.error('更新图表数据失败:', error)
@@ -1264,10 +1264,10 @@ onMounted(() => {
         // 然后获取知识点列表
         fetchKnowledgeList().then(() => {
             // 最后初始化图表
-            nextTick(() => {
+    nextTick(() => {
                 // 延迟初始化图表，确保DOM已渲染且echarts已加载
                 setTimeout(() => {
-                    initCharts()
+        initCharts()
                 }, 300)
             })
         })

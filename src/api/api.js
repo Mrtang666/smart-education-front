@@ -2591,120 +2591,284 @@ export const studentAssistantAPI = {
     }
 };
 
+// 课程选择相关API
+export const courseSelectionAPI = {
+    /**
+     * 获取学生选择的课程（需要token）
+     * @param {string} studentId 学生ID
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Object>} 课程选择信息
+     * 返回字段：由后端返回，包含课程选择的详细信息
+     */
+    async getStudentCourseSelection(studentId, courseId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const studentIdStr = String(studentId);
+            const courseIdStr = String(courseId);
+            
+            console.log(`获取学生选课信息，学生ID: ${studentIdStr}, 课程ID: ${courseIdStr}`);
+            
+            const response = await axios.get(`/api/course-selection/student/${studentIdStr}/course/${courseIdStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取学生选课信息失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
 
-//后端待开发的课程资料接口，此处是模拟接口
-// export const materialAPI = {
-//     /**
-//      * 上传课程资料（需要token）
-//      * @param {FormData} formData 包含文件和元数据的FormData对象
-//      * @param {string} courseId 课程ID
-//      * @returns {Promise<Object>} 上传结果
-//      * 返回字段：
-//      *   - id: string 资料ID
-//      *   - name: string 资料名称
-//      *   - size: string 资料大小
-//      *   - courseId: string 课程ID
-//      *   - uploadTime: string 上传时间
-//      *   - fileUrl: string 文件URL
-//      */
-//     async uploadMaterial(formData, courseId) {
-//         const axios = createTeacherAuthorizedAxios();
-//         // 确保courseId是字符串形式
-//         const courseIdStr = String(courseId);
-        
-//         try {
-//             const bn = new BigNumber(courseIdStr);
-//             formData.append('courseId', bn.toString());
-//         } catch (error) {
-//             console.error('无法将课程ID转换为BigNumber:', error);
-//             formData.append('courseId', courseIdStr);
-//         }
-        
-//         const response = await axios.post('/api/material/upload', formData, {
-//             headers: {
-//                 'Content-Type': 'multipart/form-data'
-//             }
-//         });
-//         return response.data;
-//     },
+    /**
+     * 学生选课（需要token）
+     * @param {string} studentId 学生ID
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Object>} 选课结果
+     * 返回字段：由后端返回，通常包含选课成功状态和消息
+     */
+    async selectCourse(studentId, courseId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const studentIdStr = String(studentId);
+            const courseIdStr = String(courseId);
+            
+            console.log(`学生选课，学生ID: ${studentIdStr}, 课程ID: ${courseIdStr}`);
+            
+            const response = await axios.post(`/api/course-selection/student/${studentIdStr}/course/${courseIdStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('学生选课失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
 
-//     /**
-//      * 获取课程资料列表（需要token）
-//      * @param {string} courseId 课程ID
-//      * @returns {Promise<Array<Object>>} 资料列表
-//      * 每项字段：
-//      *   - id: string 资料ID
-//      *   - name: string 资料名称
-//      *   - size: string 资料大小
-//      *   - courseId: string 课程ID
-//      *   - uploadTime: string 上传时间
-//      *   - fileUrl: string 文件URL
-//      */
-//     async getMaterialsByCourseId(courseId) {
-//         const axios = createStudentAuthorizedAxios();
-//         // 确保courseId是字符串形式
-//         const courseIdStr = String(courseId);
-        
-//         let courseIdParam = courseIdStr;
-//         try {
-//             const bn = new BigNumber(courseIdStr);
-//             courseIdParam = bn.toString();
-//         } catch (error) {
-//             console.error('无法将课程ID转换为BigNumber:', error);
-//         }
-        
-//         const response = await axios.get(`/api/material/course/${courseIdParam}`);
-//         return response.data;
-//     },
+    /**
+     * 获取学生所有选课（需要token）
+     * @param {string} studentId 学生ID
+     * @returns {Promise<Array<Object>>} 学生选课列表
+     * 每项字段：由后端返回，包含课程选择的详细信息
+     */
+    async getStudentCourses(studentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const studentIdStr = String(studentId);
+            
+            console.log(`获取学生所有选课，学生ID: ${studentIdStr}`);
+            
+            const response = await axios.get(`/api/course-selection/student/${studentIdStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取学生所有选课失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
 
-//     /**
-//      * 删除课程资料（需要token）
-//      * @param {string} materialId 资料ID
-//      * @returns {Promise<Object>} 删除结果
-//      * 返回字段：
-//      *   - success: boolean 是否删除成功
-//      *   - message: string 提示信息
-//      */
-//     async deleteMaterial(materialId) {
-//         const axios = createTeacherAuthorizedAxios();
-//         // 确保materialId是字符串形式
-//         const materialIdStr = String(materialId);
-        
-//         let materialIdParam = materialIdStr;
-//         try {
-//             const bn = new BigNumber(materialIdStr);
-//             materialIdParam = bn.toString();
-//         } catch (error) {
-//             console.error('无法将资料ID转换为BigNumber:', error);
-//         }
-        
-//         const response = await axios.delete(`/api/material/${materialIdParam}`);
-//         return response.data;
-//     },
+    /**
+     * 获取选择了某课程的所有学生（需要token）
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Array<Object>>} 学生列表
+     * 每项字段：由后端返回，包含学生信息
+     */
+    async getCourseStudents(courseId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            console.log(`获取选择了课程的所有学生，课程ID: ${courseIdStr}`);
+            
+            const response = await axios.get(`/api/course-selection/course/${courseIdStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取选择课程的学生列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
 
-//     /**
-//      * 获取资料下载链接（需要token）
-//      * @param {string} materialId 资料ID
-//      * @returns {Promise<Object>} 下载信息
-//      * 返回字段：
-//      *   - downloadUrl: string 下载URL
-//      *   - name: string 文件名
-//      */
-//     async getMaterialDownloadUrl(materialId) {
-//         const axios = createStudentAuthorizedAxios();
-//         // 确保materialId是字符串形式
-//         const materialIdStr = String(materialId);
-        
-//         let materialIdParam = materialIdStr;
-//         try {
-//             const bn = new BigNumber(materialIdStr);
-//             materialIdParam = bn.toString();
-//         } catch (error) {
-//             console.error('无法将资料ID转换为BigNumber:', error);
-//         }
-        
-//         const response = await axios.get(`/api/material/download/${materialIdParam}`);
-//         return response.data;
-//     }
-// };
+    /**
+     * 批量删除学生选课（需要token）
+     * @param {string} studentId 学生ID
+     * @param {Array<string>} courseIds 课程ID数组
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     *   - count: number 成功删除的数量
+     */
+    async batchDeleteStudentCourses(studentId, courseIds) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const studentIdStr = String(studentId);
+            
+            // 确保所有courseId都是字符串类型
+            const courseIdsStr = courseIds.map(id => String(id));
+            
+            console.log(`批量删除学生选课，学生ID: ${studentIdStr}, 课程数量: ${courseIdsStr.length}`);
+            
+            const response = await axios.delete(`/api/course-selection/batch/student/${studentIdStr}/course`, {
+                data: courseIdsStr
+            });
+            return response.data;
+        } catch (error) {
+            console.error('批量删除学生选课失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 批量删除课程中的学生（需要token）
+     * @param {string} courseId 课程ID
+     * @param {Array<string>} studentIds 学生ID数组
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     *   - count: number 成功删除的数量
+     */
+    async batchDeleteCourseStudents(courseId, studentIds) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            // 确保所有studentId都是字符串类型
+            const studentIdsStr = studentIds.map(id => String(id));
+            
+            console.log(`批量删除课程中的学生，课程ID: ${courseIdStr}, 学生数量: ${studentIdsStr.length}`);
+            
+            const response = await axios.delete(`/api/course-selection/batch/course/${courseIdStr}`, {
+                data: studentIdsStr
+            });
+            return response.data;
+        } catch (error) {
+            console.error('批量删除课程中的学生失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
+
+// 课程文件相关API   TODO：完善文件乱码bug
+export const courseFileAPI = {
+    /**
+     * 上传课程文件（需要token）
+     * @param {string} courseId 课程ID
+     * @param {FormData} formData 包含文件的FormData对象
+     * @returns {Promise<Object>} 上传结果
+     * 返回字段：
+     *   - success: boolean 是否上传成功
+     *   - fileId: string 文件ID
+     *   - fileName: string 文件名
+     *   - fileSize: number 文件大小
+     *   - fileType: string 文件类型
+     *   - uploadTime: string 上传时间（ISO格式）
+     */
+    async uploadCourseFile(courseId, formData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            console.log(`上传课程文件，课程ID: ${courseIdStr}`);
+            
+            const response = await axios.post(`/api/course-file/upload/courseId/${courseIdStr}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('上传课程文件失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 下载课程文件（需要token）
+     * @param {string} fileId 文件ID
+     * @returns {Promise<Blob>} 文件Blob对象
+     */
+    async downloadCourseFile(fileId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const fileIdStr = String(fileId);
+            
+            console.log(`下载课程文件，文件ID: ${fileIdStr}`);
+            
+            const response = await axios.get(`/api/course-file/download/fileId/${fileIdStr}`, {
+                responseType: 'blob'
+            });
+            return response.data;
+        } catch (error) {
+            console.error('下载课程文件失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取课程的所有文件（需要token）
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Array<Object>>} 文件列表
+     * 每项字段：
+     *   - fileId: string 文件ID
+     *   - fileName: string 文件名
+     *   - fileSize: number 文件大小
+     *   - fileType: string 文件类型
+     *   - courseId: string 课程ID
+     *   - uploaderId: string 上传者ID
+     *   - uploaderName: string 上传者姓名
+     *   - uploadTime: string 上传时间（ISO格式）
+     *   - downloadCount: number 下载次数
+     */
+    async getCourseFiles(courseId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            console.log(`获取课程文件列表，课程ID: ${courseIdStr}`);
+            
+            const response = await axios.get(`/api/course-file/courseId/${courseIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.fileId !== undefined) item.fileId = String(item.fileId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                    if (item.uploaderId !== undefined) item.uploaderId = String(item.uploaderId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程文件列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 删除课程文件（需要token）
+     * @param {string} fileId 文件ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     */
+    async deleteCourseFile(fileId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const fileIdStr = String(fileId);
+            
+            console.log(`删除课程文件，文件ID: ${fileIdStr}`);
+            
+            const response = await axios.delete(`/api/course-file/fileId/${fileIdStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除课程文件失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
 
