@@ -11,6 +11,8 @@ import "element-plus/dist/index.css";
 import zhCn from "element-plus/es/locale/lang/zh-cn";
 // 引入Element Plus图标
 import * as ElementPlusIconsVue from "@element-plus/icons-vue";
+// 引入stagewise工具栏
+import { setupStagewise } from "./plugins/stagewise";
 
 const app = createApp(App);
 
@@ -27,4 +29,8 @@ app.use(ElementPlus, {
 app.use(Vant);
 app.use(Icon);
 app.use(router);
+
+// 设置stagewise工具栏（仅在开发环境中启用）
+setupStagewise(app);
+
 app.mount("#app");
