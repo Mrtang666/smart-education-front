@@ -38,26 +38,26 @@ const createStudentAuthorizedAxios = () => {
         (response) => response,
         async (error) => {
             const originalRequest = error.config;
-            
+
             // 如果是401错误且没有重试过
             if (error.response && error.response.status === 401 && !originalRequest._retry) {
                 originalRequest._retry = true;
-                
+
                 try {
                     // 获取刷新token
                     const refreshToken = getRefreshToken();
                     if (!refreshToken) {
                         throw new Error('没有刷新token可用');
                     }
-                    
+
                     // 刷新token
                     const response = await authAPI.studentRefreshToken({ refreshToken });
                     const { accessToken, refreshToken: newRefreshToken } = response;
-                    
+
                     // 保存新token
                     setToken(accessToken);
                     setRefreshToken(newRefreshToken);
-                    
+
                     // 更新请求头并重试
                     originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
                     return instance(originalRequest);
@@ -68,7 +68,7 @@ const createStudentAuthorizedAxios = () => {
                     return Promise.reject(refreshError);
                 }
             }
-            
+
             return Promise.reject(error);
         }
     );
@@ -100,26 +100,26 @@ const createTeacherAuthorizedAxios = () => {
         (response) => response,
         async (error) => {
             const originalRequest = error.config;
-            
+
             // 如果是401错误且没有重试过
             if (error.response && error.response.status === 401 && !originalRequest._retry) {
                 originalRequest._retry = true;
-                
+
                 try {
                     // 获取刷新token
                     const refreshToken = getRefreshToken();
                     if (!refreshToken) {
                         throw new Error('没有刷新token可用');
                     }
-                    
+
                     // 刷新token
                     const response = await authAPI.teacherRefreshToken({ refreshToken });
                     const { accessToken, refreshToken: newRefreshToken } = response;
-                    
+
                     // 保存新token
                     setToken(accessToken);
                     setRefreshToken(newRefreshToken);
-                    
+
                     // 更新请求头并重试
                     originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
                     return instance(originalRequest);
@@ -130,7 +130,7 @@ const createTeacherAuthorizedAxios = () => {
                     return Promise.reject(refreshError);
                 }
             }
-            
+
             return Promise.reject(error);
         }
     );
@@ -433,7 +433,7 @@ export const courseAPI = {
         try {
             // 创建数据副本，避免修改原始数据
             const dataToSend = { ...courseData };
-            
+
             // 确保ID是字符串形式
             if (dataToSend.id !== undefined) {
                 try {
@@ -444,7 +444,7 @@ export const courseAPI = {
                     dataToSend.id = String(dataToSend.id);
                 }
             }
-            
+
             // 如果有知识点ID列表，确保所有ID都是字符串形式
             if (Array.isArray(dataToSend.knowledgeIds)) {
                 dataToSend.knowledgeIds = dataToSend.knowledgeIds.map(id => {
@@ -456,14 +456,14 @@ export const courseAPI = {
                     }
                 });
             }
-            
+
             const response = await axios.post('/api/course/save', dataToSend);
-            
+
             // 确保返回的ID是字符串形式
             if (response.data && response.data.id !== undefined) {
                 response.data.id = String(response.data.id);
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('保存或更新课程失败:', error.response ? error.response.data : error.message);
@@ -482,24 +482,24 @@ export const courseAPI = {
         try {
             // 确保课程ID是字符串形式
             const courseIdStr = String(courseId);
-            
+
             // 调用API时将ID转换为BigNumber
             let courseIdParam = courseIdStr;
-            
+
             try {
                 const bn = new BigNumber(courseIdStr);
                 courseIdParam = bn.toString();
             } catch (error) {
                 console.error('无法将课程ID转换为BigNumber:', error);
             }
-            
+
             const response = await axios.get(`/api/course/${courseIdParam}`);
-            
+
             // 确保返回的ID是字符串形式
             if (response.data && response.data.id !== undefined) {
                 response.data.id = String(response.data.id);
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('获取课程信息失败:', error.response ? error.response.data : error.message);
@@ -520,17 +520,17 @@ export const courseAPI = {
         try {
             // 确保课程ID是字符串形式
             const courseIdStr = String(courseId);
-            
+
             // 调用API时将ID转换为BigNumber
             let courseIdParam = courseIdStr;
-            
+
             try {
                 const bn = new BigNumber(courseIdStr);
                 courseIdParam = bn.toString();
             } catch (error) {
                 console.error('无法将课程ID转换为BigNumber:', error);
             }
-            
+
             const response = await axios.delete(`/api/course/${courseIdParam}`);
             return response.data;
         } catch (error) {
@@ -956,10 +956,10 @@ export const knowledgeAPI = {
         const axios = createTeacherAuthorizedAxios();
         try {
             console.log('更新知识点数据:', updateKnowledgeData);
-            
+
             // 创建数据副本，避免修改原始数据
             const dataToSend = { ...updateKnowledgeData };
-            
+
             // 确保ID是字符串类型
             if (dataToSend.knowledgeId !== undefined) {
                 dataToSend.knowledgeId = String(dataToSend.knowledgeId);
@@ -967,7 +967,7 @@ export const knowledgeAPI = {
             if (dataToSend.teacherId !== undefined) {
                 dataToSend.teacherId = String(dataToSend.teacherId);
             }
-            
+
             // 调用API时将ID转换为BigNumber
             if (dataToSend.knowledgeId) {
                 try {
@@ -977,7 +977,7 @@ export const knowledgeAPI = {
                     console.error('无法将知识点ID转换为BigNumber:', error);
                 }
             }
-            
+
             if (dataToSend.teacherId) {
                 try {
                     const bn = new BigNumber(dataToSend.teacherId);
@@ -986,15 +986,15 @@ export const knowledgeAPI = {
                     console.error('无法将教师ID转换为BigNumber:', error);
                 }
             }
-            
+
             const response = await axios.put('/api/knowledge/update', dataToSend);
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (response.data) {
                 if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
                 if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('更新知识点失败:', error.response ? error.response.data : error.message);
@@ -1017,15 +1017,15 @@ export const knowledgeAPI = {
         const axios = createTeacherAuthorizedAxios();
         try {
             console.log('创建知识点数据:', knowledgeData);
-            
+
             // 创建数据副本，避免修改原始数据
             const dataToSend = { ...knowledgeData };
-            
+
             // 确保ID是字符串类型
             if (dataToSend.teacherId !== undefined) {
                 dataToSend.teacherId = String(dataToSend.teacherId);
             }
-            
+
             // 调用API时将ID转换为BigNumber
             if (dataToSend.teacherId) {
                 try {
@@ -1035,15 +1035,15 @@ export const knowledgeAPI = {
                     console.error('无法将教师ID转换为BigNumber:', error);
                 }
             }
-            
+
             const response = await axios.post('/api/knowledge/save', dataToSend);
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (response.data) {
                 if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
                 if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('创建知识点失败:', error.response ? error.response.data : error.message);
@@ -1059,18 +1059,18 @@ export const knowledgeAPI = {
      */
     async getKnowledgeById(id) {
         const axios = createTeacherAuthorizedAxios();
-        
+
         // 确保ID是字符串类型
         const idStr = String(id);
-        
+
         const response = await axios.get(`/api/knowledge/${idStr}`);
-        
+
         // 确保返回的所有ID字段都是字符串类型
         if (response.data) {
             if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
             if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
         }
-        
+
         return response.data;
     },
 
@@ -1090,16 +1090,16 @@ export const knowledgeAPI = {
             if (courseId === null || courseId === undefined) {
                 throw new Error('删除知识点需要指定课程ID，请选择一个课程');
             }
-            
+
             // 确保ID是字符串类型
             const knowledgeIdStr = String(id);
             const courseIdStr = String(courseId);
-            
+
             console.log(`尝试删除知识点，课程ID: ${courseIdStr}, 知识点ID: ${knowledgeIdStr}`);
-            
+
             // 直接使用字符串形式的ID构建URL
             const url = `/api/knowledge/course/${courseIdStr}/knowledge/${knowledgeIdStr}`;
-            
+
             console.log('删除知识点URL:', url);
             const response = await axios.delete(url);
             console.log('删除知识点响应:', response.data);
@@ -1109,7 +1109,7 @@ export const knowledgeAPI = {
             throw error;
         }
     },
-    
+
     /**
      * 移除知识点持久化（需要token）
      * @param {string} knowledgeId 知识点ID
@@ -1123,9 +1123,9 @@ export const knowledgeAPI = {
         try {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
-            
+
             console.log(`尝试移除知识点持久化，知识点ID: ${knowledgeIdStr}`);
-            
+
             const response = await axios.delete(`/api/knowledge/${knowledgeIdStr}`);
             console.log('移除知识点持久化响应:', response.data);
             return response.data;
@@ -1150,12 +1150,12 @@ export const knowledgeAPI = {
         try {
             // 确保courseId是字符串类型
             const courseIdStr = String(courseId);
-            
+
             // 确保所有knowledgeId都是字符串类型
             const knowledgeIdsStr = knowledgeIds.map(id => String(id));
-            
+
             console.log(`尝试从课程中批量移除知识点，课程ID: ${courseIdStr}, 知识点数量: ${knowledgeIdsStr.length}`);
-            
+
             const response = await axios.delete(`/api/knowledge/course/${courseIdStr}/batch`, {
                 data: knowledgeIdsStr
             });
@@ -1181,9 +1181,9 @@ export const knowledgeAPI = {
         try {
             // 确保所有knowledgeId都是字符串类型
             const knowledgeIdsStr = knowledgeIds.map(id => String(id));
-            
+
             console.log(`尝试批量移除知识点持久化，知识点数量: ${knowledgeIdsStr.length}`);
-            
+
             const response = await axios.delete('/api/knowledge/batch', {
                 data: knowledgeIdsStr
             });
@@ -1194,7 +1194,7 @@ export const knowledgeAPI = {
             throw error;
         }
     },
-    
+
     /**
      * 查询与目标知识点相关联的所有课程（需要token）
      * @param {string} knowledgeId 知识点ID
@@ -1216,25 +1216,25 @@ export const knowledgeAPI = {
         try {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
-            
+
             console.log(`查询与知识点相关联的课程，知识点ID: ${knowledgeIdStr}`);
-            
+
             const response = await axios.get(`/api/course/knowledge/${knowledgeIdStr}`);
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
                 response.data.forEach(item => {
                     if (item.id !== undefined) item.id = String(item.id);
                 });
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('查询知识点相关课程失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     },
-    
+
     /**
      * 根据教师ID获取知识点列表（需要token）
      * @param {string} teacherId 教师ID
@@ -1252,12 +1252,12 @@ export const knowledgeAPI = {
      */
     async getKnowledgeByTeacherId(teacherId) {
         const axios = createTeacherAuthorizedAxios();
-        
+
         // 确保ID是字符串类型
         const teacherIdStr = String(teacherId);
-        
+
         const response = await axios.get(`/api/knowledge/teacher/${teacherIdStr}`);
-        
+
         // 确保返回的所有ID字段都是字符串类型
         if (Array.isArray(response.data)) {
             response.data.forEach(item => {
@@ -1265,7 +1265,7 @@ export const knowledgeAPI = {
                 if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
             });
         }
-        
+
         return response.data;
     },
 
@@ -1285,21 +1285,21 @@ export const knowledgeAPI = {
      */
     async getKnowledgeByCourseId(courseId) {
         const axios = createTeacherAuthorizedAxios();
-        
+
         // 确保ID是字符串类型
-            const courseIdStr = String(courseId);
-            
-            const response = await axios.get(`/api/knowledge/course/${courseIdStr}`);
-            
-            // 确保返回的所有ID字段都是字符串类型
-            if (Array.isArray(response.data)) {
-                response.data.forEach(item => {
-                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
-                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
-                });
-            }
-            
-            return response.data;
+        const courseIdStr = String(courseId);
+
+        const response = await axios.get(`/api/knowledge/course/${courseIdStr}`);
+
+        // 确保返回的所有ID字段都是字符串类型
+        if (Array.isArray(response.data)) {
+            response.data.forEach(item => {
+                if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+            });
+        }
+
+        return response.data;
     },
 
     /**
@@ -1311,13 +1311,13 @@ export const knowledgeAPI = {
      */
     async getKnowledgeByTeacherInCourse(courseId, teacherId) {
         const axios = createTeacherAuthorizedAxios();
-        
+
         // 确保ID是字符串类型
         const courseIdStr = String(courseId);
         const teacherIdStr = String(teacherId);
-        
+
         const response = await axios.get(`/api/knowledge/course/${courseIdStr}/teacher/${teacherIdStr}`);
-        
+
         // 确保返回的所有ID字段都是字符串类型
         if (Array.isArray(response.data)) {
             response.data.forEach(item => {
@@ -1325,7 +1325,7 @@ export const knowledgeAPI = {
                 if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
             });
         }
-        
+
         return response.data;
     },
 
@@ -1341,35 +1341,35 @@ export const knowledgeAPI = {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
             const courseIdStr = String(courseId);
-            
+
             console.log(`尝试复制知识点(${knowledgeIdStr})到课程(${courseIdStr})`);
-            
+
             // 调用API时将ID转换为BigNumber
             let knowledgeIdParam = knowledgeIdStr;
             let courseIdParam = courseIdStr;
-            
+
             try {
                 const bn = new BigNumber(knowledgeIdStr);
                 knowledgeIdParam = bn.toString();
-        } catch (error) {
+            } catch (error) {
                 console.error('无法将知识点ID转换为BigNumber:', error);
             }
-            
+
             try {
                 const bn = new BigNumber(courseIdStr);
                 courseIdParam = bn.toString();
             } catch (error) {
                 console.error('无法将课程ID转换为BigNumber:', error);
             }
-            
+
             const response = await axios.post(`/api/knowledge/${knowledgeIdParam}/copy/course/${courseIdParam}`);
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (response.data) {
                 if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
                 if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('复制知识点失败:', error.response ? error.response.data : error.message);
@@ -1390,7 +1390,7 @@ export const knowledgeAPI = {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
             const courseIdStr = String(courseId);
-            
+
             console.log(`尝试将知识点(${knowledgeIdStr})添加到课程(${courseIdStr})`);
             const response = await axios.post(`/api/knowledge/${knowledgeIdStr}/append/course/${courseIdStr}`);
             console.log('添加知识点到课程响应:', response.data);
@@ -1411,19 +1411,19 @@ export const knowledgeAPI = {
         try {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
-            
+
             // 调用API时将ID转换为BigNumber
             let knowledgeIdParam = knowledgeIdStr;
-            
+
             try {
                 const bn = new BigNumber(knowledgeIdStr);
                 knowledgeIdParam = bn.toString();
             } catch (error) {
                 console.error('无法将知识点ID转换为BigNumber:', error);
             }
-            
+
             const response = await axios.get(`/api/question/knowledge/${knowledgeIdParam}`);
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
                 response.data.forEach(item => {
@@ -1432,7 +1432,7 @@ export const knowledgeAPI = {
                     if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
                 });
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('获取知识点题目列表失败:', error.response ? error.response.data : error.message);
@@ -1462,13 +1462,13 @@ export const knowledgeAPI = {
         try {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
-            
+
             console.log(`搜索知识点题目，知识点ID: ${knowledgeIdStr}, 关键词: ${keyword}`);
-            
+
             const response = await axios.get(`/api/question/knowledge/${knowledgeIdStr}/search/content`, {
                 params: { keyword }
             });
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
                 response.data.forEach(item => {
@@ -1477,7 +1477,7 @@ export const knowledgeAPI = {
                     if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
                 });
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('搜索知识点题目失败:', error.response ? error.response.data : error.message);
@@ -1500,11 +1500,11 @@ export const knowledgeAPI = {
         try {
             // 确保ID是字符串类型
             const knowledgeIdStr = String(knowledgeId);
-            
+
             console.log(`条件搜索知识点题目，知识点ID: ${knowledgeIdStr}, 查询条件:`, questionQueryDTO);
-            
+
             const response = await axios.get(`/api/question/knowledge/${knowledgeIdStr}/conditions`, { params: questionQueryDTO });
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
                 response.data.forEach(item => {
@@ -1513,7 +1513,7 @@ export const knowledgeAPI = {
                     if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
                 });
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('条件搜索知识点题目失败:', error.response ? error.response.data : error.message);
@@ -1531,11 +1531,11 @@ export const knowledgeAPI = {
         const axios = createTeacherAuthorizedAxios();
         try {
             console.log(`搜索知识点，关键词: ${keyword}`);
-            
+
             const response = await axios.get('/api/knowledge/search', {
                 params: { keyword }
             });
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
                 response.data.forEach(item => {
@@ -1543,7 +1543,7 @@ export const knowledgeAPI = {
                     if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
                 });
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('搜索知识点失败:', error.response ? error.response.data : error.message);
@@ -1564,22 +1564,22 @@ export const knowledgeAPI = {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
             const knowledgeIdStr = String(knowledgeId);
-            
+
             console.log(`调整知识点位置，课程ID: ${courseIdStr}, 知识点ID: ${knowledgeIdStr}, 新位置: ${position}`);
-            
+
             const response = await axios.put('/api/knowledge/resort-knowledge', {
                 courseId: courseIdStr,
                 knowledgeId: knowledgeIdStr,
                 position: position
             });
-            
+
             return response.data;
         } catch (error) {
             console.error('调整知识点位置失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     },
-    
+
 };
 
 export const examAPI = {
@@ -2606,9 +2606,9 @@ export const courseSelectionAPI = {
             // 确保ID是字符串类型
             const studentIdStr = String(studentId);
             const courseIdStr = String(courseId);
-            
+
             console.log(`获取学生选课信息，学生ID: ${studentIdStr}, 课程ID: ${courseIdStr}`);
-            
+
             const response = await axios.get(`/api/course-selection/student/${studentIdStr}/course/${courseIdStr}`);
             return response.data;
         } catch (error) {
@@ -2630,9 +2630,9 @@ export const courseSelectionAPI = {
             // 确保ID是字符串类型
             const studentIdStr = String(studentId);
             const courseIdStr = String(courseId);
-            
+
             console.log(`学生选课，学生ID: ${studentIdStr}, 课程ID: ${courseIdStr}`);
-            
+
             const response = await axios.post(`/api/course-selection/student/${studentIdStr}/course/${courseIdStr}`);
             return response.data;
         } catch (error) {
@@ -2652,9 +2652,9 @@ export const courseSelectionAPI = {
         try {
             // 确保ID是字符串类型
             const studentIdStr = String(studentId);
-            
+
             console.log(`获取学生所有选课，学生ID: ${studentIdStr}`);
-            
+
             const response = await axios.get(`/api/course-selection/student/${studentIdStr}`);
             return response.data;
         } catch (error) {
@@ -2674,9 +2674,9 @@ export const courseSelectionAPI = {
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
-            
+
             console.log(`获取选择了课程的所有学生，课程ID: ${courseIdStr}`);
-            
+
             const response = await axios.get(`/api/course-selection/course/${courseIdStr}`);
             return response.data;
         } catch (error) {
@@ -2700,12 +2700,12 @@ export const courseSelectionAPI = {
         try {
             // 确保ID是字符串类型
             const studentIdStr = String(studentId);
-            
+
             // 确保所有courseId都是字符串类型
             const courseIdsStr = courseIds.map(id => String(id));
-            
+
             console.log(`批量删除学生选课，学生ID: ${studentIdStr}, 课程数量: ${courseIdsStr.length}`);
-            
+
             const response = await axios.delete(`/api/course-selection/batch/student/${studentIdStr}/course`, {
                 data: courseIdsStr
             });
@@ -2731,12 +2731,12 @@ export const courseSelectionAPI = {
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
-            
+
             // 确保所有studentId都是字符串类型
             const studentIdsStr = studentIds.map(id => String(id));
-            
+
             console.log(`批量删除课程中的学生，课程ID: ${courseIdStr}, 学生数量: ${studentIdsStr.length}`);
-            
+
             const response = await axios.delete(`/api/course-selection/batch/course/${courseIdStr}`, {
                 data: studentIdsStr
             });
@@ -2768,9 +2768,9 @@ export const courseFileAPI = {
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
-            
+
             console.log(`上传课程文件，课程ID: ${courseIdStr}`);
-            
+
             const response = await axios.post(`/api/course-file/upload/courseId/${courseIdStr}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
@@ -2790,12 +2790,13 @@ export const courseFileAPI = {
      */
     async downloadCourseFile(fileId) {
         const axios = createStudentAuthorizedAxios();
+        console.log(fileId + "开始下载");
+
         try {
-            // 确保ID是字符串类型
             const fileIdStr = String(fileId);
-            
+
             console.log(`下载课程文件，文件ID: ${fileIdStr}`);
-            
+
             const response = await axios.get(`/api/course-file/download/fileId/${fileIdStr}`, {
                 responseType: 'blob'
             });
@@ -2803,6 +2804,8 @@ export const courseFileAPI = {
         } catch (error) {
             console.error('下载课程文件失败:', error.response ? error.response.data : error.message);
             throw error;
+        } finally {
+            console.log(fileId + "下载结束");
         }
     },
 
@@ -2826,11 +2829,11 @@ export const courseFileAPI = {
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
-            
+
             console.log(`获取课程文件列表，课程ID: ${courseIdStr}`);
-            
+
             const response = await axios.get(`/api/course-file/courseId/${courseIdStr}`);
-            
+
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
                 response.data.forEach(item => {
@@ -2839,7 +2842,7 @@ export const courseFileAPI = {
                     if (item.uploaderId !== undefined) item.uploaderId = String(item.uploaderId);
                 });
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('获取课程文件列表失败:', error.response ? error.response.data : error.message);
@@ -2860,9 +2863,9 @@ export const courseFileAPI = {
         try {
             // 确保ID是字符串类型
             const fileIdStr = String(fileId);
-            
+
             console.log(`删除课程文件，文件ID: ${fileIdStr}`);
-            
+
             const response = await axios.delete(`/api/course-file/fileId/${fileIdStr}`);
             return response.data;
         } catch (error) {

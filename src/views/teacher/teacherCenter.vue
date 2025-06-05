@@ -226,9 +226,9 @@ function handleMenuClick(menu) {
     case '知识':
       router.push('/teacher/knowledge')
       break
-    // case '考试':
-    //   router.push('/teacher/exam')
-    //   break
+    case '考试':
+      router.push('/teacher/exam')
+      break
     // case '作业':
     //   router.push('/teacher/homework')
     //   break

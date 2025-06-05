@@ -242,9 +242,9 @@
                       {{ formatDate(scope.row.startTime) }} 至 {{ formatDate(scope.row.endTime) }}
                     </template>
                   </el-table-column>
-                  <el-table-column prop="status" label="状态" width="100">
+                  <el-table-column label="状态" width="100">
                     <template #default="scope">
-                      <el-tag :type="getExamStatusType(scope.row.status)">{{ scope.row.status }}</el-tag>
+                      <el-tag :type="getExamStatusType(scope.row.status, scope.row)">{{ getExamStatus(scope.row) }}</el-tag>
                     </template>
                   </el-table-column>
                   <el-table-column label="操作" width="200" fixed="right">
@@ -567,13 +567,14 @@
             value-format="YYYY-MM-DDTHH:mm:ss"
           />
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="examForm.status" placeholder="请选择考试状态">
-            <el-option label="未开始" value="未开始" />
-            <el-option label="进行中" value="进行中" />
-            <el-option label="已结束" value="已结束" />
-          </el-select>
-        </el-form-item>
+        <div class="form-tip">
+          <el-alert
+            title="考试状态将根据开始和结束时间自动判断"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+        </div>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -654,7 +655,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit, Plus, Document, Upload, Download, Delete, Search } from '@element-plus/icons-vue'
@@ -814,6 +815,12 @@ const examSearchKeyword = ref('')
 const examCurrentPage = ref(1)
 const examPageSize = ref(10)
 
+// 添加计算属性跟踪当前时间
+const currentTime = ref(new Date())
+
+// 定时更新当前时间
+let timeInterval = null
+
 // 考试表单
 const addExamDialogVisible = ref(false)
 const examFormRef = ref(null)
@@ -824,7 +831,6 @@ const examForm = ref({
   durationMinutes: 120,
   startTime: '',
   endTime: '',
-  status: '未开始',
   examId: null
 })
 const examFormTitle = ref('创建考试')
@@ -937,7 +943,86 @@ onMounted(async () => {
   } finally {
     loadingInstance.close()
   }
+  
+  // 设置定时器，每分钟更新一次当前时间
+  timeInterval = setInterval(() => {
+    currentTime.value = new Date()
+    // 检查是否需要更新考试状态
+    updateExamsStatus()
+  }, 60000) // 每分钟更新一次
 })
+
+onUnmounted(() => {
+  // 清除定时器
+  if (timeInterval) {
+    clearInterval(timeInterval)
+  }
+})
+
+// 更新考试状态的方法
+async function updateExamsStatus() {
+  if (!exams.value || exams.value.length === 0) return
+  
+  const now = currentTime.value
+  const examUpdates = []
+  
+  for (const exam of exams.value) {
+    const startTime = exam.startTime ? new Date(exam.startTime) : null
+    const endTime = exam.endTime ? new Date(exam.endTime) : null
+    let newStatus = null
+    
+    if (startTime && endTime) {
+      // 根据当前时间判断状态
+      if (now < startTime && exam.status !== '未开始') {
+        newStatus = '未开始'
+      } else if (now >= startTime && now <= endTime && exam.status !== '进行中') {
+        newStatus = '进行中'
+      } else if (now > endTime && exam.status !== '已结束') {
+        newStatus = '已结束'
+      }
+      
+      // 如果状态需要更新
+      if (newStatus && newStatus !== exam.status) {
+        examUpdates.push({
+          exam,
+          newStatus
+        })
+      }
+    }
+  }
+  
+  // 批量更新考试状态
+  if (examUpdates.length > 0) {
+    try {
+      for (const update of examUpdates) {
+        const examData = {
+          examId: update.exam.examId,
+          title: update.exam.title,
+          description: update.exam.description,
+          courseId: update.exam.courseId,
+          teacherId: update.exam.teacherId,
+          totalScore: update.exam.totalScore,
+          durationMinutes: update.exam.durationMinutes,
+          startTime: update.exam.startTime,
+          endTime: update.exam.endTime,
+          status: update.newStatus
+        }
+        
+        await examAPI.updateExam(examData)
+        
+        // 更新本地状态
+        const index = exams.value.findIndex(e => e.examId === update.exam.examId)
+        if (index !== -1) {
+          exams.value[index].status = update.newStatus
+        }
+      }
+      
+      console.log(`已自动更新 ${examUpdates.length} 个考试的状态`)
+    } catch (error) {
+      console.error('自动更新考试状态失败:', error)
+    }
+  }
+}
 
 // 获取课程知识点
 async function fetchCourseKnowledges() {
@@ -1038,6 +1123,9 @@ async function fetchCourseExams() {
         ...exam,
         examId: exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
       }));
+      
+      // 获取考试后立即检查状态
+      updateExamsStatus()
     } else {
       exams.value = []
     }
@@ -1794,24 +1882,44 @@ async function downloadMaterial(material) {
   try {
     // 确保资料ID是字符串形式
     const fileIdStr = material.id || material.fileId
+    if (!fileIdStr) {
+      ElMessage.error('文件ID无效，无法下载')
+      return
+    }
+    
+    // 显示下载中提示
+    const loadingInstance = ElLoading.service({
+      text: '文件下载中...',
+      background: 'rgba(255, 255, 255, 0.7)'
+    })
     
     // 获取下载链接并下载文件
     const blob = await courseFileAPI.downloadCourseFile(fileIdStr)
+    
+    // 检查blob是否有效
+    if (!blob || blob.size === 0) {
+      throw new Error('下载的文件为空或无效')
+    }
     
     // 创建下载链接
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = material.name || material.fileName
+    link.download = material.name || material.fileName || `下载文件_${new Date().getTime()}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
     
-    ElMessage.success('资料下载中...')
+    // 延迟释放URL对象，确保下载开始
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+    }, 100)
+    
+    ElMessage.success('文件下载成功')
+    loadingInstance.close()
   } catch (error) {
     console.error('下载资料失败:', error)
-    ElMessage.error('下载资料失败，请稍后重试')
+    ElMessage.error(`下载资料失败: ${error.message || '请稍后重试'}`)
   }
 }
 
@@ -1856,7 +1964,6 @@ function showAddExamDialog() {
     durationMinutes: 120,
     startTime: '',
     endTime: '',
-    status: '未开始',
     examId: null
   }
   
@@ -1874,7 +1981,6 @@ function editExam(exam) {
     durationMinutes: exam.durationMinutes,
     startTime: exam.startTime,
     endTime: exam.endTime,
-    status: exam.status,
     examId: exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
   }
   
@@ -1905,6 +2011,20 @@ async function saveExam() {
         // 确保courseId是字符串形式
         const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
         
+        // 根据开始和结束时间自动判断状态
+        const now = currentTime.value;
+        const startTime = new Date(examForm.value.startTime);
+        const endTime = new Date(examForm.value.endTime);
+        
+        let status = '未知';
+        if (now < startTime) {
+          status = '未开始';
+        } else if (now >= startTime && now <= endTime) {
+          status = '进行中';
+        } else if (now > endTime) {
+          status = '已结束';
+        }
+        
         if (examForm.value.examId) {
           // 更新考试
           const examData = {
@@ -1917,7 +2037,7 @@ async function saveExam() {
             durationMinutes: examForm.value.durationMinutes,
             startTime: examForm.value.startTime,
             endTime: examForm.value.endTime,
-            status: examForm.value.status
+            status: status // 使用自动判断的状态
           }
           
           await examAPI.updateExam(examData)
@@ -1933,7 +2053,7 @@ async function saveExam() {
             durationMinutes: examForm.value.durationMinutes,
             startTime: examForm.value.startTime,
             endTime: examForm.value.endTime,
-            status: examForm.value.status
+            status: status // 使用自动判断的状态
           }
           
           await examAPI.saveExam(examData)
@@ -2093,7 +2213,23 @@ function formatDate(dateString) {
 }
 
 // 获取考试状态类型
-function getExamStatusType(status) {
+function getExamStatusType(status, exam) {
+  // 根据考试的开始和结束时间自动判断状态
+  const now = currentTime.value;
+  const startTime = exam ? new Date(exam.startTime) : null;
+  const endTime = exam ? new Date(exam.endTime) : null;
+  
+  if (startTime && endTime) {
+    if (now < startTime) {
+      return 'info'; // 未开始
+    } else if (now >= startTime && now <= endTime) {
+      return 'warning'; // 进行中
+    } else if (now > endTime) {
+      return 'success'; // 已结束
+    }
+  }
+  
+  // 如果无法判断，则使用数据库中存储的状态
   switch(status) {
     case '未开始':
       return 'info'
@@ -2137,10 +2273,27 @@ const examRules = {
   ],
   endTime: [
     { required: true, message: '请选择结束时间', trigger: 'change' }
-  ],
-  status: [
-    { required: true, message: '请选择考试状态', trigger: 'change' }
   ]
+}
+
+// 获取考试状态文本
+function getExamStatus(exam) {
+  const now = currentTime.value;
+  const startTime = exam ? new Date(exam.startTime) : null;
+  const endTime = exam ? new Date(exam.endTime) : null;
+  
+  if (startTime && endTime) {
+    if (now < startTime) {
+      return '未开始';
+    } else if (now >= startTime && now <= endTime) {
+      return '进行中';
+    } else if (now > endTime) {
+      return '已结束';
+    }
+  }
+  
+  // 如果无法判断，则使用数据库中存储的状态
+  return exam.status || '未知';
 }
 </script>
 
@@ -2590,5 +2743,14 @@ const examRules = {
 
 .exam-scores-container {
   min-height: 300px;
+}
+
+.form-tip {
+  margin-bottom: 20px;
+}
+
+:deep(.form-tip .el-alert) {
+  margin-left: 100px;
+  width: calc(100% - 100px);
 }
 </style> 
