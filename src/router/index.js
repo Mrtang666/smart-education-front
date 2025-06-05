@@ -37,8 +37,20 @@ const routes = [
         component: () => import("@/views/teacher/teacherKnowledge.vue"),
       },
       {
+        path: "knowledge/:knowledgeId",
+        component: () => import("@/views/teacher/teacherKnowledgeDetail.vue"),
+        props: true,
+        name: "teacherKnowledgeDetail"
+      },
+      {
         path: "exam",
         component: () => import("@/views/teacher/teacherExam.vue"),
+      },
+      {
+        path: "exam/scores/:examId",
+        component: () => import("@/views/teacher/teacherExamScores.vue"),
+        props: true,
+        name: "teacherExamScores"
       },
       // {
       //   path: "examCheck",

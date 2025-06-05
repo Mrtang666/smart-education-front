@@ -30,7 +30,7 @@
                 </span>
                 <template #dropdown>
                     <el-dropdown-menu>
-                        <el-dropdown-item @click="emit('userAction', 'profile')">个人中心</el-dropdown-item>
+                        <el-dropdown-item @click="handleProfileClick">个人中心</el-dropdown-item>
                         <el-dropdown-item @click="emit('userAction', 'changePassword')">修改密码</el-dropdown-item>
                         <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                     </el-dropdown-menu>
@@ -81,6 +81,11 @@ const searchValue = ref(props.defaultSearchValue)
 const emit = defineEmits(['userAction', 'search', 'searchInput'])
 
 const inviteCode = ref('')
+
+function handleProfileClick() {
+    // 跳转到个人中心页面
+    router.push('/teacher/center')
+}
 
 function handleSearchInput() {
     // 将搜索框的值发送给父组件

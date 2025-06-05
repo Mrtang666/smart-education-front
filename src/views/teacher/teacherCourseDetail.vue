@@ -33,7 +33,7 @@
                   暂无知识点，请点击"添加知识点"按钮添加
                 </div>
                 <div v-else class="knowledge-list">
-                  <div v-for="knowledge in courseKnowledges" :key="knowledge.knowledgeId" class="knowledge-item">
+                  <div v-for="knowledge in courseKnowledges" :key="knowledge.knowledgeId" class="knowledge-item" @click="viewKnowledgeDetail(knowledge)">
                     <div class="knowledge-header">
                       <h4>{{ knowledge.name }}</h4>
                       <el-tag :type="getDifficultyTagType(knowledge.difficultyLevel)">{{ knowledge.difficultyLevel }}</el-tag>
@@ -46,8 +46,8 @@
                       <span class="teach-plan-content">{{ knowledge.teachPlan || '暂无教学计划' }}</span>
                     </div>
                     <div class="knowledge-actions">
-                      <el-button link type="primary" @click="editKnowledge(knowledge)">编辑</el-button>
-                      <el-button link type="danger" @click="removeKnowledge(knowledge)">删除</el-button>
+                      <el-button link type="primary" @click.stop="editKnowledge(knowledge)">编辑</el-button>
+                      <el-button link type="danger" @click.stop="removeKnowledge(knowledge)">删除</el-button>
                     </div>
                   </div>
                 </div>
@@ -119,9 +119,9 @@
                     批量删除 ({{ selectedStudents.length }})
                   </el-button>
                   <el-button type="primary" size="small" @click="showAddStudentDialog">
-                    <el-icon><Plus /></el-icon>
-                    添加学生
-                  </el-button>
+                  <el-icon><Plus /></el-icon>
+                  添加学生
+                </el-button>
                 </div>
               </div>
               <div class="section-body">
@@ -319,8 +319,21 @@
               </el-input>
             </el-form-item>
             
+            <el-form-item>
+              <el-button type="primary" @click="searchExistingKnowledge">
+                <el-icon><Search /></el-icon> 搜索知识点
+              </el-button>
+            </el-form-item>
+            
             <div class="knowledge-search-results" v-if="searchedKnowledges.length > 0">
-              <el-table :data="searchedKnowledges" style="width: 100%" @row-click="selectKnowledge" :row-class-name="getRowClassName">
+              <el-table 
+                :data="searchedKnowledges" 
+                style="width: 100%" 
+                @row-click="selectKnowledge" 
+                :row-class-name="getRowClassName"
+                @selection-change="handleKnowledgeSelectionChange"
+              >
+                <el-table-column type="selection" width="55" />
                 <el-table-column prop="name" label="名称" width="180" />
                 <el-table-column prop="difficultyLevel" label="难度" width="100">
                   <template #default="scope">
@@ -335,7 +348,12 @@
             </div>
             
             <div v-if="selectedKnowledges.length > 0" class="selected-knowledge-list">
-              <h4>已选择的知识点</h4>
+              <div class="selected-header">
+                <h4>已选择的知识点 ({{ selectedKnowledges.length }})</h4>
+                <el-button type="primary" size="small" @click="addSelectedKnowledgesToCourse" :disabled="selectedKnowledges.length === 0">
+                  确认添加到课程
+                </el-button>
+              </div>
               <el-tag 
                 v-for="knowledge in selectedKnowledges" 
                 :key="knowledge.knowledgeId" 
@@ -351,9 +369,6 @@
           <template #footer>
             <div class="dialog-footer">
               <el-button @click="addKnowledgeDialogVisible = false">取消</el-button>
-              <el-button type="primary" @click="addSelectedKnowledgesToCourse" :disabled="selectedKnowledges.length === 0">
-                添加到课程
-              </el-button>
             </div>
           </template>
         </el-tab-pane>
@@ -378,6 +393,9 @@
             </el-form-item>
             <el-form-item label="教学计划">
               <el-input v-model="newKnowledge.teachPlan" type="textarea" placeholder="请输入教学计划" :rows="3" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="saveKnowledge">创建知识点</el-button>
             </el-form-item>
           </el-form>
           <template #footer>
@@ -1118,6 +1136,7 @@ async function searchExistingKnowledge() {
   }
 }
 
+// 修改选择知识点函数，支持表格多选
 // 选择知识点
 function selectKnowledge(row) {
   // 检查是否已经选择了该知识点
@@ -1130,6 +1149,12 @@ function selectKnowledge(row) {
     // 从已选择列表中移除
     selectedKnowledges.value.splice(index, 1)
   }
+}
+
+// 添加表格选择变化处理函数
+function handleKnowledgeSelectionChange(selection) {
+  // 直接用选中的行替换已选择的知识点列表
+  selectedKnowledges.value = selection
 }
 
 // 获取行样式类名
@@ -1268,6 +1293,9 @@ function editKnowledge(knowledge) {
     teachPlan: knowledge.teachPlan || '',
     knowledgeId: knowledge.knowledgeId ? new BigNumber(knowledge.knowledgeId).toString() : knowledge.knowledgeId // 保存原知识点ID，用于更新
   }
+  
+  // 切换到创建新知识点标签页
+  knowledgeDialogTab.value = 'create'
   
   addKnowledgeDialogVisible.value = true
   ElMessage.info('请在表单中修改知识点信息后点击确认')
@@ -1746,13 +1774,13 @@ async function downloadMaterial(material) {
     
     // 创建下载链接
     const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
+      const link = document.createElement('a')
     link.href = url
     link.download = material.name || material.fileName || `下载文件_${new Date().getTime()}`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
     // 延迟释放URL对象，确保下载开始
     setTimeout(() => {
       window.URL.revokeObjectURL(url)
@@ -1885,7 +1913,7 @@ async function saveExam() {
           
           await examAPI.updateExam(examData)
           ElMessage.success('考试更新成功')
-        } else {
+  } else {
           // 创建新考试
           const examData = {
             title: examForm.value.title,
@@ -2149,6 +2177,22 @@ onUnmounted(() => {
     clearInterval(timeInterval)
   }
 })
+
+// 查看知识点详情
+function viewKnowledgeDetail(knowledge) {
+  // 确保知识点ID是字符串形式
+  const knowledgeIdStr = knowledge.knowledgeId ? new BigNumber(knowledge.knowledgeId).toString() : knowledge.knowledgeId
+  
+  // 跳转到知识点详情页面
+  router.push({
+    path: `/teacher/knowledge/${knowledgeIdStr}`,
+    query: {
+      courseName: courseName.value,
+      courseId: courseId,
+      knowledgeName: knowledge.name
+    }
+  })
+}
 </script>
 
 <style scoped>
@@ -2352,11 +2396,32 @@ onUnmounted(() => {
   background-color: #fff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
+  cursor: pointer;
+  position: relative;
 }
 
 .knowledge-item:hover {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
   transform: translateY(-3px);
+  background-color: #f9fbfe;
+}
+
+.knowledge-item::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #c0c4cc;
+  border-right: 2px solid #c0c4cc;
+  transform: translateY(-50%) rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.knowledge-item:hover::after {
+  opacity: 1;
 }
 
 .knowledge-header {

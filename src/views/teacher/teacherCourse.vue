@@ -1,7 +1,13 @@
 <template>
   <div class="teacher-course">
     <div class="course-header">
-      <h2 class="section-title">课程管理</h2>
+      <div class="header-content">
+        <h2 class="section-title">课程管理</h2>
+        <!-- 添加加入课程按钮 -->
+        <el-button type="primary" @click="showJoinCourseDialog" class="join-course-btn">
+          <el-icon><Plus /></el-icon>加入课程
+        </el-button>
+      </div>
       <div class="course-actions">
         <!-- 移除了顶部的新建课程按钮和搜索框 -->
       </div>
@@ -297,6 +303,24 @@
             <el-button @click="knowledgeSelectionVisible = false">取消</el-button>
             <el-button type="primary" @click="confirmKnowledgeSelection">确定</el-button>
           </div>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 加入课程对话框 -->
+    <el-dialog v-model="joinCourseDialogVisible" title="加入课程" width="400px" :close-on-click-modal="false">
+      <el-form :model="joinCourseForm" label-width="80px" ref="joinCourseFormRef">
+        <el-form-item label="邀请码" prop="inviteCode" :rules="[
+          { required: true, message: '请输入邀请码', trigger: 'blur' },
+          { min: 6, max: 20, message: '邀请码长度在6到20个字符之间', trigger: 'blur' }
+        ]">
+          <el-input v-model="joinCourseForm.inviteCode" placeholder="请输入课程邀请码" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="joinCourseDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleJoinCourse">加入</el-button>
         </div>
       </template>
     </el-dialog>
@@ -1100,6 +1124,56 @@ function extractTags(description) {
   
   return tags;
 }
+
+// 加入课程相关
+const joinCourseDialogVisible = ref(false)
+const joinCourseFormRef = ref(null)
+const joinCourseForm = ref({
+  inviteCode: ''
+})
+
+// 显示加入课程对话框
+function showJoinCourseDialog() {
+  joinCourseDialogVisible.value = true
+  joinCourseForm.value.inviteCode = ''
+}
+//待写邀请码接口
+// // 处理加入课程
+// async function handleJoinCourse() {
+//   joinCourseFormRef.value.validate(async (valid) => {
+//     if (valid) {
+//       try {
+//         // 从localstorage中获取教师ID
+//         const userInfoStr = localStorage.getItem('user_info')
+//         if (!userInfoStr) {
+//           throw new Error('未找到用户信息，请重新登录')
+//         }
+        
+//         const userInfo = JSON.parse(userInfoStr)
+//         if (!userInfo || !userInfo.teacherId) {
+//           throw new Error('用户信息不完整或不是教师账号')
+//         }
+        
+//         // 调用API加入课程
+//         await courseAPI.joinCourseByInviteCode({
+//           inviteCode: joinCourseForm.value.inviteCode,
+//           teacherId: userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+//         })
+        
+//         // 关闭对话框
+//         joinCourseDialogVisible.value = false
+        
+//         // 重新获取课程列表
+//         await fetchCourses()
+        
+//         ElMessage.success('成功加入课程')
+//       } catch (error) {
+//         console.error('加入课程失败:', error)
+//         ElMessage.error('加入课程失败: ' + (error.message || '请稍后重试'))
+//       }
+//     }
+//   })
+// }
 </script>
 
 <style scoped>
@@ -1111,6 +1185,12 @@ function extractTags(description) {
 
 .course-header {
   margin-bottom: 24px;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .section-title {
@@ -1412,6 +1492,12 @@ function extractTags(description) {
   margin: 0 16px;
   height: 36px;
   padding: 0 16px;
+}
+
+.join-course-btn {
+  height: 36px;
+  padding: 0 16px;
+  margin-right: 0;
 }
 
 /* 知识点选择样式 */
