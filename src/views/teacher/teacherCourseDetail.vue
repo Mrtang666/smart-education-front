@@ -244,7 +244,7 @@
                   </el-table-column>
                   <el-table-column label="状态" width="100">
                     <template #default="scope">
-                      <el-tag :type="getExamStatusType(scope.row.status, scope.row)">{{ getExamStatus(scope.row) }}</el-tag>
+                      <el-tag :type="getExamStatusType(scope.row.status, scope.row, currentTime.value)">{{ getExamStatus(scope.row, currentTime.value) }}</el-tag>
                     </template>
                   </el-table-column>
                   <el-table-column label="操作" width="200" fixed="right">
@@ -583,74 +583,6 @@
         </div>
       </template>
     </el-dialog>
-
-    <!-- 考试成绩对话框 -->
-    <el-dialog v-model="examScoresDialogVisible" :title="`${currentExam?.title || ''} - 学生成绩`" width="800px">
-      <div class="exam-scores-container">
-        <div class="table-toolbar">
-          <el-input
-            v-model="scoreSearchKeyword"
-            placeholder="搜索学生姓名或学号"
-            prefix-icon="Search"
-            clearable
-            @clear="handleScoreSearchClear"
-            @input="handleScoreSearchInput"
-            style="width: 250px;"
-          />
-        </div>
-        <div v-if="examScores.length === 0 && !isLoadingScores" class="empty-tip">
-          暂无学生成绩数据
-        </div>
-        <el-table
-          v-else
-          :data="filteredScores"
-          style="width: 100%"
-          v-loading="isLoadingScores"
-        >
-          <el-table-column prop="studentId" label="学号" width="120" />
-          <el-table-column prop="fullName" label="姓名" width="120" />
-          <el-table-column prop="score" label="得分" width="100">
-            <template #default="scope">
-              <span :class="{ 'high-score': scope.row.score >= currentExam.totalScore * 0.8, 'low-score': scope.row.score < currentExam.totalScore * 0.6 }">
-                {{ scope.row.score }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="得分率" width="100">
-            <template #default="scope">
-              <el-progress 
-                :percentage="Math.round((scope.row.score / currentExam.totalScore) * 100)" 
-                :status="getScoreStatus(scope.row.score, currentExam.totalScore)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column prop="submitTime" label="提交时间" width="180">
-            <template #default="scope">
-              {{ formatDate(scope.row.submitTime) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right">
-            <template #default="scope">
-              <el-button link type="primary" @click="viewStudentAnswers(scope.row)">查看答卷</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="pagination-container" v-if="examScores.length > scorePageSize">
-          <el-pagination
-            v-model:current-page="scoreCurrentPage"
-            v-model:page-size="scorePageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="filteredScores.length"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="examScoresDialogVisible = false">关闭</el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -659,8 +591,9 @@ import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit, Plus, Document, Upload, Download, Delete, Search } from '@element-plus/icons-vue'
-import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, studentExamAPI } from '@/api/api'
+import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
+import { getExamStatusType, getExamStatus, updateExamsStatus, formatDateTime } from '@/utils/examManager'
 
 const route = useRoute()
 const router = useRouter()
@@ -836,15 +769,6 @@ const examForm = ref({
 const examFormTitle = ref('创建考试')
 const isSavingExam = ref(false)
 
-// 考试成绩
-const examScoresDialogVisible = ref(false)
-const currentExam = ref(null)
-const examScores = ref([])
-const isLoadingScores = ref(false)
-const scoreSearchKeyword = ref('')
-const scoreCurrentPage = ref(1)
-const scorePageSize = ref(10)
-
 // 过滤考试列表
 const filteredExams = computed(() => {
   if (!examSearchKeyword.value) {
@@ -857,100 +781,17 @@ const filteredExams = computed(() => {
   )
 })
 
-// 过滤成绩列表
-const filteredScores = computed(() => {
-  if (!scoreSearchKeyword.value) {
-    return examScores.value
-  }
-  const keyword = scoreSearchKeyword.value.toLowerCase()
-  return examScores.value.filter(score => 
-    (score.studentId && score.studentId.toString().includes(keyword)) ||
-    (score.fullName && score.fullName.toLowerCase().includes(keyword))
-  )
-})
-
-// 获取课程信息
-onMounted(async () => {
-  if (!courseId) {
-    ElMessage.error('课程ID不存在')
-    goBack()
-    return
-  }
-
-  const loadingInstance = ElLoading.service({
-    target: '.course-detail',
-    text: '加载课程信息...',
-    background: 'rgba(255, 255, 255, 0.7)'
-  })
-
-  try {
-    // 通过API获取课程信息
-    const response = await courseAPI.getCourseById(courseId)
-    
-    if (response) {
-      courseData.value = response
-      courseName.value = response.name || '未命名课程'
-      courseDescription.value = response.description || '暂无课程介绍'
-      
-      // 设置课程颜色
-      // 这里可以根据课程类别设置不同的颜色
-      const categoryColors = {
-        '计算机科学': '#409EFF',
-        '数学': '#67C23A',
-        '物理': '#E6A23C',
-        '化学': '#F56C6C',
-        '生物': '#909399',
-        'AI通识': '#9B59B6',
-        '程序设计语言': '#3498DB'
-      }
-      
-      courseColor.value = categoryColors[response.category] || '#409EFF'
-      
-      // 初始化编辑表单数据
-      editCourseForm.value = {
-        name: response.name || '',
-        category: response.category || '',
-        credit: response.credit || 3,
-        description: response.description || ''
-      }
-      
-      console.log('课程数据加载成功:', response)
-      
-      // 加载课程知识点
-      await fetchCourseKnowledges()
-      
-      // 加载课程资料
-      await fetchCourseMaterials()
-      
-      // 加载课程学生
-      await fetchCourseStudents()
-      
-      // 加载课程考试
-      await fetchCourseExams()
-      
-      homeworks.value = [
-        { id: 1, title: '第一章习题', deadline: '2023-06-01', submitRate: '85%' },
-        { id: 2, title: '第二章习题', deadline: '2023-06-15', submitRate: '70%' },
-      ]
-    } else {
-      ElMessage.error('获取课程信息失败')
-      goBack()
+// 设置定时器，每分钟更新一次当前时间
+timeInterval = setInterval(() => {
+  currentTime.value = new Date()
+  // 检查是否需要更新考试状态
+  updateExamsStatus(exams.value, currentTime.value).then(updatedExams => {
+    if (updatedExams) {
+      // 如果有更新，重新加载考试列表
+      fetchCourseExams()
     }
-  } catch (error) {
-    console.error('获取课程信息失败:', error)
-    ElMessage.error('获取课程信息失败，请稍后重试')
-    goBack()
-  } finally {
-    loadingInstance.close()
-  }
-  
-  // 设置定时器，每分钟更新一次当前时间
-  timeInterval = setInterval(() => {
-    currentTime.value = new Date()
-    // 检查是否需要更新考试状态
-    updateExamsStatus()
-  }, 60000) // 每分钟更新一次
-})
+  })
+}, 60000) // 每分钟更新一次
 
 onUnmounted(() => {
   // 清除定时器
@@ -959,70 +800,72 @@ onUnmounted(() => {
   }
 })
 
-// 更新考试状态的方法
-async function updateExamsStatus() {
-  if (!exams.value || exams.value.length === 0) return
+// // 更新考试状态的方法
+// async function updateExamsStatus(exams, now) {
+//   if (!exams || exams.length === 0) return true
   
-  const now = currentTime.value
-  const examUpdates = []
+//   const examUpdates = []
   
-  for (const exam of exams.value) {
-    const startTime = exam.startTime ? new Date(exam.startTime) : null
-    const endTime = exam.endTime ? new Date(exam.endTime) : null
-    let newStatus = null
+//   for (const exam of exams) {
+//     const startTime = exam.startTime ? new Date(exam.startTime) : null
+//     const endTime = exam.endTime ? new Date(exam.endTime) : null
+//     let newStatus = null
     
-    if (startTime && endTime) {
-      // 根据当前时间判断状态
-      if (now < startTime && exam.status !== '未开始') {
-        newStatus = '未开始'
-      } else if (now >= startTime && now <= endTime && exam.status !== '进行中') {
-        newStatus = '进行中'
-      } else if (now > endTime && exam.status !== '已结束') {
-        newStatus = '已结束'
-      }
+//     if (startTime && endTime) {
+//       // 根据当前时间判断状态
+//       if (now < startTime && exam.status !== '未开始') {
+//         newStatus = '未开始'
+//       } else if (now >= startTime && now <= endTime && exam.status !== '进行中') {
+//         newStatus = '进行中'
+//       } else if (now > endTime && exam.status !== '已结束') {
+//         newStatus = '已结束'
+//       }
       
-      // 如果状态需要更新
-      if (newStatus && newStatus !== exam.status) {
-        examUpdates.push({
-          exam,
-          newStatus
-        })
-      }
-    }
-  }
+//       // 如果状态需要更新
+//       if (newStatus && newStatus !== exam.status) {
+//         examUpdates.push({
+//           exam,
+//           newStatus
+//         })
+//       }
+//     }
+//   }
   
-  // 批量更新考试状态
-  if (examUpdates.length > 0) {
-    try {
-      for (const update of examUpdates) {
-        const examData = {
-          examId: update.exam.examId,
-          title: update.exam.title,
-          description: update.exam.description,
-          courseId: update.exam.courseId,
-          teacherId: update.exam.teacherId,
-          totalScore: update.exam.totalScore,
-          durationMinutes: update.exam.durationMinutes,
-          startTime: update.exam.startTime,
-          endTime: update.exam.endTime,
-          status: update.newStatus
-        }
+//   // 批量更新考试状态
+//   if (examUpdates.length > 0) {
+//     try {
+//       for (const update of examUpdates) {
+//         const examData = {
+//           examId: update.exam.examId,
+//           title: update.exam.title,
+//           description: update.exam.description,
+//           courseId: update.exam.courseId,
+//           teacherId: update.exam.teacherId,
+//           totalScore: update.exam.totalScore,
+//           durationMinutes: update.exam.durationMinutes,
+//           startTime: update.exam.startTime,
+//           endTime: update.exam.endTime,
+//           status: update.newStatus
+//         }
         
-        await examAPI.updateExam(examData)
+//         await examAPI.updateExam(examData)
         
-        // 更新本地状态
-        const index = exams.value.findIndex(e => e.examId === update.exam.examId)
-        if (index !== -1) {
-          exams.value[index].status = update.newStatus
-        }
-      }
+//         // 更新本地状态
+//         const index = exams.findIndex(e => e.examId === update.exam.examId)
+//         if (index !== -1) {
+//           exams[index].status = update.newStatus
+//         }
+//       }
       
-      console.log(`已自动更新 ${examUpdates.length} 个考试的状态`)
-    } catch (error) {
-      console.error('自动更新考试状态失败:', error)
-    }
-  }
-}
+//       console.log(`已自动更新 ${examUpdates.length} 个考试的状态`)
+//       return true
+//     } catch (error) {
+//       console.error('自动更新考试状态失败:', error)
+//       return false
+//     }
+//   }
+//   return false
+// }
 
 // 获取课程知识点
 async function fetchCourseKnowledges() {
@@ -2107,67 +1950,21 @@ function removeExam(exam) {
 
 // 查看考试成绩
 async function viewExamScores(exam) {
-  try {
-    currentExam.value = exam
-    examScoresDialogVisible.value = true
-    isLoadingScores.value = true
-    
-    // 确保examId是字符串形式
-    const examIdStr = exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
-    
-    // 获取课程中所有学生的ID
-    const studentIds = courseStudents.value.map(student => 
-      student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
-    )
-    
-    // 为每个学生获取考试成绩
-    const scorePromises = studentIds.map(async (studentId) => {
-      try {
-        // 调用API获取学生在该考试的成绩
-        const scoreData = await studentExamAPI.getExamScore(studentId, examIdStr)
-        if (scoreData) {
-          // 查找对应的学生信息
-          const student = courseStudents.value.find(s => s.studentId === studentId)
-          return {
-            studentId: studentId,
-            fullName: student ? student.fullName : '未知学生',
-            score: scoreData.score || 0,
-            totalScore: exam.totalScore,
-            submitTime: scoreData.submitTime || '',
-            examId: examIdStr,
-            // 添加其他可能需要的成绩信息
-            graded: scoreData.graded || false,
-            feedback: scoreData.feedback || ''
-          }
-        }
-        return null
-      } catch (error) {
-        console.error(`获取学生 ${studentId} 的成绩失败:`, error)
-        return null
-      }
-    })
-    
-    // 等待所有请求完成
-    const results = await Promise.all(scorePromises)
-    
-    // 过滤掉null结果并保存到examScores
-    examScores.value = results.filter(score => score !== null)
-    
-    if (examScores.value.length === 0) {
-      ElMessage.info('暂无学生成绩数据')
-    }
-  } catch (error) {
-    console.error('获取考试成绩失败:', error)
-    ElMessage.error('获取考试成绩失败，请稍后重试')
-    examScores.value = []
-  } finally {
-    isLoadingScores.value = false
+  // 如果考试状态是未开始，提示未开始
+  if (exam.status === '未开始' || getExamStatus(exam, currentTime.value) === '未开始') {
+    ElMessage.warning('考试尚未开始，暂无成绩数据')
+    return
   }
-}
-
-// 查看学生答卷
-function viewStudentAnswers(studentScore) {
-  ElMessage.info(`查看学生 ${studentScore.fullName} 的答卷功能正在开发中...`)
+  
+  // 跳转到考试成绩页面
+  router.push({
+    path: `/teacher/exam/scores/${exam.examId}`,
+    query: {
+      title: exam.title,
+      courseId: exam.courseId,
+      courseName: courseName.value
+    }
+  })
 }
 
 // 处理考试搜索输入
@@ -2182,77 +1979,59 @@ function handleExamSearchClear() {
   examCurrentPage.value = 1
 }
 
-// 处理成绩搜索输入
-function handleScoreSearchInput() {
-  // 重置分页到第一页
-  scoreCurrentPage.value = 1
-}
-
-// 处理成绩搜索清除
-function handleScoreSearchClear() {
-  scoreSearchKeyword.value = ''
-  scoreCurrentPage.value = 1
-}
-
 // 格式化日期
 function formatDate(dateString) {
-  if (!dateString) return '未设置'
-  
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch (error) {
-    return dateString
-  }
+  return formatDateTime(dateString);
 }
 
-// 获取考试状态类型
-function getExamStatusType(status, exam) {
-  // 根据考试的开始和结束时间自动判断状态
-  const now = currentTime.value;
-  const startTime = exam ? new Date(exam.startTime) : null;
-  const endTime = exam ? new Date(exam.endTime) : null;
+// // 获取考试状态类型
+// function getExamStatusType(status, exam, now) {
+//   // 根据考试的开始和结束时间自动判断状态
+//   const startTime = exam ? new Date(exam.startTime) : null;
+//   const endTime = exam ? new Date(exam.endTime) : null;
   
-  if (startTime && endTime) {
-    if (now < startTime) {
-      return 'info'; // 未开始
-    } else if (now >= startTime && now <= endTime) {
-      return 'warning'; // 进行中
-    } else if (now > endTime) {
-      return 'success'; // 已结束
-    }
-  }
+//   if (startTime && endTime) {
+//     if (now < startTime) {
+//       return 'info'; // 未开始
+//     } else if (now >= startTime && now <= endTime) {
+//       return 'warning'; // 进行中
+//     } else if (now > endTime) {
+//       return 'success'; // 已结束
+//     }
+//   }
   
-  // 如果无法判断，则使用数据库中存储的状态
-  switch(status) {
-    case '未开始':
-      return 'info'
-    case '进行中':
-      return 'warning'
-    case '已结束':
-      return 'success'
-    default:
-      return 'info'
-  }
-}
+//   // 如果无法判断，则使用数据库中存储的状态
+//   switch(status) {
+//     case '未开始':
+//       return 'info'
+//     case '进行中':
+//       return 'warning'
+//     case '已结束':
+//       return 'success'
+//     default:
+//       return 'info'
+//   }
+// }
 
-// 获取成绩状态
-function getScoreStatus(score, totalScore) {
-  const percentage = (score / totalScore) * 100
-  if (percentage >= 80) {
-    return 'success'
-  } else if (percentage >= 60) {
-    return 'warning'
-  } else {
-    return 'exception'
-  }
-}
+// // 获取考试状态文本
+// function getExamStatus(exam) {
+//   const now = currentTime.value;
+//   const startTime = exam ? new Date(exam.startTime) : null;
+//   const endTime = exam ? new Date(exam.endTime) : null;
+  
+//   if (startTime && endTime) {
+//     if (now < startTime) {
+//       return '未开始';
+//     } else if (now >= startTime && now <= endTime) {
+//       return '进行中';
+//     } else if (now > endTime) {
+//       return '已结束';
+//     }
+//   }
+  
+//   // 如果无法判断，则使用数据库中存储的状态
+//   return exam.status || '未知';
+// }
 
 // 考试表单验证规则
 const examRules = {
@@ -2276,25 +2055,100 @@ const examRules = {
   ]
 }
 
-// 获取考试状态文本
-function getExamStatus(exam) {
-  const now = currentTime.value;
-  const startTime = exam ? new Date(exam.startTime) : null;
-  const endTime = exam ? new Date(exam.endTime) : null;
-  
-  if (startTime && endTime) {
-    if (now < startTime) {
-      return '未开始';
-    } else if (now >= startTime && now <= endTime) {
-      return '进行中';
-    } else if (now > endTime) {
-      return '已结束';
+// 获取课程信息
+onMounted(async () => {
+  if (!courseId) {
+    ElMessage.error('课程ID不存在')
+    goBack()
+    return
+  }
+
+  const loadingInstance = ElLoading.service({
+    target: '.course-detail',
+    text: '加载课程信息...',
+    background: 'rgba(255, 255, 255, 0.7)'
+  })
+
+  try {
+    // 通过API获取课程信息
+    const response = await courseAPI.getCourseById(courseId)
+    
+    if (response) {
+      courseData.value = response
+      courseName.value = response.name || '未命名课程'
+      courseDescription.value = response.description || '暂无课程介绍'
+      
+      // 设置课程颜色
+      // 这里可以根据课程类别设置不同的颜色
+      const categoryColors = {
+        '计算机科学': '#409EFF',
+        '数学': '#67C23A',
+        '物理': '#E6A23C',
+        '化学': '#F56C6C',
+        '生物': '#909399',
+        'AI通识': '#9B59B6',
+        '程序设计语言': '#3498DB'
+      }
+      
+      courseColor.value = categoryColors[response.category] || '#409EFF'
+      
+      // 初始化编辑表单数据
+      editCourseForm.value = {
+        name: response.name || '',
+        category: response.category || '',
+        credit: response.credit || 3,
+        description: response.description || ''
+      }
+      
+      console.log('课程数据加载成功:', response)
+      
+      // 加载课程知识点
+      await fetchCourseKnowledges()
+      
+      // 加载课程资料
+      await fetchCourseMaterials()
+      
+      // 加载课程学生
+      await fetchCourseStudents()
+      
+      // 加载课程考试
+      await fetchCourseExams()
+      
+      homeworks.value = [
+        { id: 1, title: '第一章习题', deadline: '2023-06-01', submitRate: '85%' },
+        { id: 2, title: '第二章习题', deadline: '2023-06-15', submitRate: '70%' },
+      ]
+    } else {
+      ElMessage.error('获取课程信息失败')
+      goBack()
     }
+  } catch (error) {
+    console.error('获取课程信息失败:', error)
+    ElMessage.error('获取课程信息失败，请稍后重试')
+    goBack()
+  } finally {
+    loadingInstance.close()
   }
   
-  // 如果无法判断，则使用数据库中存储的状态
-  return exam.status || '未知';
-}
+  // 设置定时器，每分钟更新一次当前时间
+  timeInterval = setInterval(() => {
+    currentTime.value = new Date()
+    // 检查是否需要更新考试状态
+    updateExamsStatus(exams.value, currentTime.value).then(updatedExams => {
+      if (updatedExams) {
+        // 如果有更新，重新加载考试列表
+        fetchCourseExams()
+      }
+    })
+  }, 60000) // 每分钟更新一次
+})
+
+onUnmounted(() => {
+  // 清除定时器
+  if (timeInterval) {
+    clearInterval(timeInterval)
+  }
+})
 </script>
 
 <style scoped>
@@ -2729,20 +2583,6 @@ function getExamStatus(exam) {
   margin-left: 10px;
   color: #909399;
   font-size: 14px;
-}
-
-.high-score {
-  color: #67C23A;
-  font-weight: bold;
-}
-
-.low-score {
-  color: #F56C6C;
-  font-weight: bold;
-}
-
-.exam-scores-container {
-  min-height: 300px;
 }
 
 .form-tip {
