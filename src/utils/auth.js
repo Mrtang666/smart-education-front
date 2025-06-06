@@ -56,7 +56,8 @@ export function getValidToken() {
     console.log('token即将过期，请求时将尝试刷新');
   }
   
-  return token;
+  // 确保token不包含Bearer前缀
+  return cleanupToken(token);
 }
 
 /**

@@ -1616,6 +1616,77 @@ export const knowledgeAPI = {
         }
     },
     
+    /**
+     * 添加题目（需要token）
+     * @param {Object} questionData 题目数据
+     * @param {string} questionData.questionType 题目类型（选择题、填空题、判断题、简答题等）
+     * @param {string} questionData.content 题目内容
+     * @param {Array<Object>} [questionData.options] 选项（选择题必填）
+     * @param {string} questionData.referenceAnswer 参考答案
+     * @param {string} questionData.difficulty 难度等级（简单、中等、困难）
+     * @param {number} questionData.scorePoints 分值
+     * @param {string} [questionData.analysis] 解析（可选）
+     * @param {string} questionData.teacherId 教师ID
+     * @param {string} questionData.knowledgeId 知识点ID
+     * @returns {Promise<Object>} 添加的题目数据
+     */
+    async addQuestion(questionData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log('添加题目，数据:', questionData);
+            
+            const response = await axios.post('/api/question/save', questionData);
+            return response.data;
+        } catch (error) {
+            console.error('添加题目失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 更新题目（需要token）
+     * @param {Object} questionData 题目数据
+     * @param {string} questionData.questionId 题目ID
+     * @param {string} [questionData.questionType] 题目类型（选择题、填空题、判断题、简答题等）
+     * @param {string} [questionData.content] 题目内容
+     * @param {Array<Object>} [questionData.options] 选项（选择题必填）
+     * @param {string} [questionData.referenceAnswer] 参考答案
+     * @param {string} [questionData.difficulty] 难度等级（简单、中等、困难）
+     * @param {number} [questionData.scorePoints] 分值
+     * @param {string} [questionData.analysis] 解析（可选）
+     * @returns {Promise<Object>} 更新后的题目数据
+     */
+    async updateQuestion(questionData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log('更新题目，数据:', questionData);
+            
+            const response = await axios.put('/api/question/update', questionData);
+            return response.data;
+        } catch (error) {
+            console.error('更新题目失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 删除题目（需要token）
+     * @param {string} questionId 题目ID
+     * @returns {Promise<Object>} 操作结果
+     */
+    async deleteQuestion(questionId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log(`删除题目，题目ID: ${questionId}`);
+            
+            const response = await axios.delete(`/api/question/${questionId}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除题目失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
 };
 
 export const examAPI = {

@@ -23,57 +23,9 @@
         <div class="card-header">
           <h3>相关习题 ({{ questions.length }})</h3>
           <div class="header-actions">
-            <el-button type="success" size="small" @click="practiceQuestions" :disabled="questions.length === 0">
-              <el-icon><CaretRight /></el-icon>开始练习
-            </el-button>
             <el-button type="primary" size="small" @click="addQuestion">
               <el-icon><Plus /></el-icon>添加习题
             </el-button>
-          </div>
-        </div>
-        
-        <!-- 搜索和过滤区域 -->
-        <div class="search-filter-container">
-          <div class="search-box">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索题目内容"
-              clearable
-              @keyup.enter="searchQuestions"
-              @clear="resetSearch"
-            >
-              <template #suffix>
-                <el-icon class="search-icon" @click="searchQuestions"><Search /></el-icon>
-              </template>
-            </el-input>
-          </div>
-          
-          <div class="filter-box">
-            <el-select v-model="filterConditions.questionType" placeholder="题目类型" clearable @change="applyFilters">
-              <el-option label="选择题" value="选择题"></el-option>
-              <el-option label="填空题" value="填空题"></el-option>
-              <el-option label="判断题" value="判断题"></el-option>
-              <el-option label="简答题" value="简答题"></el-option>
-            </el-select>
-            
-            <el-select v-model="filterConditions.difficulty" placeholder="难度等级" clearable @change="applyFilters">
-              <el-option label="简单" value="简单"></el-option>
-              <el-option label="中等" value="中等"></el-option>
-              <el-option label="困难" value="困难"></el-option>
-            </el-select>
-            
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              @change="applyFilters"
-            ></el-date-picker>
-            
-            <el-button type="primary" plain @click="resetFilters">重置筛选</el-button>
           </div>
         </div>
         
@@ -102,13 +54,7 @@
               </div>
               <div class="question-content">
                 <div class="question-title">{{ question.content }}</div>
-                <div class="question-options" v-if="question.options && question.options.length > 0">
-                  <div v-for="option in question.options" :key="option.key" class="option-item">
-                    <span class="option-key">{{ option.key }}.</span>
-                    <span class="option-text">{{ option.text }}</span>
-                  </div>
-                </div>
-                <div class="question-answer" v-if="question.referenceAnswer">
+                <div class="question-answer-row" v-if="question.referenceAnswer">
                   <div class="answer-label">参考答案:</div>
                   <div class="answer-content">{{ question.referenceAnswer }}</div>
                 </div>
@@ -171,14 +117,88 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 添加/编辑习题对话框 -->
+    <el-dialog v-model="questionDialogVisible" :title="isEditingQuestion ? '编辑习题' : '添加习题'" width="700px">
+      <el-form :model="questionForm" label-width="100px" :rules="questionRules" ref="questionFormRef">
+        <el-form-item label="题目类型" prop="questionType">
+          <el-select v-model="questionForm.questionType" placeholder="请选择题目类型">
+            <el-option label="选择题" value="选择题"></el-option>
+            <el-option label="填空题" value="填空题"></el-option>
+            <el-option label="判断题" value="判断题"></el-option>
+            <el-option label="简答题" value="简答题"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="题目内容" prop="content">
+          <el-input v-model="questionForm.content" type="textarea" :rows="3" placeholder="请输入题目内容" />
+        </el-form-item>
+        
+        <!-- 选择题选项 -->
+        <template v-if="questionForm.questionType === '选择题' || questionForm.questionType === '判断题'">
+          <el-form-item label="选项">
+            <div v-for="(option, index) in questionForm.options" :key="index" class="option-input-item">
+              <div class="option-input-key">{{ option.key }}.</div>
+              <el-input v-model="option.text" placeholder="请输入选项内容" :disabled="questionForm.questionType === '判断题'" />
+              <el-button @click="removeOption(index)" type="danger" circle plain 
+                v-if="questionForm.options.length > 2 && questionForm.questionType === '选择题'">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </div>
+            <div class="add-option-button" v-if="questionForm.questionType === '选择题'">
+              <el-button @click="addOption" type="primary" plain v-if="questionForm.options.length < 6">
+                <el-icon><Plus /></el-icon>添加选项
+              </el-button>
+            </div>
+          </el-form-item>
+        </template>
+        
+        <el-form-item label="参考答案" prop="referenceAnswer">
+          <template v-if="questionForm.questionType === '选择题' || questionForm.questionType === '判断题'">
+            <el-select v-model="questionForm.referenceAnswer" placeholder="请选择正确答案">
+              <el-option 
+                v-for="option in questionForm.options" 
+                :key="option.key" 
+                :label="option.key" 
+                :value="option.key">
+              </el-option>
+            </el-select>
+          </template>
+          <template v-else>
+            <el-input v-model="questionForm.referenceAnswer" type="textarea" :rows="2" placeholder="请输入参考答案" />
+          </template>
+        </el-form-item>
+        
+        <el-form-item label="难度等级" prop="difficulty">
+          <el-select v-model="questionForm.difficulty" placeholder="请选择难度等级">
+            <el-option label="简单" value="简单"></el-option>
+            <el-option label="中等" value="中等"></el-option>
+            <el-option label="困难" value="困难"></el-option>
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="分值" prop="scorePoints">
+          <el-input-number v-model="questionForm.scorePoints" :min="1" :max="100" />
+        </el-form-item>
+        
+        <el-form-item label="解析">
+          <el-input v-model="questionForm.analysis" type="textarea" :rows="2" placeholder="请输入题目解析（可选）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="questionDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveQuestion">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Edit, Plus, CaretRight, DocumentRemove, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Plus, DocumentRemove, Delete } from '@element-plus/icons-vue'
 import { knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 
@@ -221,21 +241,74 @@ const questions = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 
-// 搜索和过滤
-const searchKeyword = ref('')
-const dateRange = ref([])
-const filterConditions = ref({
-  questionType: '',
-  difficulty: '',
-  startTime: '',
-  endTime: ''
-})
-
 // 计算属性：当前页显示的题目
 const displayQuestions = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return questions.value.slice(start, end)
+})
+
+// 习题对话框相关
+const questionDialogVisible = ref(false)
+const questionFormRef = ref(null)
+const isEditingQuestion = ref(false)
+const currentEditingQuestion = ref(null)
+
+// 习题表单
+const questionForm = ref({
+  questionType: '选择题',
+  content: '',
+  options: [
+    { key: 'A', text: '' },
+    { key: 'B', text: '' },
+    { key: 'C', text: '' },
+    { key: 'D', text: '' }
+  ],
+  referenceAnswer: '',
+  difficulty: '中等',
+  scorePoints: 5,
+  analysis: ''
+})
+
+// 表单验证规则
+const questionRules = {
+  questionType: [
+    { required: true, message: '请选择题目类型', trigger: 'change' }
+  ],
+  content: [
+    { required: true, message: '请输入题目内容', trigger: 'blur' },
+    { min: 2, max: 1000, message: '长度在 2 到 1000 个字符', trigger: 'blur' }
+  ],
+  referenceAnswer: [
+    { required: true, message: '请输入参考答案', trigger: 'blur' }
+  ],
+  difficulty: [
+    { required: true, message: '请选择难度等级', trigger: 'change' }
+  ],
+  scorePoints: [
+    { required: true, message: '请输入分值', trigger: 'blur' }
+  ]
+}
+
+// 监听题目类型变化，重置参考答案
+watch(() => questionForm.value.questionType, (newType) => {
+  questionForm.value.referenceAnswer = ''
+  
+  if (newType === '判断题') {
+    // 为判断题设置固定的选项
+    questionForm.value.options = [
+      { key: 'A', text: '正确' },
+      { key: 'B', text: '错误' }
+    ]
+  } else if (newType === '选择题' && questionForm.value.options.length === 0) {
+    // 如果切换到选择题，且没有选项，则初始化选项
+    questionForm.value.options = [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ]
+  }
 })
 
 // 获取知识点详情
@@ -298,95 +371,6 @@ async function fetchQuestions() {
   } finally {
     loading.value = false
   }
-}
-
-// 搜索题目
-async function searchQuestions() {
-  if (!searchKeyword.value.trim()) {
-    await fetchQuestions() // 如果关键词为空，则获取所有题目
-    return
-  }
-  
-  loading.value = true
-  try {
-    const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
-    const response = await knowledgeAPI.searchQuestionsInKnowledge(knowledgeIdStr, searchKeyword.value.trim())
-    
-    if (Array.isArray(response)) {
-      questions.value = response
-      currentPage.value = 1 // 重置到第一页
-      ElMessage.success(`找到 ${response.length} 个匹配的习题`)
-    } else {
-      questions.value = []
-      ElMessage.info('未找到匹配的习题')
-    }
-  } catch (error) {
-    console.error('搜索习题失败:', error)
-    ElMessage.error('搜索习题失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 重置搜索
-function resetSearch() {
-  searchKeyword.value = ''
-  fetchQuestions()
-}
-
-// 应用过滤条件
-async function applyFilters() {
-  // 更新日期范围
-  if (dateRange.value && dateRange.value.length === 2) {
-    filterConditions.value.startTime = dateRange.value[0]
-    filterConditions.value.endTime = dateRange.value[1]
-  } else {
-    filterConditions.value.startTime = ''
-    filterConditions.value.endTime = ''
-  }
-  
-  // 检查是否有过滤条件
-  const hasFilters = filterConditions.value.questionType || 
-                    filterConditions.value.difficulty || 
-                    filterConditions.value.startTime || 
-                    filterConditions.value.endTime
-  
-  if (!hasFilters) {
-    await fetchQuestions() // 如果没有过滤条件，则获取所有题目
-    return
-  }
-  
-  loading.value = true
-  try {
-    const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
-    const response = await knowledgeAPI.searchQuestionsInKnowledgeConditionally(knowledgeIdStr, filterConditions.value)
-    
-    if (Array.isArray(response)) {
-      questions.value = response
-      currentPage.value = 1 // 重置到第一页
-      ElMessage.success(`找到 ${response.length} 个匹配的习题`)
-    } else {
-      questions.value = []
-      ElMessage.info('未找到匹配的习题')
-    }
-  } catch (error) {
-    console.error('过滤习题失败:', error)
-    ElMessage.error('过滤习题失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 重置过滤条件
-function resetFilters() {
-  filterConditions.value = {
-    questionType: '',
-    difficulty: '',
-    startTime: '',
-    endTime: ''
-  }
-  dateRange.value = []
-  fetchQuestions()
 }
 
 // 返回上一页
@@ -452,7 +436,26 @@ async function saveKnowledge() {
 
 // 添加习题
 function addQuestion() {
-  ElMessage.info('添加习题功能待实现')
+  isEditingQuestion.value = false
+  currentEditingQuestion.value = null
+  
+  // 重置表单
+  questionForm.value = {
+    questionType: '选择题',
+    content: '',
+    options: [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ],
+    referenceAnswer: '',
+    difficulty: '中等',
+    scorePoints: 5,
+    analysis: ''
+  }
+  
+  questionDialogVisible.value = true
 }
 
 // 查看习题
@@ -471,7 +474,15 @@ function deleteQuestion(question) {
       type: 'warning'
     }
   ).then(async () => {
-    ElMessage.info(`删除习题: ${question.content}`)
+    try {
+      await knowledgeAPI.deleteQuestion(question.questionId)
+      ElMessage.success('习题删除成功')
+      // 重新获取习题列表
+      await fetchQuestions()
+    } catch (error) {
+      console.error('删除习题失败:', error)
+      ElMessage.error('删除习题失败: ' + (error.message || '请稍后重试'))
+    }
   }).catch(() => {
     // 用户取消删除
   })
@@ -479,13 +490,52 @@ function deleteQuestion(question) {
 
 // 编辑习题
 function editQuestion(question) {
-  ElMessage.info(`编辑习题: ${question.content}`)
-}
-
-// 开始练习
-function practiceQuestions() {
-  ElMessage.success('开始练习模式')
-  // 这里可以跳转到练习页面或者展开练习模式
+  isEditingQuestion.value = true
+  currentEditingQuestion.value = question
+  
+  // 从题目内容中提取选项（如果是选择题）
+  let content = question.content;
+  let options = [];
+  
+  if (question.questionType === '选择题') {
+    // 尝试从内容中提取选项
+    const contentLines = content.split('\n');
+    let mainContent = [];
+    let optionsStarted = false;
+    
+    for (const line of contentLines) {
+      const trimmedLine = line.trim();
+      // 查找选项格式的行 (A. xxx, B. xxx 等)
+      if (/^[A-Z]\.\s/.test(trimmedLine)) {
+        optionsStarted = true;
+        const key = trimmedLine[0]; // 获取选项字母
+        const text = trimmedLine.substring(2).trim(); // 获取选项内容
+        options.push({ key, text });
+      } else if (!optionsStarted && trimmedLine) {
+        // 如果还没开始处理选项且行不为空，添加到主内容
+        mainContent.push(trimmedLine);
+      }
+    }
+    
+    // 更新题目内容（仅保留主要内容）
+    content = mainContent.join('\n');
+  }
+  
+  // 复制问题数据到表单
+  questionForm.value = {
+    questionType: question.questionType || '选择题',
+    content: content || '',
+    options: options.length > 0 ? options : 
+      question.questionType === '判断题' ? 
+        [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }] : 
+        [{ key: 'A', text: '' }, { key: 'B', text: '' }, { key: 'C', text: '' }, { key: 'D', text: '' }],
+    referenceAnswer: question.referenceAnswer || '',
+    difficulty: question.difficulty || '中等',
+    scorePoints: question.scorePoints || 5,
+    analysis: question.analysis || ''
+  }
+  
+  questionDialogVisible.value = true
 }
 
 // 处理每页显示数量变化
@@ -514,6 +564,102 @@ function getQuestionDifficultyType(level) {
   }
 }
 
+// 添加选项
+function addOption() {
+  const keys = ['A', 'B', 'C', 'D', 'E', 'F']
+  if (questionForm.value.options.length < keys.length) {
+    const nextKey = keys[questionForm.value.options.length]
+    questionForm.value.options.push({ key: nextKey, text: '' })
+  }
+}
+
+// 移除选项
+function removeOption(index) {
+  if (questionForm.value.options.length > 2) {
+    // 如果删除的是当前选中的答案，则清空答案
+    if (questionForm.value.referenceAnswer === questionForm.value.options[index].key) {
+      questionForm.value.referenceAnswer = ''
+    }
+    
+    questionForm.value.options.splice(index, 1)
+    
+    // 重新排序选项的key
+    const keys = ['A', 'B', 'C', 'D', 'E', 'F']
+    questionForm.value.options.forEach((option, idx) => {
+      option.key = keys[idx]
+    })
+  }
+}
+
+// 保存习题
+async function saveQuestion() {
+  questionFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        // 从localstorage中获取教师ID
+        const userInfoStr = localStorage.getItem('user_info')
+        if (!userInfoStr) {
+          throw new Error('未找到用户信息，请重新登录')
+        }
+        
+        const userInfo = JSON.parse(userInfoStr)
+        if (!userInfo || !userInfo.teacherId) {
+          throw new Error('用户信息不完整或不是教师账号')
+        }
+        
+        // 确保教师ID和知识点ID是字符串形式
+        const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+        const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
+        
+        // 准备提交的数据
+        let content = questionForm.value.content;
+        
+        // 如果是选择题或判断题，将选项内容添加到题目内容中
+        if ((questionForm.value.questionType === '选择题' || questionForm.value.questionType === '判断题') && 
+            questionForm.value.options.length > 0) {
+          // 添加换行
+          content += '\n\n';
+          // 添加每个选项
+          questionForm.value.options.forEach(option => {
+            content += `${option.key}. ${option.text}\n`;
+          });
+        }
+        
+        const questionData = {
+          questionType: questionForm.value.questionType,
+          content: content,
+          referenceAnswer: questionForm.value.referenceAnswer,
+          difficulty: questionForm.value.difficulty,
+          scorePoints: questionForm.value.scorePoints,
+          analysis: questionForm.value.analysis || '',
+          teacherId: teacherId,
+          knowledgeId: knowledgeIdStr
+        }
+        
+        if (isEditingQuestion.value && currentEditingQuestion.value) {
+          // 更新现有习题
+          questionData.questionId = currentEditingQuestion.value.questionId
+          await knowledgeAPI.updateQuestion(questionData)
+          ElMessage.success('习题更新成功')
+        } else {
+          // 添加新习题
+          await knowledgeAPI.addQuestion(questionData)
+          ElMessage.success('习题添加成功')
+        }
+        
+        // 重新获取习题列表
+        await fetchQuestions()
+        
+        // 关闭对话框
+        questionDialogVisible.value = false
+      } catch (error) {
+        console.error('保存习题失败:', error)
+        ElMessage.error('保存习题失败: ' + (error.message || '请稍后重试'))
+      }
+    }
+  })
+}
+
 // 在组件挂载时获取知识点详情
 onMounted(async () => {
   if (!knowledgeId) {
@@ -522,7 +668,12 @@ onMounted(async () => {
     return
   }
   
-  await fetchKnowledgeDetail()
+  try {
+    await fetchKnowledgeDetail()
+  } catch (error) {
+    console.error('初始化知识点详情失败:', error)
+    ElMessage.error('加载知识点详情失败，请稍后重试')
+  }
 })
 </script>
 
@@ -747,16 +898,22 @@ onMounted(async () => {
 
 .question-item {
   border: 1px solid #ebeef5;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
   overflow: hidden;
+  background-color: #fff;
+  transition: box-shadow 0.3s ease;
+}
+
+.question-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .question-header {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background-color: #f8f9fa;
   border-bottom: 1px solid #ebeef5;
 }
@@ -771,85 +928,66 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  margin-right: 12px;
+  margin-right: 10px;
+  font-size: 12px;
 }
 
 .question-type {
   margin-right: 12px;
 }
 
-.question-difficulty {
-  /* 添加样式 */
-}
-
 .question-content {
-  padding: 16px;
+  padding: 12px;
 }
 
 .question-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
-  color: #303133;
-  margin-bottom: 16px;
-  line-height: 1.6;
+  color: #333;
+  margin-bottom: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  text-align: left;
 }
 
-.question-options {
+.question-answer-row {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.option-item {
-  display: flex;
-  align-items: flex-start;
-}
-
-.option-key {
-  font-weight: 500;
-  margin-right: 8px;
-  color: #409EFF;
-}
-
-.option-text {
-  flex: 1;
-}
-
-.question-answer {
-  background-color: #f8f9fa;
-  padding: 12px;
-  border-radius: 8px;
-  margin-top: 16px;
+  align-items: center;
+  margin-top: 8px;
 }
 
 .answer-label {
-  font-weight: 500;
+  font-weight: 600;
   color: #67C23A;
-  margin-bottom: 8px;
+  margin-right: 8px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .answer-content {
   color: #303133;
-  white-space: pre-wrap;
+  line-height: 1.4;
+  font-size: 13px;
+  text-align: left;
 }
 
 .question-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-top: 1px solid #ebeef5;
   background-color: #fafafa;
 }
 
 .score-tag {
   font-weight: 500;
+  font-size: 12px;
 }
 
 .question-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pagination-container {
@@ -860,5 +998,23 @@ onMounted(async () => {
 
 .teach-plan-card {
   border-left: 4px solid #E6A23C;
+}
+
+/* 添加习题表单相关样式 */
+.option-input-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.option-input-key {
+  font-weight: 500;
+  margin-right: 8px;
+  width: 20px;
+  color: #409EFF;
+}
+
+.add-option-button {
+  margin-top: 12px;
 }
 </style> 

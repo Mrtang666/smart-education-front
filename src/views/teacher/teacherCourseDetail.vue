@@ -173,36 +173,6 @@
             </div>
           </el-tab-pane>
 
-          <el-tab-pane label="作业管理" name="homework">
-            <div class="content-section">
-              <div class="section-header">
-                <h3>作业列表</h3>
-                <el-button type="primary" size="small">
-                  <el-icon><Plus /></el-icon>
-                  创建作业
-                </el-button>
-              </div>
-              <div class="section-body">
-                <div v-if="homeworks.length === 0" class="empty-tip">
-                  暂无作业
-                </div>
-                <div v-else class="homework-list">
-                  <div v-for="homework in homeworks" :key="homework.id" class="homework-item">
-                    <div class="homework-info">
-                      <h4>{{ homework.title }}</h4>
-                      <p>截止日期: {{ homework.deadline }}</p>
-                      <p>提交率: {{ homework.submitRate }}</p>
-                    </div>
-                    <div class="homework-actions">
-                      <el-button link type="primary">查看</el-button>
-                      <el-button link type="danger">删除</el-button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </el-tab-pane>
-          
           <el-tab-pane label="考试管理" name="exams">
             <div class="content-section">
               <div class="section-header">
