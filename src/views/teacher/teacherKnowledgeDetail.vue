@@ -7,7 +7,7 @@
           <el-icon><ArrowLeft /></el-icon>
           <span>返回</span>
         </div>
-        <h1 class="knowledge-title">{{ knowledgeName }} 知识点详情</h1>
+        <h1 class="knowledge-title">{{ knowledgeName }} 知识点</h1>
       </div>
       <div class="knowledge-actions">
         <el-button type="primary" plain @click="editKnowledge">
@@ -21,9 +21,9 @@
       <!-- 习题区域 -->
       <div class="detail-card questions-card">
         <div class="card-header">
-          <h3>相关习题 ({{ questions.length }})</h3>
+          <h3><el-icon class="header-icon"><Document /></el-icon>相关习题 ({{ questions.length }})</h3>
           <div class="header-actions">
-            <el-button type="primary" size="small" @click="addQuestion">
+            <el-button type="primary" size="small" @click="addQuestion" class="add-btn">
               <el-icon><Plus /></el-icon>添加习题
             </el-button>
           </div>
@@ -41,44 +41,51 @@
               <el-button type="primary" @click="addQuestion">添加习题</el-button>
             </el-empty>
           </div>
-          <div v-else class="questions-list">
-            <div v-for="(question, index) in displayQuestions" :key="question.questionId" class="question-item">
+          <div v-else class="questions-grid">
+            <el-card v-for="(question, index) in displayQuestions" :key="question.questionId" class="question-card" shadow="hover">
               <div class="question-header">
-                <div class="question-index">{{ (currentPage - 1) * pageSize + index + 1 }}</div>
+                <div class="question-index">{{ (currentPage - 1) * 4 + index + 1 }}</div>
                 <div class="question-type">
-                  <el-tag size="small">{{ question.questionType }}</el-tag>
+                  <el-tag size="small" effect="dark">{{ question.questionType }}</el-tag>
                 </div>
                 <div class="question-difficulty">
-                  <el-tag size="small" :type="getQuestionDifficultyType(question.difficulty)">{{ question.difficulty }}</el-tag>
+                  <el-tag size="small" :type="getQuestionDifficultyType(question.difficulty)" effect="dark">{{ question.difficulty }}</el-tag>
                 </div>
               </div>
               <div class="question-content">
                 <div class="question-title">{{ question.content }}</div>
-                <div class="question-answer-row" v-if="question.referenceAnswer">
-                  <div class="answer-label">参考答案:</div>
-                  <div class="answer-content">{{ question.referenceAnswer }}</div>
+                <div class="question-bottom">
+                  <div class="question-answer-row" v-if="question.referenceAnswer">
+                    <div class="answer-label">参考答案:</div>
+                    <div class="answer-content">{{ question.referenceAnswer }}</div>
+                  </div>
+                  <div class="question-analysis-row" v-if="question.analysis">
+                    <div class="analysis-label">解析:</div>
+                    <div class="analysis-content">{{ question.analysis }}</div>
+                  </div>
                 </div>
               </div>
               <div class="question-footer">
                 <el-tag size="small" type="info" class="score-tag">{{ question.scorePoints || 0 }}分</el-tag>
                 <div class="question-actions">
-                  <el-button link type="primary" @click="viewQuestion(question)">查看详情</el-button>
-                  <el-button link type="primary" @click="editQuestion(question)">编辑</el-button>
-                  <el-button link type="danger" @click="deleteQuestion(question)">删除</el-button>
+                  <el-button link type="primary" @click="editQuestion(question)">
+                    <el-icon><Edit /></el-icon>编辑
+                  </el-button>
+                  <el-button link type="danger" @click="deleteQuestion(question)">
+                    <el-icon><Delete /></el-icon>删除
+                  </el-button>
                 </div>
               </div>
-            </div>
+            </el-card>
           </div>
           
           <!-- 分页控件 -->
           <div class="pagination-container" v-if="questions.length > 0">
             <el-pagination
               v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[5, 10, 20, 50]"
-              layout="total, sizes, prev, pager, next, jumper"
+              layout="prev, pager, next, jumper"
+              :page-size="4"
               :total="questions.length"
-              @size-change="handleSizeChange"
               @current-change="handleCurrentChange"
               background
             />
@@ -198,7 +205,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Edit, Plus, DocumentRemove, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Plus, DocumentRemove, Delete, Document } from '@element-plus/icons-vue'
 import { knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 
@@ -239,13 +246,12 @@ const rules = {
 const questions = ref([])
 // 分页相关
 const currentPage = ref(1)
-const pageSize = ref(10)
 
 // 计算属性：当前页显示的题目
 const displayQuestions = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return questions.value.slice(start, end)
+  const start = (currentPage.value - 1) * 4;
+  const end = start + 4;
+  return questions.value.slice(start, end);
 })
 
 // 习题对话框相关
@@ -458,10 +464,6 @@ function addQuestion() {
   questionDialogVisible.value = true
 }
 
-// 查看习题
-function viewQuestion(question) {
-  ElMessage.info(`查看习题: ${question.content}`)
-}
 
 // 删除习题
 function deleteQuestion(question) {
@@ -536,13 +538,6 @@ function editQuestion(question) {
   }
   
   questionDialogVisible.value = true
-}
-
-// 处理每页显示数量变化
-function handleSizeChange(size) {
-  pageSize.value = size
-  // 重置到第一页
-  currentPage.value = 1
 }
 
 // 处理页码变化
@@ -739,9 +734,11 @@ onMounted(async () => {
 
 .knowledge-content {
   flex: 1;
-  padding: 32px 40px;
+  padding: 16px 20px;
   background-color: #f5f7fa;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .loading-container, .empty-container {
@@ -760,8 +757,29 @@ onMounted(async () => {
 .detail-card {
   background-color: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 150px);
+  min-height: 700px;
+}
+
+.questions-card {
+  position: relative;
+}
+
+.questions-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(to right, #67C23A, #85ce61);
+  border-radius: 12px 12px 0 0;
 }
 
 .card-header {
@@ -770,6 +788,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: #f8fafc;
 }
 
 .card-header h3 {
@@ -777,6 +796,25 @@ onMounted(async () => {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+  display: flex;
+  align-items: center;
+}
+
+.header-icon {
+  margin-right: 8px;
+  color: #67C23A;
+  font-size: 20px;
+}
+
+.add-btn {
+  background: linear-gradient(135deg, #67C23A, #85ce61);
+  border: none;
+  transition: transform 0.2s;
+}
+
+.add-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
 }
 
 .search-filter-container {
@@ -807,6 +845,11 @@ onMounted(async () => {
 
 .card-body {
   padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
 }
 
 .detail-item {
@@ -843,7 +886,7 @@ onMounted(async () => {
 }
 
 .questions-list {
-  margin-top: 16px;
+  margin-top: 8px;
 }
 
 .dialog-footer {
@@ -887,49 +930,62 @@ onMounted(async () => {
   margin-bottom: 8px;
 }
 
-.questions-card {
-  border-left: 4px solid #67C23A;
+.questions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: auto;
 }
 
-.header-actions {
+.question-card {
+  margin-bottom: 0;
+  border: none;
+  height: 550px; /* 固定卡片高度 */
+}
+
+/* 深度选择器修改Element UI内部样式 */
+:deep(.el-card.question-card) {
+  height: 550px;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.3s;
 }
 
-.question-item {
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+:deep(.el-card.question-card .el-card__body) {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
   overflow: hidden;
-  background-color: #fff;
-  transition: box-shadow 0.3s ease;
 }
 
-.question-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+.el-card.question-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
 }
 
 .question-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  background-color: #f8f9fa;
+  padding: 10px 12px;
+  background: linear-gradient(to right, #f0f9eb, #f8fafc);
   border-bottom: 1px solid #ebeef5;
 }
 
 .question-index {
-  width: 24px;
-  height: 24px;
-  background-color: #409EFF;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #409EFF, #53a8ff);
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  margin-right: 10px;
-  font-size: 12px;
+  margin-right: 12px;
+  font-size: 14px;
+  box-shadow: 0 3px 6px rgba(64, 158, 255, 0.3);
 }
 
 .question-type {
@@ -937,63 +993,108 @@ onMounted(async () => {
 }
 
 .question-content {
+  flex: 1;
   padding: 12px;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .question-title {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
-  margin-bottom: 12px;
+  color: #303133;
+  margin-bottom: 10px;
   line-height: 1.5;
   white-space: pre-wrap;
   text-align: left;
 }
 
+.question-bottom {
+  margin-top: auto; /* 推到内容区底部 */
+}
+
 .question-answer-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  margin-top: 12px;
+  background-color: #f0f9eb;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.question-analysis-row {
+  display: flex;
+  align-items: flex-start;
   margin-top: 8px;
+  background-color: #ffefef;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.analysis-label {
+  font-weight: 600;
+  color: #F56C6C;
+  margin-right: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.analysis-content {
+  color: #303133;
+  line-height: 1.4;
+  font-size: 14px;
+  text-align: left;
 }
 
 .answer-label {
   font-weight: 600;
   color: #67C23A;
   margin-right: 8px;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .answer-content {
   color: #303133;
   line-height: 1.4;
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
+  font-weight: 500;
 }
 
 .question-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-top: 1px solid #ebeef5;
   background-color: #fafafa;
 }
 
 .score-tag {
   font-weight: 500;
-  font-size: 12px;
+  font-size: 13px;
+  background-color: #f2f6fc;
+  color: #606266;
+  border: none;
 }
 
 .question-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .pagination-container {
-  margin-top: 24px;
+  margin-top: 20px;
   display: flex;
   justify-content: center;
+  background-color: #fff;
+  padding: 10px 0;
+  border-top: 1px solid #ebeef5;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .teach-plan-card {
@@ -1016,5 +1117,10 @@ onMounted(async () => {
 
 .add-option-button {
   margin-top: 12px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 </style> 

@@ -1,15 +1,11 @@
 <template>
   <router-view />
-  <StagewiseToolbar v-if="isDevelopment" :config="stagewiseConfig" />
 </template>
 
 <script>
-import { stagewiseConfig } from './plugins/stagewise';
-
 export default {
   data() {
     return {
-      stagewiseConfig,
       isDevelopment: process.env.NODE_ENV === 'development'
     };
   }
