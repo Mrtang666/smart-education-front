@@ -1,7 +1,7 @@
 <template>
     <div class="exam-container">
         <div class="header-row">
-            <h2 class="section-title">考试管理</h2>
+        <h2 class="section-title">考试管理</h2>
 
             <!-- 搜索和操作栏 -->
             <div class="action-bar">
