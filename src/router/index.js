@@ -52,6 +52,12 @@ const routes = [
         props: true,
         name: "teacherExamScores"
       },
+      {
+        path: "exercise",
+        component: () => import("@/views/teacher/teacherExercise.vue"),
+      },
+      
+      
       // {
       //   path: "examCheck",
       //   component: () => import("@/views/teacher/teacherExamCheck.vue"),

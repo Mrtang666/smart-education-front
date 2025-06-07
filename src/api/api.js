@@ -2292,6 +2292,54 @@ export const attendanceAPI = {
         const axios = createStudentAuthorizedAxios();
         const response = await axios.get(`/api/attendance/student/${studentId}/course/name`, { params: { courseName } });
         return response.data;
+    },
+    
+    /**
+     * 获取课程的考勤记录（需要token）
+     * @param {number} courseId 课程ID
+     * @returns {Promise<Array<Object>>} 考勤记录列表
+     * 返回字段：
+     *   - attendanceId: number 考勤ID
+     *   - courseId: number 课程ID
+     *   - studentId: number 学生ID
+     *   - status: string 状态
+     *   - attendanceDate: string 考勤日期
+     *   - remark: string 备注
+     *   - recordedBy: number 记录人ID
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     *   - courseName: string 课程名称
+     *   - studentName: string 学生姓名
+     *   - recorderName: string 记录人姓名
+     *   - absent: boolean 是否缺勤
+     *   - late: boolean 是否迟到
+     *   - present: boolean 是否出勤
+     */
+    async getCourseAttendance(courseId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            console.log(`获取课程的考勤记录，课程ID: ${courseIdStr}`);
+            
+            const response = await axios.get(`/api/attendance/course/${courseIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.attendanceId !== undefined) item.attendanceId = String(item.attendanceId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                    if (item.studentId !== undefined) item.studentId = String(item.studentId);
+                    if (item.recordedBy !== undefined) item.recordedBy = String(item.recordedBy);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程考勤记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     }
 };
 

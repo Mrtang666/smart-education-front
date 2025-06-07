@@ -188,6 +188,7 @@ const chatSuggestions = ref([
 const menuList = [
   { name: '课程', icon: Reading },
   { name: '知识', icon: Document },
+  { name: '作业', icon: Document },
   { name: '考试', icon: Document },
   { name: '分析', icon: DataAnalysis },
 ]
@@ -220,9 +221,13 @@ function handleMenuClick(menu) {
     case '知识':
       router.push('/teacher/knowledge')
       break
+    case '作业':
+      router.push('/teacher/exercise')
+      break
     case '考试':
       router.push('/teacher/exam')
       break
+    
     // case '分析':
     //   router.push('/teacher/analysis')
     //   break

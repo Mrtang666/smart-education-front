@@ -1,4 +1,3 @@
-<!-- 这边我还没做好，等我明天做，你先别动 -->
 <template>
   <div class="knowledge-detail-container">
     <div class="knowledge-header">
@@ -7,7 +6,7 @@
           <el-icon><ArrowLeft /></el-icon>
           <span>返回</span>
         </div>
-        <h1 class="knowledge-title">{{ knowledgeName }} 知识点</h1>
+        <h1 class="knowledge-title">{{ knowledgeName }} 知识点详情</h1>
       </div>
       <div class="knowledge-actions">
         <el-button type="primary" plain @click="editKnowledge">
@@ -18,24 +17,12 @@
     </div>
 
     <div class="knowledge-content">
-      <!-- 统计图表区域 -->
-      <div class="charts-container" v-if="questions.length > 0">
-        <div class="chart-wrapper">
-          <div class="chart-title">习题难度分布</div>
-          <div id="difficultyChart" class="chart"></div>
-        </div>
-        <div class="chart-wrapper">
-          <div class="chart-title">习题类型分布</div>
-          <div id="questionTypeChart" class="chart"></div>
-        </div>
-      </div>
-      
       <!-- 习题区域 -->
       <div class="detail-card questions-card">
         <div class="card-header">
-          <h3><el-icon class="header-icon"><Document /></el-icon>相关习题 ({{ questions.length }})</h3>
+          <h3>相关习题 ({{ questions.length }})</h3>
           <div class="header-actions">
-            <el-button type="primary" size="small" @click="addQuestion" class="add-btn">
+            <el-button type="primary" size="small" @click="addQuestion">
               <el-icon><Plus /></el-icon>添加习题
             </el-button>
           </div>
@@ -53,51 +40,44 @@
               <el-button type="primary" @click="addQuestion">添加习题</el-button>
             </el-empty>
           </div>
-          <div v-else class="questions-grid">
-            <el-card v-for="(question, index) in displayQuestions" :key="question.questionId" class="question-card" shadow="hover">
+          <div v-else class="questions-list">
+            <div v-for="(question, index) in displayQuestions" :key="question.questionId" class="question-item">
               <div class="question-header">
-                <div class="question-index">{{ (currentPage - 1) * 4 + index + 1 }}</div>
+                <div class="question-index">{{ (currentPage - 1) * pageSize + index + 1 }}</div>
                 <div class="question-type">
-                  <el-tag size="small" effect="dark">{{ question.questionType }}</el-tag>
+                  <el-tag size="small">{{ question.questionType }}</el-tag>
                 </div>
                 <div class="question-difficulty">
-                  <el-tag size="small" :type="getQuestionDifficultyType(question.difficulty)" effect="dark">{{ question.difficulty }}</el-tag>
+                  <el-tag size="small" :type="getQuestionDifficultyType(question.difficulty)">{{ question.difficulty }}</el-tag>
                 </div>
               </div>
               <div class="question-content">
                 <div class="question-title">{{ question.content }}</div>
-                <div class="question-bottom">
-                  <div class="question-answer-row" v-if="question.referenceAnswer">
-                    <div class="answer-label">参考答案:</div>
-                    <div class="answer-content">{{ question.referenceAnswer }}</div>
-                  </div>
-                  <div class="question-analysis-row" v-if="question.analysis">
-                    <div class="analysis-label">解析:</div>
-                    <div class="analysis-content">{{ question.analysis }}</div>
-                  </div>
+                <div class="question-answer-row" v-if="question.referenceAnswer">
+                  <div class="answer-label">参考答案:</div>
+                  <div class="answer-content">{{ question.referenceAnswer }}</div>
                 </div>
               </div>
               <div class="question-footer">
                 <el-tag size="small" type="info" class="score-tag">{{ question.scorePoints || 0 }}分</el-tag>
                 <div class="question-actions">
-                  <el-button link type="primary" @click="editQuestion(question)">
-                    <el-icon><Edit /></el-icon>编辑
-                  </el-button>
-                  <el-button link type="danger" @click="deleteQuestion(question)">
-                    <el-icon><Delete /></el-icon>删除
-                  </el-button>
+                  <el-button link type="primary" @click="viewQuestion(question)">查看详情</el-button>
+                  <el-button link type="primary" @click="editQuestion(question)">编辑</el-button>
+                  <el-button link type="danger" @click="deleteQuestion(question)">删除</el-button>
                 </div>
               </div>
-            </el-card>
+            </div>
           </div>
           
           <!-- 分页控件 -->
           <div class="pagination-container" v-if="questions.length > 0">
             <el-pagination
               v-model:current-page="currentPage"
-              layout="prev, pager, next, jumper"
-              :page-size="4"
+              v-model:page-size="pageSize"
+              :page-sizes="[5, 10, 20, 50]"
+              layout="total, sizes, prev, pager, next, jumper"
               :total="questions.length"
+              @size-change="handleSizeChange"
               @current-change="handleCurrentChange"
               background
             />
@@ -214,10 +194,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Edit, Plus, DocumentRemove, Delete, Document } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Plus, DocumentRemove, Delete } from '@element-plus/icons-vue'
 import { knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 
@@ -258,12 +238,13 @@ const rules = {
 const questions = ref([])
 // 分页相关
 const currentPage = ref(1)
+const pageSize = ref(10)
 
 // 计算属性：当前页显示的题目
 const displayQuestions = computed(() => {
-  const start = (currentPage.value - 1) * 4;
-  const end = start + 4;
-  return questions.value.slice(start, end);
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return questions.value.slice(start, end)
 })
 
 // 习题对话框相关
@@ -329,42 +310,6 @@ watch(() => questionForm.value.questionType, (newType) => {
   }
 })
 
-// 图表相关
-let difficultyChart = null
-let questionTypeChart = null
-
-// 计算习题难度分布
-const difficultyDistribution = computed(() => {
-  const distribution = {
-    '简单': 0,
-    '中等': 0,
-    '困难': 0
-  }
-  
-  questions.value.forEach(question => {
-    if (question.difficulty in distribution) {
-      distribution[question.difficulty]++
-    }
-  })
-  
-  return distribution
-})
-
-// 计算习题类型分布
-const questionTypeDistribution = computed(() => {
-  const distribution = {}
-  
-  questions.value.forEach(question => {
-    const type = question.questionType || '未知类型'
-    if (!distribution[type]) {
-      distribution[type] = 0
-    }
-    distribution[type]++
-  })
-  
-  return distribution
-})
-
 // 获取知识点详情
 async function fetchKnowledgeDetail() {
   loading.value = true
@@ -415,17 +360,6 @@ async function fetchQuestions() {
     
     if (Array.isArray(response)) {
       questions.value = response
-      
-      // 获取习题后更新图表
-      nextTick(() => {
-        if (questions.value.length > 0) {
-          if (!isEChartsLoaded()) {
-            loadEChartsScript()
-          } else {
-            initCharts()
-          }
-        }
-      })
     } else {
       questions.value = []
     }
@@ -523,6 +457,10 @@ function addQuestion() {
   questionDialogVisible.value = true
 }
 
+// 查看习题
+function viewQuestion(question) {
+  ElMessage.info(`查看习题: ${question.content}`)
+}
 
 // 删除习题
 function deleteQuestion(question) {
@@ -597,6 +535,13 @@ function editQuestion(question) {
   }
   
   questionDialogVisible.value = true
+}
+
+// 处理每页显示数量变化
+function handleSizeChange(size) {
+  pageSize.value = size
+  // 重置到第一页
+  currentPage.value = 1
 }
 
 // 处理页码变化
@@ -714,202 +659,6 @@ async function saveQuestion() {
   })
 }
 
-// 动态加载echarts脚本
-const loadEChartsScript = () => {
-  if (document.getElementById('echarts-script')) {
-    return
-  }
-  
-  const script = document.createElement('script')
-  script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js'
-  script.id = 'echarts-script'
-  script.onload = () => {
-    console.log('echarts加载成功')
-    initCharts()
-  }
-  script.onerror = () => {
-    console.error('echarts加载失败')
-  }
-  document.head.appendChild(script)
-}
-
-// 检查是否已经加载echarts
-const isEChartsLoaded = () => {
-  return !!window.echarts
-}
-
-// 初始化图表
-const initCharts = () => {
-  try {
-    // 使用CDN加载的echarts
-    const echarts = window.echarts
-    if (!echarts) {
-      console.error('未找到echarts库')
-      loadEChartsScript()
-      return
-    }
-    
-    // 初始化难度分布图表
-    const difficultyChartDom = document.getElementById('difficultyChart')
-    if (difficultyChartDom) {
-      difficultyChart = echarts.init(difficultyChartDom)
-    }
-    
-    // 初始化题型分布图表
-    const questionTypeChartDom = document.getElementById('questionTypeChart')
-    if (questionTypeChartDom) {
-      questionTypeChart = echarts.init(questionTypeChartDom)
-    }
-    
-    // 更新图表数据
-    updateCharts()
-  } catch (error) {
-    console.error('初始化图表失败:', error)
-  }
-}
-
-// 更新图表数据
-const updateCharts = () => {
-  const echarts = window.echarts
-  if (!echarts) {
-    console.warn('echarts未加载，无法更新图表')
-    return
-  }
-  
-  // 如果习题列表为空，则不绘制图表
-  if (questions.value.length === 0) {
-    console.log('习题列表为空，不更新图表')
-    return
-  }
-  
-  try {
-    // 更新难度分布图表
-    if (difficultyChart) {
-      const difficultyData = difficultyDistribution.value
-      difficultyChart.setOption({
-        title: {
-          text: '习题难度分布',
-          left: 'center',
-          show: false
-        },
-        tooltip: {
-          trigger: 'item',
-          formatter: '{a} <br/>{b}: {c} ({d}%)'
-        },
-        legend: {
-          orient: 'horizontal',
-          bottom: 'bottom',
-          data: Object.keys(difficultyData)
-        },
-        color: ['#67C23A', '#E6A23C', '#F56C6C'],
-        series: [
-          {
-            name: '难度分布',
-            type: 'pie',
-            radius: ['40%', '70%'],
-            avoidLabelOverlap: false,
-            itemStyle: {
-              borderRadius: 10,
-              borderColor: '#fff',
-              borderWidth: 2
-            },
-            label: {
-              show: false,
-              position: 'center'
-            },
-            emphasis: {
-              label: {
-                show: true,
-                fontSize: '18',
-                fontWeight: 'bold'
-              }
-            },
-            labelLine: {
-              show: false
-            },
-            data: [
-              { value: difficultyData['简单'] || 0, name: '简单' },
-              { value: difficultyData['中等'] || 0, name: '中等' },
-              { value: difficultyData['困难'] || 0, name: '困难' }
-            ]
-          }
-        ]
-      })
-    }
-    
-    // 更新题型分布图表
-    if (questionTypeChart) {
-      const typeData = questionTypeDistribution.value
-      const typeNames = Object.keys(typeData)
-      // const typeValues = typeNames.map(name => typeData[name])
-      
-      // 为不同题型设置不同颜色
-      const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9254DE']
-      
-      questionTypeChart.setOption({
-        title: {
-          text: '习题类型分布',
-          left: 'center',
-          show: false
-        },
-        tooltip: {
-          trigger: 'item',
-          formatter: '{a} <br/>{b}: {c} ({d}%)'
-        },
-        legend: {
-          orient: 'horizontal',
-          bottom: 'bottom',
-          data: typeNames
-        },
-        series: [
-          {
-            name: '题型分布',
-            type: 'pie',
-            radius: '55%',
-            center: ['50%', '45%'],
-            avoidLabelOverlap: false,
-            itemStyle: {
-              borderRadius: 10,
-              borderColor: '#fff',
-              borderWidth: 2
-            },
-            label: {
-              show: true,
-              formatter: '{b}: {c} ({d}%)'
-            },
-            emphasis: {
-              label: {
-                show: true,
-                fontSize: '16',
-                fontWeight: 'bold'
-              }
-            },
-            data: typeNames.map((name, index) => ({
-              value: typeData[name],
-              name: name,
-              itemStyle: {
-                color: colors[index % colors.length]
-              }
-            }))
-          }
-        ]
-      })
-    }
-  } catch (error) {
-    console.error('更新图表数据失败:', error)
-  }
-}
-
-// 创建监听窗口大小变化的函数
-const handleResize = () => {
-  if (difficultyChart) {
-    difficultyChart.resize()
-  }
-  if (questionTypeChart) {
-    questionTypeChart.resize()
-  }
-}
-
 // 在组件挂载时获取知识点详情
 onMounted(async () => {
   if (!knowledgeId) {
@@ -920,38 +669,19 @@ onMounted(async () => {
   
   try {
     await fetchKnowledgeDetail()
-    
-    // 添加窗口大小变化监听
-    window.addEventListener('resize', handleResize)
   } catch (error) {
     console.error('初始化知识点详情失败:', error)
     ElMessage.error('加载知识点详情失败，请稍后重试')
-  }
-})
-
-// 组件卸载前清理
-onBeforeUnmount(() => {
-  // 移除窗口大小变化监听
-  window.removeEventListener('resize', handleResize)
-  
-  // 销毁图表实例
-  if (difficultyChart) {
-    difficultyChart.dispose()
-    difficultyChart = null
-  }
-  if (questionTypeChart) {
-    questionTypeChart.dispose()
-    questionTypeChart = null
   }
 })
 </script>
 
 <style scoped>
 .knowledge-detail-container {
-  min-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* 添加：使整个容器可滚动 */
+  overflow: hidden;
 }
 
 .knowledge-header {
@@ -1008,11 +738,9 @@ onBeforeUnmount(() => {
 
 .knowledge-content {
   flex: 1;
-  padding: 16px 20px;
+  padding: 32px 40px;
   background-color: #f5f7fa;
-  display: flex;
-  flex-direction: column;
-  overflow-y: visible; /* 修改：内容区域不限制溢出 */
+  overflow-y: auto;
 }
 
 .loading-container, .empty-container {
@@ -1031,27 +759,8 @@ onBeforeUnmount(() => {
 .detail-card {
   background-color: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  overflow: visible; /* 修改：确保内容不被截断 */
-}
-
-.questions-card {
-  position: relative;
-}
-
-.questions-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(to right, #67C23A, #85ce61);
-  border-radius: 12px 12px 0 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .card-header {
@@ -1060,7 +769,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #f8fafc;
 }
 
 .card-header h3 {
@@ -1068,25 +776,6 @@ onBeforeUnmount(() => {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
-  display: flex;
-  align-items: center;
-}
-
-.header-icon {
-  margin-right: 8px;
-  color: #67C23A;
-  font-size: 20px;
-}
-
-.add-btn {
-  background: linear-gradient(135deg, #67C23A, #85ce61);
-  border: none;
-  transition: transform 0.2s;
-}
-
-.add-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
 }
 
 .search-filter-container {
@@ -1117,9 +806,6 @@ onBeforeUnmount(() => {
 
 .card-body {
   padding: 20px;
-  overflow: visible; /* 习题列表不滚动 */
-  display: flex;
-  flex-direction: column;
 }
 
 .detail-item {
@@ -1156,7 +842,7 @@ onBeforeUnmount(() => {
 }
 
 .questions-list {
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 .dialog-footer {
@@ -1200,62 +886,49 @@ onBeforeUnmount(() => {
   margin-bottom: 8px;
 }
 
-.questions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-  margin-bottom: auto;
+.questions-card {
+  border-left: 4px solid #67C23A;
 }
 
-.question-card {
-  margin-bottom: 0;
-  border: none;
-  height: 550px; /* 固定卡片高度 */
-}
-
-/* 深度选择器修改Element UI内部样式 */
-:deep(.el-card.question-card) {
-  height: 550px;
+.header-actions {
   display: flex;
-  flex-direction: column;
-  transition: transform 0.2s, box-shadow 0.3s;
+  gap: 10px;
 }
 
-:deep(.el-card.question-card .el-card__body) {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  height: 100%;
+.question-item {
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
   overflow: hidden;
+  background-color: #fff;
+  transition: box-shadow 0.3s ease;
 }
 
-.el-card.question-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+.question-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .question-header {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  background: linear-gradient(to right, #f0f9eb, #f8fafc);
+  padding: 8px 12px;
+  background-color: #f8f9fa;
   border-bottom: 1px solid #ebeef5;
 }
 
 .question-index {
-  width: 28px;
-  height: 28px;
-  background: linear-gradient(135deg, #409EFF, #53a8ff);
+  width: 24px;
+  height: 24px;
+  background-color: #409EFF;
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  margin-right: 12px;
-  font-size: 14px;
-  box-shadow: 0 3px 6px rgba(64, 158, 255, 0.3);
+  margin-right: 10px;
+  font-size: 12px;
 }
 
 .question-type {
@@ -1263,108 +936,63 @@ onBeforeUnmount(() => {
 }
 
 .question-content {
-  flex: 1;
   padding: 12px;
-  background-color: white;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
 }
 
 .question-title {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
-  margin-bottom: 10px;
+  color: #333;
+  margin-bottom: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
   text-align: left;
 }
 
-.question-bottom {
-  margin-top: auto; /* 推到内容区底部 */
-}
-
 .question-answer-row {
   display: flex;
-  align-items: flex-start;
-  margin-top: 12px;
-  background-color: #f0f9eb;
-  padding: 8px 12px;
-  border-radius: 6px;
-}
-
-.question-analysis-row {
-  display: flex;
-  align-items: flex-start;
+  align-items: center;
   margin-top: 8px;
-  background-color: #ffefef;
-  padding: 8px 12px;
-  border-radius: 6px;
-}
-
-.analysis-label {
-  font-weight: 600;
-  color: #F56C6C;
-  margin-right: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.analysis-content {
-  color: #303133;
-  line-height: 1.4;
-  font-size: 14px;
-  text-align: left;
 }
 
 .answer-label {
   font-weight: 600;
   color: #67C23A;
   margin-right: 8px;
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .answer-content {
   color: #303133;
   line-height: 1.4;
-  font-size: 14px;
+  font-size: 13px;
   text-align: left;
-  font-weight: 500;
 }
 
 .question-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-top: 1px solid #ebeef5;
   background-color: #fafafa;
 }
 
 .score-tag {
   font-weight: 500;
-  font-size: 13px;
-  background-color: #f2f6fc;
-  color: #606266;
-  border: none;
+  font-size: 12px;
 }
 
 .question-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 24px;
   display: flex;
   justify-content: center;
-  background-color: #fff;
-  padding: 10px 0;
-  border-top: 1px solid #ebeef5;
-  margin-bottom: 0;
-  width: 100%;
 }
 
 .teach-plan-card {
@@ -1387,49 +1015,5 @@ onBeforeUnmount(() => {
 
 .add-option-button {
   margin-top: 12px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-/* 图表相关样式 */
-.charts-container {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
-  flex-shrink: 0;
-}
-
-.chart-wrapper {
-  flex: 1;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  height: 350px; /* 固定图表高度 */
-}
-
-.chart-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.chart {
-  height: 300px;
-  width: 100%;
-}
-
-/* 响应式布局 */
-@media screen and (max-width: 768px) {
-  .charts-container {
-    flex-direction: column;
-  }
 }
 </style> 

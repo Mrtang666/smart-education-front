@@ -237,6 +237,129 @@
               </div>
             </div>
           </el-tab-pane>
+
+          <el-tab-pane label="作业管理" name="homework">
+            <div class="content-section">
+              <div class="section-header">
+                <h3>作业列表</h3>
+                <el-button type="primary" size="small" @click="showAddHomeworkDialog">
+                  <el-icon><Plus /></el-icon>
+                  创建作业
+                </el-button>
+              </div>
+              <div class="section-body">
+                <div class="table-toolbar" v-if="homeworks.length > 0">
+                  <el-input
+                    v-model="homeworkSearchKeyword"
+                    placeholder="搜索作业标题或描述"
+                    prefix-icon="Search"
+                    clearable
+                    @clear="handleHomeworkSearchClear"
+                    @input="handleHomeworkSearchInput"
+                    style="width: 250px;"
+                  />
+                </div>
+                <div v-if="homeworks.length === 0" class="empty-tip">
+                  暂无作业，请点击"创建作业"按钮添加
+                </div>
+                <el-table
+                  v-else
+                  :data="filteredHomeworks"
+                  style="width: 100%"
+                  v-loading="isLoadingHomeworks"
+                >
+                  <el-table-column prop="title" label="作业标题" min-width="180" />
+                  <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+                  <el-table-column prop="totalScore" label="总分" width="80" />
+                  <el-table-column label="截止日期" width="180">
+                    <template #default="scope">
+                      {{ formatDate(scope.row.deadline) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="提交率" width="100">
+                    <template #default="scope">
+                      {{ scope.row.submitRate || '0%' }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="状态" width="100">
+                    <template #default="scope">
+                      <el-tag :type="getHomeworkStatusType(scope.row, currentTime.value)">{{ getHomeworkStatus(scope.row, currentTime.value) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="250" fixed="right">
+                    <template #default="scope">
+                      <el-button link type="primary" @click="viewHomeworkSubmissions(scope.row)">查看提交</el-button>
+                      <el-button link type="primary" @click="editHomework(scope.row)">编辑</el-button>
+                      <el-button link type="danger" @click="removeHomework(scope.row)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div class="pagination-container" v-if="homeworks.length > homeworkPageSize">
+                  <el-pagination
+                    v-model:current-page="homeworkCurrentPage"
+                    v-model:page-size="homeworkPageSize"
+                    :page-sizes="[10, 20, 50, 100]"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="filteredHomeworks.length"
+                  />
+                </div>
+              </div>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="考勤管理" name="attendance">
+            <div class="content-section">
+              <div class="section-header">
+                <h3>考勤列表</h3>
+                <el-button type="primary" size="small" @click="showAddAttendanceDialog">
+                  <el-icon><Plus /></el-icon>
+                  添加考勤
+                </el-button>
+              </div>
+              <div class="section-body">
+                <div class="table-toolbar" v-if="attendances.length > 0">
+                  <el-input
+                    v-model="attendanceSearchKeyword"
+                    placeholder="搜索考勤日期或状态"
+                    prefix-icon="Search"
+                    clearable
+                    @clear="handleAttendanceSearchClear"
+                    @input="handleAttendanceSearchInput"
+                    style="width: 250px;"
+                  />
+                </div>
+                <div v-if="attendances.length === 0" class="empty-tip">
+                  暂无考勤记录，请点击"添加考勤"按钮添加
+                </div>
+                <div v-else class="attendance-list">
+                  <div v-for="attendance in filteredAttendances" :key="attendance.attendanceId" class="attendance-item" @click="viewAttendanceDetail(attendance)">
+                    <div class="attendance-header">
+                      <h4>{{ formatDate(attendance.attendanceDate) }} 考勤</h4>
+                      <el-tag :type="getAttendanceStatusType(attendance.status)">{{ attendance.status }}</el-tag>
+                    </div>
+                    <div class="attendance-info">
+                      <p>出勤人数: {{ getAttendanceStats(attendance).present }} / {{ courseStudents.length }}</p>
+                      <p>缺勤人数: {{ getAttendanceStats(attendance).absent }}</p>
+                      <p>迟到人数: {{ getAttendanceStats(attendance).late }}</p>
+                    </div>
+                    <div class="attendance-actions">
+                      <el-button link type="primary" @click.stop="editAttendance(attendance)">编辑</el-button>
+                      <el-button link type="danger" @click.stop="removeAttendance(attendance)">删除</el-button>
+                    </div>
+                  </div>
+                </div>
+                <div class="pagination-container" v-if="attendances.length > attendancePageSize">
+                  <el-pagination
+                    v-model:current-page="attendanceCurrentPage"
+                    v-model:page-size="attendancePageSize"
+                    :page-sizes="[10, 20, 50, 100]"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="filteredAttendances.length"
+                  />
+                </div>
+              </div>
+            </div>
+          </el-tab-pane>
         </el-tabs>
       </div>
     </div>
@@ -571,6 +694,236 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 添加考勤对话框 -->
+    <el-dialog v-model="addAttendanceDialogVisible" :title="attendanceFormTitle" width="600px">
+      <el-form :model="attendanceForm" label-width="100px" :rules="attendanceRules" ref="attendanceFormRef">
+        <el-form-item label="考勤日期" prop="attendanceDate">
+          <el-date-picker
+            v-model="attendanceForm.attendanceDate"
+            type="date"
+            placeholder="选择考勤日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="考勤状态" prop="status">
+          <el-select v-model="attendanceForm.status" placeholder="请选择考勤状态">
+            <el-option label="进行中" value="进行中"></el-option>
+            <el-option label="已结束" value="已结束"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="attendanceForm.remark" type="textarea" :rows="3" placeholder="请输入考勤备注" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addAttendanceDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveAttendance" :loading="isSavingAttendance">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 考勤详情对话框 -->
+    <el-dialog v-model="attendanceDetailDialogVisible" :title="`${currentAttendance ? formatDate(currentAttendance.attendanceDate) : ''} 考勤详情`" width="800px">
+      <div v-if="currentAttendance" class="attendance-detail">
+        <div class="detail-header">
+          <div class="detail-item">
+            <span class="label">考勤日期:</span>
+            <span class="value">{{ formatDate(currentAttendance.attendanceDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">考勤状态:</span>
+            <span class="value">
+              <el-tag :type="getAttendanceStatusType(currentAttendance.status)">{{ currentAttendance.status }}</el-tag>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="label">备注:</span>
+            <span class="value">{{ currentAttendance.remark || '无' }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-content">
+          <div class="table-toolbar">
+            <el-input
+              v-model="attendanceDetailSearchKeyword"
+              placeholder="搜索学生姓名或学号"
+              prefix-icon="Search"
+              clearable
+              @clear="handleAttendanceDetailSearchClear"
+              @input="handleAttendanceDetailSearchInput"
+              style="width: 250px;"
+            />
+          </div>
+          
+          <el-table
+            :data="filteredAttendanceStudents"
+            style="width: 100%"
+            v-loading="isLoadingAttendanceStudents"
+          >
+            <el-table-column prop="studentId" label="学号" width="120" />
+            <el-table-column prop="fullName" label="姓名" width="120" />
+            <el-table-column prop="className" label="班级" width="120" />
+            <el-table-column label="考勤状态" width="120">
+              <template #default="scope">
+                <el-select 
+                  v-model="scope.row.attendanceStatus" 
+                  placeholder="选择状态"
+                  :disabled="currentAttendance.status === '已结束'"
+                  @change="updateStudentAttendanceStatus(scope.row)"
+                >
+                  <el-option label="出勤" value="出勤"></el-option>
+                  <el-option label="缺勤" value="缺勤"></el-option>
+                  <el-option label="迟到" value="迟到"></el-option>
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="200">
+              <template #default="scope">
+                <el-input 
+                  v-model="scope.row.remark" 
+                  placeholder="备注信息"
+                  :disabled="currentAttendance.status === '已结束'"
+                  @blur="updateStudentAttendanceRemark(scope.row)"
+                />
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination-container" v-if="attendanceStudents.length > attendanceDetailPageSize">
+            <el-pagination
+              v-model:current-page="attendanceDetailCurrentPage"
+              v-model:page-size="attendanceDetailPageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              :total="filteredAttendanceStudents.length"
+            />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="attendanceDetailDialogVisible = false">关闭</el-button>
+          <el-button 
+            type="primary" 
+            v-if="currentAttendance && currentAttendance.status === '进行中'" 
+            @click="finishAttendance"
+          >
+            结束考勤
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 添加作业对话框 -->
+    <el-dialog v-model="addHomeworkDialogVisible" title="添加作业" width="600px">
+      <el-form :model="homeworkForm" label-width="100px" :rules="homeworkRules" ref="homeworkFormRef">
+        <el-form-item label="作业标题" prop="title">
+          <el-input v-model="homeworkForm.title" placeholder="请输入作业标题" />
+        </el-form-item>
+        <el-form-item label="所属课程">
+          <el-input v-model="courseName" disabled />
+        </el-form-item>
+        <el-form-item label="作业描述">
+          <el-input v-model="homeworkForm.description" type="textarea" :rows="3" placeholder="请输入作业描述" />
+        </el-form-item>
+        <el-form-item label="总分" prop="totalScore">
+          <el-input-number v-model="homeworkForm.totalScore" :min="1" :max="100" />
+        </el-form-item>
+        <el-form-item label="截止日期" prop="deadline">
+          <el-date-picker
+            v-model="homeworkForm.deadline"
+            type="datetime"
+            placeholder="选择截止日期"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+          />
+        </el-form-item>
+        <el-form-item label="作业文件">
+          <el-upload
+            ref="homeworkUploadRef"
+            :auto-upload="false"
+            :on-change="handleHomeworkFileChange"
+            :on-remove="handleHomeworkFileRemove"
+            :before-upload="beforeHomeworkFileUpload"
+            :file-list="homeworkFileList"
+            :limit="1"
+            accept=".pdf,.pptx,.docx,.txt"
+          >
+            <el-button type="primary">选择文件</el-button>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="addHomeworkDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveHomework" :loading="isSavingHomework">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 作业提交情况对话框 -->
+    <el-dialog v-model="homeworkSubmissionsDialogVisible" title="作业提交情况" width="600px">
+      <div class="homework-submissions-container">
+        <div class="homework-submissions-header">
+          <div class="homework-submissions-search">
+            <el-input
+              v-model="homeworkSubmissionSearchKeyword"
+              placeholder="搜索学生姓名或学号"
+              prefix-icon="Search"
+              clearable
+              @clear="handleHomeworkSubmissionSearchClear"
+              @input="handleHomeworkSubmissionSearchInput"
+              style="width: 250px;"
+            />
+          </div>
+          <el-button type="primary" @click="exportHomeworkScores">导出成绩</el-button>
+        </div>
+        <div class="homework-submissions-body">
+          <div v-if="homeworkSubmissions.length === 0" class="empty-homework-submissions">
+            暂无作业提交记录
+          </div>
+          <div v-else class="homework-submissions-list">
+            <div v-for="submission in filteredHomeworkSubmissions" :key="submission.submissionId" class="homework-submission-item">
+              <div class="submission-header">
+                <div class="submission-info">
+                  <span class="student-name">{{ submission.fullName }}</span>
+                  <span class="submission-time">{{ formatDate(submission.submitTime) }}</span>
+                </div>
+                <div class="submission-actions">
+                  <el-button link type="primary" @click="updateSubmissionScore(submission)">评分</el-button>
+                  <el-button link type="primary" @click="viewSubmissionDetail(submission)">查看</el-button>
+                </div>
+              </div>
+              <div class="submission-score">
+                <span class="score-label">分数:</span>
+                <span class="score-value">{{ submission.score !== undefined ? submission.score : '未评分' }}</span>
+              </div>
+              <div class="submission-status">
+                <span class="status-label">状态:</span>
+                <span class="status-value">{{ getSubmissionStatus(submission, currentHomework.value) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="pagination-container" v-if="homeworkSubmissions.length > homeworkSubmissionPageSize">
+            <el-pagination
+              v-model:current-page="homeworkSubmissionCurrentPage"
+              v-model:page-size="homeworkSubmissionPageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              :total="filteredHomeworkSubmissions.length"
+            />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="homeworkSubmissionsDialogVisible = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -579,7 +932,7 @@ import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit, Plus, Document, Upload, Download, Delete, Search } from '@element-plus/icons-vue'
-import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI } from '@/api/api'
+import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import { getExamStatusType, getExamStatus, updateExamsStatus, formatDateTime } from '@/utils/examManager'
 
@@ -645,6 +998,448 @@ const pageSize = ref(10)
 
 // 作业列表
 const homeworks = ref([])
+const isLoadingHomeworks = ref(false)
+const homeworkSearchKeyword = ref('')
+const homeworkCurrentPage = ref(1)
+const homeworkPageSize = ref(10)
+const addHomeworkDialogVisible = ref(false)
+const homeworkFormRef = ref(null)
+const homeworkForm = ref({
+  title: '',
+  description: '',
+  totalScore: 100,
+  deadline: '',
+  homeworkId: null
+})
+const homeworkFormTitle = ref('创建作业')
+const isSavingHomework = ref(false)
+const homeworkFileList = ref([])
+const homeworkUploadRef = ref(null)
+const currentHomework = ref(null)
+const homeworkSubmissionsDialogVisible = ref(false)
+const homeworkSubmissions = ref([])
+const isLoadingHomeworkSubmissions = ref(false)
+const homeworkSubmissionSearchKeyword = ref('')
+const homeworkSubmissionCurrentPage = ref(1)
+const homeworkSubmissionPageSize = ref(10)
+const isExportingScores = ref(false)
+
+// 过滤作业列表
+const filteredHomeworks = computed(() => {
+  if (!homeworkSearchKeyword.value) {
+    return homeworks.value
+  }
+  const keyword = homeworkSearchKeyword.value.toLowerCase()
+  return homeworks.value.filter(homework => 
+    (homework.title && homework.title.toLowerCase().includes(keyword)) ||
+    (homework.description && homework.description.toLowerCase().includes(keyword))
+  )
+})
+
+// 过滤作业提交列表
+const filteredHomeworkSubmissions = computed(() => {
+  if (!homeworkSubmissionSearchKeyword.value) {
+    return homeworkSubmissions.value
+  }
+  const keyword = homeworkSubmissionSearchKeyword.value.toLowerCase()
+  return homeworkSubmissions.value.filter(submission => 
+    (submission.studentId && submission.studentId.toString().includes(keyword)) ||
+    (submission.fullName && submission.fullName.toLowerCase().includes(keyword))
+  )
+})
+
+// 作业表单验证规则
+const homeworkRules = {
+  title: [
+    { required: true, message: '请输入作业标题', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  totalScore: [
+    { required: true, message: '请输入总分', trigger: 'blur' },
+    { type: 'number', min: 1, message: '总分必须大于0', trigger: 'blur' }
+  ],
+  deadline: [
+    { required: true, message: '请选择截止日期', trigger: 'change' }
+  ]
+}
+
+// 获取课程作业列表
+async function fetchCourseHomeworks() {
+  try {
+    isLoadingHomeworks.value = true
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+    console.log('获取课程作业，课程ID:', courseIdStr)
+    
+    const response = await examAPI.getExamsInCourse(courseIdStr, 'homework')
+    console.log('获取到的作业数据:', response)
+    
+    if (Array.isArray(response)) {
+      // 确保所有ID都是字符串形式
+      homeworks.value = response.map(homework => ({
+        ...homework,
+        homeworkId: homework.examId ? new BigNumber(homework.examId).toString() : homework.examId
+      }));
+    } else {
+      homeworks.value = []
+    }
+  } catch (error) {
+    console.error('获取课程作业失败:', error)
+    ElMessage.error('获取课程作业失败，请稍后重试')
+    homeworks.value = []
+  } finally {
+    isLoadingHomeworks.value = false
+  }
+}
+
+// 显示添加作业对话框
+function showAddHomeworkDialog() {
+  homeworkFormTitle.value = '创建作业'
+  // 重置表单
+  homeworkForm.value = {
+    title: '',
+    description: '',
+    totalScore: 100,
+    deadline: '',
+    homeworkId: null
+  }
+  
+  homeworkFileList.value = []
+  addHomeworkDialogVisible.value = true
+}
+
+// 编辑作业
+function editHomework(homework) {
+  homeworkFormTitle.value = '编辑作业'
+  // 填充表单数据
+  homeworkForm.value = {
+    title: homework.title,
+    description: homework.description || '',
+    totalScore: homework.totalScore,
+    deadline: homework.deadline,
+    homeworkId: homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
+  }
+  
+  // 如果有附件，加载附件列表
+  homeworkFileList.value = homework.attachments ? homework.attachments.map(attachment => ({
+    name: attachment.fileName,
+    url: attachment.fileUrl
+  })) : []
+  
+  addHomeworkDialogVisible.value = true
+}
+
+// 保存作业
+async function saveHomework() {
+  homeworkFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        isSavingHomework.value = true
+        
+        // 从localstorage中获取教师ID
+        const userInfoStr = localStorage.getItem('user_info')
+        if (!userInfoStr) {
+          throw new Error('未找到用户信息，请重新登录')
+        }
+        
+        const userInfo = JSON.parse(userInfoStr)
+        if (!userInfo || !userInfo.teacherId) {
+          throw new Error('用户信息不完整或不是教师账号')
+        }
+        
+        // 确保教师ID是字符串形式
+        const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+        
+        // 确保courseId是字符串形式
+        const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+        
+        if (homeworkForm.value.homeworkId) {
+          // 更新作业
+          const homeworkData = {
+            examId: homeworkForm.value.homeworkId,
+            title: homeworkForm.value.title,
+            description: homeworkForm.value.description,
+            totalScore: homeworkForm.value.totalScore,
+            deadline: homeworkForm.value.deadline,
+            type: 'homework'
+          }
+          
+          await examAPI.updateExam(homeworkData)
+          ElMessage.success('作业更新成功')
+        } else {
+          // 创建新作业
+          const homeworkData = {
+            title: homeworkForm.value.title,
+            description: homeworkForm.value.description,
+            courseId: courseIdStr,
+            teacherId: teacherId,
+            totalScore: homeworkForm.value.totalScore,
+            deadline: homeworkForm.value.deadline,
+            type: 'homework'
+          }
+          
+          await examAPI.saveExam(homeworkData)
+          ElMessage.success('作业创建成功')
+        }
+        
+        // 重新获取作业列表
+        await fetchCourseHomeworks()
+        
+        // 关闭对话框
+        addHomeworkDialogVisible.value = false
+      } catch (error) {
+        console.error('保存作业失败:', error)
+        ElMessage.error(`保存作业失败: ${error.message || '请稍后重试'}`)
+      } finally {
+        isSavingHomework.value = false
+      }
+    }
+  })
+}
+
+// 删除作业
+function removeHomework(homework) {
+  ElMessageBox.confirm(
+    `确定要删除作业"${homework.title}"吗？删除后将无法恢复。`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保homeworkId是字符串形式
+      const homeworkIdStr = homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
+      
+      await examAPI.deleteExamById(homeworkIdStr)
+      
+      // 重新获取作业列表
+      await fetchCourseHomeworks()
+      
+      ElMessage.success('作业删除成功')
+    } catch (error) {
+      console.error('删除作业失败:', error)
+      ElMessage.error('删除作业失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
+}
+
+// 查看作业提交情况
+async function viewHomeworkSubmissions(homework) {
+  currentHomework.value = homework
+  homeworkSubmissionsDialogVisible.value = true
+  
+  try {
+    isLoadingHomeworkSubmissions.value = true
+    
+    // 确保homeworkId是字符串形式
+    const homeworkIdStr = homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
+    
+    const submissions = await examAPI.getExamStudents(homeworkIdStr)
+    
+    // 确保所有ID都是字符串形式
+    homeworkSubmissions.value = submissions.map(submission => ({
+      ...submission,
+      submissionId: submission.answerId ? new BigNumber(submission.answerId).toString() : submission.answerId,
+      studentId: submission.studentId ? new BigNumber(submission.studentId).toString() : submission.studentId,
+      homeworkId: submission.examId ? new BigNumber(submission.examId).toString() : submission.examId
+    }))
+  } catch (error) {
+    console.error('获取作业提交列表失败:', error)
+    ElMessage.error('获取作业提交列表失败，请稍后重试')
+    homeworkSubmissions.value = []
+  } finally {
+    isLoadingHomeworkSubmissions.value = false
+  }
+}
+
+// 更新提交分数
+async function updateSubmissionScore(submission) {
+  try {
+    await examAPI.gradeExamAnswer({
+      answerId: submission.submissionId,
+      score: submission.score,
+      feedback: submission.feedback
+    })
+    
+    ElMessage.success('评分已保存')
+  } catch (error) {
+    console.error('更新提交分数失败:', error)
+    ElMessage.error('更新提交分数失败，请稍后重试')
+  }
+}
+
+// 查看提交详情
+function viewSubmissionDetail() {
+  // 这里可以实现查看提交详情的功能
+  // 可以弹出一个对话框展示提交的内容和附件
+  ElMessage.info('查看提交详情功能待实现')
+}
+
+// 导出作业成绩
+function exportHomeworkScores() {
+  if (!currentHomework.value) return
+  
+  isExportingScores.value = true
+  
+  try {
+    // 创建CSV内容
+    let csvContent = "学号,姓名,提交时间,分数,状态\n"
+    
+    homeworkSubmissions.value.forEach(submission => {
+      const status = getSubmissionStatus(submission, currentHomework.value)
+      const submitTime = submission.submitTime ? formatDate(submission.submitTime) : '未提交'
+      const score = submission.score !== undefined ? submission.score : ''
+      
+      csvContent += `${submission.studentId},${submission.fullName},${submitTime},${score},${status}\n`
+    })
+    
+    // 创建Blob对象
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    
+    // 创建下载链接
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    // 设置下载属性
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${currentHomework.value.title}_成绩.csv`)
+    link.style.visibility = 'hidden'
+    
+    // 添加到文档并触发下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    ElMessage.success('成绩导出成功')
+  } catch (error) {
+    console.error('导出成绩失败:', error)
+    ElMessage.error('导出成绩失败，请稍后重试')
+  } finally {
+    isExportingScores.value = false
+  }
+}
+
+// 作业文件上传相关方法
+function handleHomeworkFileChange(file) {
+  console.log('文件变更:', file)
+}
+
+function handleHomeworkFileRemove(file) {
+  console.log('移除文件:', file)
+}
+
+function beforeHomeworkFileUpload(file) {
+  // 限制文件大小为20MB
+  const maxSize = 20 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.error('文件大小不能超过20MB')
+    return false
+  }
+  
+  return true
+}
+
+// 处理作业搜索输入
+function handleHomeworkSearchInput() {
+  // 重置分页到第一页
+  homeworkCurrentPage.value = 1
+}
+
+// 处理作业搜索清除
+function handleHomeworkSearchClear() {
+  homeworkSearchKeyword.value = ''
+  homeworkCurrentPage.value = 1
+}
+
+// 处理作业提交搜索输入
+function handleHomeworkSubmissionSearchInput() {
+  // 重置分页到第一页
+  homeworkSubmissionCurrentPage.value = 1
+}
+
+// 处理作业提交搜索清除
+function handleHomeworkSubmissionSearchClear() {
+  homeworkSubmissionSearchKeyword.value = ''
+  homeworkSubmissionCurrentPage.value = 1
+}
+
+// 获取作业状态类型
+function getHomeworkStatusType(homework, now) {
+  const deadline = homework.deadline ? new Date(homework.deadline) : null
+  
+  if (deadline) {
+    if (now > deadline) {
+      return 'danger' // 已截止
+    } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+      return 'warning' // 即将截止（24小时内）
+    } else {
+      return 'success' // 进行中
+    }
+  }
+  
+  return 'info' // 未知状态
+}
+
+// 获取作业状态文本
+function getHomeworkStatus(homework, now) {
+  const deadline = homework.deadline ? new Date(homework.deadline) : null
+  
+  if (deadline) {
+    if (now > deadline) {
+      return '已截止'
+    } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+      return '即将截止'
+    } else {
+      return '进行中'
+    }
+  }
+  
+  return '未知'
+}
+
+// 获取提交状态类型
+// function getSubmissionStatusType(submission, homework) {
+//   if (!submission.submitted) {
+//     return 'danger' // 未提交
+//   }
+  
+//   const deadline = homework.deadline ? new Date(homework.deadline) : null
+//   const submitTime = submission.submitTime ? new Date(submission.submitTime) : null
+  
+//   if (deadline && submitTime) {
+//     if (submitTime > deadline) {
+//       return 'warning' // 逾期提交
+//     } else {
+//       return 'success' // 按时提交
+//     }
+//   }
+  
+//   return 'info' // 未知状态
+// }
+
+// 获取提交状态文本
+function getSubmissionStatus(submission, homework) {
+  if (!submission.submitted) {
+    return '未提交'
+  }
+  
+  const deadline = homework.deadline ? new Date(homework.deadline) : null
+  const submitTime = submission.submitTime ? new Date(submission.submitTime) : null
+  
+  if (deadline && submitTime) {
+    if (submitTime > deadline) {
+      return '逾期提交'
+    } else {
+      return '按时提交'
+    }
+  }
+  
+  return '已提交'
+}
 
 // 课程知识点列表
 const courseKnowledges = ref([])
@@ -735,6 +1530,15 @@ const isLoadingExams = ref(false)
 const examSearchKeyword = ref('')
 const examCurrentPage = ref(1)
 const examPageSize = ref(10)
+
+// 考勤列表
+const attendances = ref([])
+const isLoadingAttendances = ref(false)
+const attendanceSearchKeyword = ref('')
+const attendanceCurrentPage = ref(1)
+const attendancePageSize = ref(10)
+const attendanceStudents = ref([])
+const attendanceDetailSearchKeyword = ref('')
 
 // 添加计算属性跟踪当前时间
 const currentTime = ref(new Date())
@@ -2112,10 +2916,11 @@ onMounted(async () => {
       // 加载课程考试
       await fetchCourseExams()
       
-      homeworks.value = [
-        { id: 1, title: '第一章习题', deadline: '2023-06-01', submitRate: '85%' },
-        { id: 2, title: '第二章习题', deadline: '2023-06-15', submitRate: '70%' },
-      ]
+      // 加载课程作业
+      await fetchCourseHomeworks()
+
+      // 加载课程考勤
+      await fetchCourseAttendances()
     } else {
       ElMessage.error('获取课程信息失败')
       goBack()
@@ -2162,6 +2967,320 @@ function viewKnowledgeDetail(knowledge) {
       knowledgeName: knowledge.name
     }
   })
+}
+
+// 添加考勤对话框
+const addAttendanceDialogVisible = ref(false)
+const attendanceFormRef = ref(null)
+const attendanceForm = ref({
+  attendanceDate: '',
+  status: '进行中',
+  remark: ''
+})
+const attendanceFormTitle = ref('添加考勤')
+const isSavingAttendance = ref(false)
+
+// 考勤详情对话框
+const attendanceDetailDialogVisible = ref(false)
+const isLoadingAttendanceStudents = ref(false)
+const attendanceDetailCurrentPage = ref(1)
+const attendanceDetailPageSize = ref(10)
+const currentAttendance = ref(null)
+
+// 过滤考勤学生列表
+const filteredAttendanceStudents = computed(() => {
+  if (!attendanceDetailSearchKeyword.value) {
+    return attendanceStudents.value
+  }
+  const keyword = attendanceDetailSearchKeyword.value.toLowerCase()
+  return attendanceStudents.value.filter(student => 
+    (student.studentId && student.studentId.toString().includes(keyword)) ||
+    (student.fullName && student.fullName.toLowerCase().includes(keyword)) ||
+    (student.className && student.className.toLowerCase().includes(keyword))
+  )
+})
+
+// 处理考勤搜索输入
+function handleAttendanceDetailSearchInput() {
+  // 重置分页到第一页
+  attendanceDetailCurrentPage.value = 1
+}
+
+// 处理考勤搜索清除
+function handleAttendanceDetailSearchClear() {
+  attendanceDetailSearchKeyword.value = ''
+  attendanceDetailCurrentPage.value = 1
+}
+
+// 保存考勤
+async function saveAttendance() {
+  attendanceFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        isSavingAttendance.value = true
+        // 确保courseId是字符串形式
+        const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
+        
+        // 创建考勤数据对象
+        const attendanceData = {
+          courseId: courseIdStr,
+          attendanceDate: attendanceForm.value.attendanceDate,
+          status: attendanceForm.value.status,
+          remark: attendanceForm.value.remark || ''
+        }
+        
+        // 提交数据到API
+        await attendanceAPI.saveAttendance(attendanceData)
+        
+        // 重新获取考勤列表
+        await fetchCourseAttendances()
+        
+        ElMessage.success('添加考勤成功')
+        addAttendanceDialogVisible.value = false
+      } catch (error) {
+        console.error('添加考勤失败:', error)
+        ElMessage.error('添加考勤失败，请稍后重试')
+      } finally {
+        isSavingAttendance.value = false
+      }
+    } else {
+      return false
+    }
+  })
+}
+
+// 编辑考勤
+function editAttendance(attendance) {
+  // 这里可以实现编辑考勤的功能
+  // 可以复用添加考勤的对话框，只需要预填充表单数据
+  attendanceForm.value = {
+    attendanceDate: attendance.attendanceDate,
+    status: attendance.status,
+    remark: attendance.remark
+  }
+  
+  addAttendanceDialogVisible.value = true
+  ElMessage.info('请在表单中修改考勤信息后点击确认')
+}
+
+// 删除考勤
+function removeAttendance(attendance) {
+  ElMessageBox.confirm(
+    `确定要删除考勤"${attendance.attendanceDate}"吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保courseId和attendanceId都是字符串形式
+      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+      const attendanceIdStr = attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId;
+      
+      await courseSelectionAPI.deleteAttendanceById(courseIdStr, attendanceIdStr)
+      // 重新获取考勤列表
+      await fetchCourseAttendances()
+      ElMessage.success('考勤删除成功')
+    } catch (error) {
+      console.error('删除考勤失败:', error)
+      ElMessage.error('删除考勤失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
+}
+
+// 根据考勤状态获取标签类型
+function getAttendanceStatusType(status) {
+  switch(status) {
+    case '进行中':
+      return 'warning'
+    case '已结束':
+      return 'success'
+    default:
+      return 'info'
+  }
+}
+
+// 获取考勤列表
+async function fetchCourseAttendances() {
+  try {
+    isLoadingAttendances.value = true
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+    console.log('获取考勤列表，课程ID:', courseIdStr)
+    
+    // 调用API获取课程考勤数据
+    const response = await attendanceAPI.getCourseAttendance(courseIdStr);
+    console.log('获取到的考勤数据:', response);
+    
+    if (Array.isArray(response)) {
+      // 确保所有ID都是字符串形式
+      attendances.value = response.map(attendance => ({
+        ...attendance,
+        attendanceId: attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId,
+        courseId: attendance.courseId ? new BigNumber(attendance.courseId).toString() : attendance.courseId,
+        recordedBy: attendance.recordedBy ? new BigNumber(attendance.recordedBy).toString() : attendance.recordedBy
+      }));
+    } else {
+      attendances.value = []
+    }
+  } catch (error) {
+    console.error('获取考勤列表失败:', error)
+    ElMessage.error('获取考勤列表失败，请稍后重试')
+    attendances.value = []
+  } finally {
+    isLoadingAttendances.value = false
+  }
+}
+
+// 显示添加考勤对话框
+function showAddAttendanceDialog() {
+  // 重置表单
+  attendanceForm.value = {
+    attendanceDate: new Date().toISOString().split('T')[0], // 今天的日期
+    status: '进行中',
+    remark: ''
+  }
+  attendanceFormTitle.value = '添加考勤'
+  addAttendanceDialogVisible.value = true
+}
+
+// 查看考勤详情
+async function viewAttendanceDetail(attendance) {
+  currentAttendance.value = attendance
+  attendanceDetailDialogVisible.value = true
+}
+
+// 更新学生考勤状态
+function updateStudentAttendanceStatus(row) {
+  // 这里可以实现更新学生考勤状态的功能
+  // 可以复用添加考勤的对话框，只需要预填充表单数据
+  attendanceForm.value = {
+    attendanceDate: currentAttendance.value.attendanceDate,
+    status: row.attendanceStatus,
+    remark: currentAttendance.value.remark
+  }
+  
+  addAttendanceDialogVisible.value = true
+  ElMessage.info('请在表单中修改考勤信息后点击确认')
+}
+
+// 更新学生考勤备注
+function updateStudentAttendanceRemark(row) {
+  // 这里可以实现更新学生考勤备注的功能
+  // 可以复用添加考勤的对话框，只需要预填充表单数据
+  attendanceForm.value = {
+    attendanceDate: currentAttendance.value.attendanceDate,
+    status: currentAttendance.value.status,
+    remark: row.remark
+  }
+  
+  addAttendanceDialogVisible.value = true
+  ElMessage.info('请在表单中修改考勤信息后点击确认')
+}
+
+// 结束考勤
+function finishAttendance() {
+  ElMessageBox.confirm(
+    `确定要结束考勤"${currentAttendance.value.attendanceDate}"吗？`,
+    '结束确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保courseId和attendanceId都是字符串形式
+      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+      const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId;
+      
+      await courseSelectionAPI.finishAttendance(courseIdStr, attendanceIdStr)
+      // 重新获取考勤列表
+      await fetchCourseAttendances();
+      
+      ElMessage.success('考勤已结束');
+      attendanceDetailDialogVisible.value = false;
+    } catch (error) {
+      console.error('结束考勤失败:', error);
+      ElMessage.error('结束考勤失败，请稍后重试');
+    }
+  }).catch(() => {
+    // 用户取消结束
+  })
+}
+
+// 过滤考勤列表
+const filteredAttendances = computed(() => {
+  if (!attendanceSearchKeyword.value) {
+    return attendances.value
+  }
+  const keyword = attendanceSearchKeyword.value.toLowerCase()
+  return attendances.value.filter(attendance => 
+    (attendance.attendanceDate && attendance.attendanceDate.toLowerCase().includes(keyword)) ||
+    (attendance.status && attendance.status.toLowerCase().includes(keyword))
+  )
+})
+
+// 获取考勤统计数据
+function getAttendanceStats(attendance) {
+  // 根据考勤数据统计学生出勤情况
+  
+  // 如果考勤记录中有学生考勤状态数据
+  if (attendance.studentRecords && Array.isArray(attendance.studentRecords)) {
+    const present = attendance.studentRecords.filter(record => record.status === '出勤').length;
+    const absent = attendance.studentRecords.filter(record => record.status === '缺勤').length;
+    const late = attendance.studentRecords.filter(record => record.status === '迟到').length;
+    
+    return {
+      present,
+      absent,
+      late
+    };
+  } else {
+    // 如果考勤记录中没有详细的学生考勤状态，则使用考勤记录上的汇总数据
+    if (attendance.presentCount !== undefined && 
+        attendance.absentCount !== undefined && 
+        attendance.lateCount !== undefined) {
+      return {
+        present: attendance.presentCount,
+        absent: attendance.absentCount,
+        late: attendance.lateCount
+      };
+    }
+    
+    // 如果没有任何统计数据，则显示总人数和0
+    return {
+      present: 0,
+      absent: 0,
+      late: 0
+    };
+  }
+}
+
+// 处理考勤搜索输入
+function handleAttendanceSearchInput() {
+  // 重置分页到第一页
+  attendanceCurrentPage.value = 1
+}
+
+// 处理考勤搜索清除
+function handleAttendanceSearchClear() {
+  attendanceSearchKeyword.value = ''
+  attendanceCurrentPage.value = 1
+}
+
+// 考勤表单验证规则
+const attendanceRules = {
+  attendanceDate: [
+    { required: true, message: '请选择考勤日期', trigger: 'change' }
+  ],
+  status: [
+    { required: true, message: '请选择考勤状态', trigger: 'change' }
+  ]
 }
 </script>
 
@@ -2627,5 +3746,134 @@ function viewKnowledgeDetail(knowledge) {
 :deep(.form-tip .el-alert) {
   margin-left: 100px;
   width: calc(100% - 100px);
+}
+
+.attendance-list {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.attendance-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+  transition: background-color 0.3s;
+}
+
+.attendance-item:hover {
+  background-color: #f5f7fa;
+}
+
+.attendance-item:last-child {
+  border-bottom: none;
+}
+
+.attendance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.attendance-header h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.attendance-info {
+  margin-bottom: 16px;
+}
+
+.attendance-info p {
+  margin: 6px 0;
+  color: #606266;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.attendance-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #ebeef5;
+  padding-top: 16px;
+  margin-top: 10px;
+}
+
+.attendance-detail {
+  padding: 10px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.detail-item {
+  margin-bottom: 15px;
+  display: flex;
+}
+
+.detail-item .label {
+  font-weight: bold;
+  width: 80px;
+  color: #606266;
+}
+
+.detail-item .value {
+  flex: 1;
+  color: #303133;
+}
+
+.attendance-detail .table-toolbar {
+  margin-bottom: 16px;
+}
+
+.attendance-detail .pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.attendance-detail .empty-search-results {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+.attendance-detail .selected-students-list {
+  margin-top: 20px;
+  border-top: 1px solid #EBEEF5;
+  padding-top: 15px;
+}
+
+.attendance-detail .selected-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.attendance-detail .selected-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.attendance-detail .selected-student-tag {
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+:deep(.attendance-detail .selected-row) {
+  background-color: #F0F9EB !important;
+}
+
+:deep(.attendance-detail .el-alert) {
+  margin-bottom: 10px;
 }
 </style> 
