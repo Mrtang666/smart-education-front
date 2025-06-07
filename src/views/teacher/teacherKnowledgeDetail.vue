@@ -18,6 +18,18 @@
     </div>
 
     <div class="knowledge-content">
+      <!-- 统计图表区域 -->
+      <div class="charts-container" v-if="questions.length > 0">
+        <div class="chart-wrapper">
+          <div class="chart-title">习题难度分布</div>
+          <div id="difficultyChart" class="chart"></div>
+        </div>
+        <div class="chart-wrapper">
+          <div class="chart-title">习题类型分布</div>
+          <div id="questionTypeChart" class="chart"></div>
+        </div>
+      </div>
+      
       <!-- 习题区域 -->
       <div class="detail-card questions-card">
         <div class="card-header">
@@ -202,7 +214,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit, Plus, DocumentRemove, Delete, Document } from '@element-plus/icons-vue'
@@ -317,6 +329,42 @@ watch(() => questionForm.value.questionType, (newType) => {
   }
 })
 
+// 图表相关
+let difficultyChart = null
+let questionTypeChart = null
+
+// 计算习题难度分布
+const difficultyDistribution = computed(() => {
+  const distribution = {
+    '简单': 0,
+    '中等': 0,
+    '困难': 0
+  }
+  
+  questions.value.forEach(question => {
+    if (question.difficulty in distribution) {
+      distribution[question.difficulty]++
+    }
+  })
+  
+  return distribution
+})
+
+// 计算习题类型分布
+const questionTypeDistribution = computed(() => {
+  const distribution = {}
+  
+  questions.value.forEach(question => {
+    const type = question.questionType || '未知类型'
+    if (!distribution[type]) {
+      distribution[type] = 0
+    }
+    distribution[type]++
+  })
+  
+  return distribution
+})
+
 // 获取知识点详情
 async function fetchKnowledgeDetail() {
   loading.value = true
@@ -367,6 +415,17 @@ async function fetchQuestions() {
     
     if (Array.isArray(response)) {
       questions.value = response
+      
+      // 获取习题后更新图表
+      nextTick(() => {
+        if (questions.value.length > 0) {
+          if (!isEChartsLoaded()) {
+            loadEChartsScript()
+          } else {
+            initCharts()
+          }
+        }
+      })
     } else {
       questions.value = []
     }
@@ -655,6 +714,202 @@ async function saveQuestion() {
   })
 }
 
+// 动态加载echarts脚本
+const loadEChartsScript = () => {
+  if (document.getElementById('echarts-script')) {
+    return
+  }
+  
+  const script = document.createElement('script')
+  script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js'
+  script.id = 'echarts-script'
+  script.onload = () => {
+    console.log('echarts加载成功')
+    initCharts()
+  }
+  script.onerror = () => {
+    console.error('echarts加载失败')
+  }
+  document.head.appendChild(script)
+}
+
+// 检查是否已经加载echarts
+const isEChartsLoaded = () => {
+  return !!window.echarts
+}
+
+// 初始化图表
+const initCharts = () => {
+  try {
+    // 使用CDN加载的echarts
+    const echarts = window.echarts
+    if (!echarts) {
+      console.error('未找到echarts库')
+      loadEChartsScript()
+      return
+    }
+    
+    // 初始化难度分布图表
+    const difficultyChartDom = document.getElementById('difficultyChart')
+    if (difficultyChartDom) {
+      difficultyChart = echarts.init(difficultyChartDom)
+    }
+    
+    // 初始化题型分布图表
+    const questionTypeChartDom = document.getElementById('questionTypeChart')
+    if (questionTypeChartDom) {
+      questionTypeChart = echarts.init(questionTypeChartDom)
+    }
+    
+    // 更新图表数据
+    updateCharts()
+  } catch (error) {
+    console.error('初始化图表失败:', error)
+  }
+}
+
+// 更新图表数据
+const updateCharts = () => {
+  const echarts = window.echarts
+  if (!echarts) {
+    console.warn('echarts未加载，无法更新图表')
+    return
+  }
+  
+  // 如果习题列表为空，则不绘制图表
+  if (questions.value.length === 0) {
+    console.log('习题列表为空，不更新图表')
+    return
+  }
+  
+  try {
+    // 更新难度分布图表
+    if (difficultyChart) {
+      const difficultyData = difficultyDistribution.value
+      difficultyChart.setOption({
+        title: {
+          text: '习题难度分布',
+          left: 'center',
+          show: false
+        },
+        tooltip: {
+          trigger: 'item',
+          formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+          orient: 'horizontal',
+          bottom: 'bottom',
+          data: Object.keys(difficultyData)
+        },
+        color: ['#67C23A', '#E6A23C', '#F56C6C'],
+        series: [
+          {
+            name: '难度分布',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 10,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: {
+              show: false,
+              position: 'center'
+            },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: '18',
+                fontWeight: 'bold'
+              }
+            },
+            labelLine: {
+              show: false
+            },
+            data: [
+              { value: difficultyData['简单'] || 0, name: '简单' },
+              { value: difficultyData['中等'] || 0, name: '中等' },
+              { value: difficultyData['困难'] || 0, name: '困难' }
+            ]
+          }
+        ]
+      })
+    }
+    
+    // 更新题型分布图表
+    if (questionTypeChart) {
+      const typeData = questionTypeDistribution.value
+      const typeNames = Object.keys(typeData)
+      // const typeValues = typeNames.map(name => typeData[name])
+      
+      // 为不同题型设置不同颜色
+      const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9254DE']
+      
+      questionTypeChart.setOption({
+        title: {
+          text: '习题类型分布',
+          left: 'center',
+          show: false
+        },
+        tooltip: {
+          trigger: 'item',
+          formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+          orient: 'horizontal',
+          bottom: 'bottom',
+          data: typeNames
+        },
+        series: [
+          {
+            name: '题型分布',
+            type: 'pie',
+            radius: '55%',
+            center: ['50%', '45%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 10,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: {
+              show: true,
+              formatter: '{b}: {c} ({d}%)'
+            },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: '16',
+                fontWeight: 'bold'
+              }
+            },
+            data: typeNames.map((name, index) => ({
+              value: typeData[name],
+              name: name,
+              itemStyle: {
+                color: colors[index % colors.length]
+              }
+            }))
+          }
+        ]
+      })
+    }
+  } catch (error) {
+    console.error('更新图表数据失败:', error)
+  }
+}
+
+// 创建监听窗口大小变化的函数
+const handleResize = () => {
+  if (difficultyChart) {
+    difficultyChart.resize()
+  }
+  if (questionTypeChart) {
+    questionTypeChart.resize()
+  }
+}
+
 // 在组件挂载时获取知识点详情
 onMounted(async () => {
   if (!knowledgeId) {
@@ -665,19 +920,38 @@ onMounted(async () => {
   
   try {
     await fetchKnowledgeDetail()
+    
+    // 添加窗口大小变化监听
+    window.addEventListener('resize', handleResize)
   } catch (error) {
     console.error('初始化知识点详情失败:', error)
     ElMessage.error('加载知识点详情失败，请稍后重试')
+  }
+})
+
+// 组件卸载前清理
+onBeforeUnmount(() => {
+  // 移除窗口大小变化监听
+  window.removeEventListener('resize', handleResize)
+  
+  // 销毁图表实例
+  if (difficultyChart) {
+    difficultyChart.dispose()
+    difficultyChart = null
+  }
+  if (questionTypeChart) {
+    questionTypeChart.dispose()
+    questionTypeChart = null
   }
 })
 </script>
 
 <style scoped>
 .knowledge-detail-container {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto; /* 添加：使整个容器可滚动 */
 }
 
 .knowledge-header {
@@ -736,9 +1010,9 @@ onMounted(async () => {
   flex: 1;
   padding: 16px 20px;
   background-color: #f5f7fa;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  overflow-y: visible; /* 修改：内容区域不限制溢出 */
 }
 
 .loading-container, .empty-container {
@@ -758,13 +1032,11 @@ onMounted(async () => {
   background-color: #fff;
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   border: none;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 150px);
-  min-height: 700px;
+  overflow: visible; /* 修改：确保内容不被截断 */
 }
 
 .questions-card {
@@ -845,11 +1117,9 @@ onMounted(async () => {
 
 .card-body {
   padding: 20px;
-  overflow-y: auto;
+  overflow: visible; /* 习题列表不滚动 */
   display: flex;
   flex-direction: column;
-  flex: 1;
-  justify-content: space-between;
 }
 
 .detail-item {
@@ -1122,5 +1392,44 @@ onMounted(async () => {
 .header-actions {
   display: flex;
   gap: 10px;
+}
+
+/* 图表相关样式 */
+.charts-container {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.chart-wrapper {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 350px; /* 固定图表高度 */
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.chart {
+  height: 300px;
+  width: 100%;
+}
+
+/* 响应式布局 */
+@media screen and (max-width: 768px) {
+  .charts-container {
+    flex-direction: column;
+  }
 }
 </style> 
