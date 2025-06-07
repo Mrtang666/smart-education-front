@@ -78,37 +78,54 @@ const routes = [
       // },
     ]
   },
-  // {
-  //   path: "/student",
-  //   redirect: "/student/center",
-  //   meta: { requiresAuth: true },
-  //   children: [
-  //     {
-  //       path: "center",
-  //       component: () => import("@/views/student/studentCenter.vue"),
-  //     },
-  //     {
-  //       path: "course",
-  //       component: () => import("@/views/student/studentCourse.vue"),
-  //     },
-  //     {
-  //       path: "courseDetail",
-  //       component: () => import("@/views/student/studentCourseDetail.vue"),
-  //     },
-  //     {
-  //       path: "exam",
-  //       component: () => import("@/views/student/studentExam.vue"),
-  //     },
-  //     {
-  //       path: "report",
-  //       component: () => import("@/views/student/studentReport.vue"),
-  //     },
-  //     {
-  //       path: "exercise",
-  //       component: () => import("@/views/student/studentExercise.vue"),
-  //     },
-  //   ]
-  // },
+  {
+    path: "/student",
+    component: () => import("@/views/student/studentCenter.vue"),
+    redirect: "/student/center",
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "center",
+        component: () => import("@/views/student/studentHome.vue"),
+      },
+      {
+        path: "homework",
+        component: () => import("@/views/student/studentHomework.vue"),
+      },
+      {
+        path: "course",
+        component: () => import("@/views/student/studentCourse.vue"),
+      },
+      // {
+      //   path: "course/:courseId",
+      //   component: () => import("@/views/student/studentCourseDetail.vue"),
+      //   props: true,
+      //   name: "studentCourseDetail"
+      // },
+      // {
+      //   path: "learning",
+      //   component: () => import("@/views/student/studentLearning.vue"),
+      // },
+      // {
+      //   path: "exam",
+      //   component: () => import("@/views/student/studentExam.vue"),
+      // },
+      // {
+      //   path: "exam/:examId",
+      //   component: () => import("@/views/student/studentExamDetail.vue"),
+      //   props: true,
+      //   name: "studentExamDetail"
+      // },
+      // {
+      //   path: "schedule",
+      //   component: () => import("@/views/student/studentSchedule.vue"),
+      // },
+      // {
+      //   path: "report",
+      //   component: () => import("@/views/student/studentReport.vue"),
+      // },
+    ]
+  },
   {
     path: "/",
     redirect: "/login"

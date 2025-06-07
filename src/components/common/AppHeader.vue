@@ -8,7 +8,16 @@
         </div>
         <div class="header-right">
             <el-input v-if="props.showInviteCode" placeholder="请输入邀请码" v-model="inviteCode" class="invite-input"
-                size="small" style="width: 140px; margin-right: 12px;" />
+                size="small" style="width: 180px; margin-right: 12px;" @keyup.enter="handleJoinCourse">
+                <template #prefix>
+                    <el-icon><Ticket /></el-icon>
+                </template>
+                <template #append>
+                    <el-button @click="handleJoinCourse" :disabled="!inviteCode.trim()">
+                        <el-icon><Right /></el-icon>
+                    </el-button>
+                </template>
+            </el-input>
             <el-input 
                 placeholder="找资料" 
                 class="search-input" 
@@ -45,7 +54,7 @@ import { ref, defineProps, defineEmits } from 'vue'
 import { ElMessage } from 'element-plus'
 import { clearAuth } from '@/utils/auth'
 import { useRouter } from 'vue-router'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Ticket, Right } from '@element-plus/icons-vue'
 
 const props = defineProps({
     logoUrl: {
@@ -78,13 +87,22 @@ const router = useRouter()
 const searchValue = ref(props.defaultSearchValue)
 
 // 搜索
-const emit = defineEmits(['userAction', 'search', 'searchInput'])
+const emit = defineEmits(['userAction', 'search', 'searchInput', 'joinCourse'])
 
 const inviteCode = ref('')
 
 function handleProfileClick() {
-    // 跳转到个人中心页面
-    router.push('/teacher/center')
+    // 获取用户信息，确定角色
+    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}')
+    
+    // 根据角色跳转到不同的个人中心页面
+    if (userInfo.roles && userInfo.roles.includes('ROLE_TEACHER')) {
+        // 教师角色
+        router.push('/teacher/center')
+    } else {
+        // 默认为学生角色
+        router.push('/student/center')
+    }
 }
 
 function handleSearchInput() {
@@ -106,6 +124,19 @@ function handleLogout() {
     
     // 跳转到登录页
     router.push('/login')
+}
+
+function handleJoinCourse() {
+    if (!inviteCode.value.trim()) {
+        ElMessage.warning('请输入邀请码')
+        return
+    }
+    
+    // 触发事件，将邀请码传给父组件处理
+    emit('joinCourse', inviteCode.value)
+    
+    // 清空输入框
+    inviteCode.value = ''
 }
 </script>
 
@@ -199,7 +230,54 @@ function handleLogout() {
 }
 
 .invite-input {
-    width: 140px;
+    width: 180px;
+}
+
+/* 修改邀请码按钮样式，使其与输入框右侧重合 */
+:deep(.invite-input .el-input__wrapper) {
+    background-color: rgba(95, 105, 126, 0.7);
+    box-shadow: none;
+    border-radius: 20px;
+    padding: 0 15px;
+    padding-right: 40px; /* 为按钮预留空间 */
+}
+
+:deep(.invite-input .el-input__inner) {
+    color: rgb(193, 197, 205);
+    height: 36px;
+}
+
+:deep(.invite-input .el-input__inner::placeholder) {
+    color: rgb(193, 197, 205);
+}
+
+:deep(.invite-input .el-input-group__append) {
+    background-color: rgba(75, 141, 230, 0.9);
+    box-shadow: none;
+    border: none;
+    color: white;
+    padding: 0 10px;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+    margin-left: -1px; /* 消除间隙 */
+    position: absolute; /* 使按钮绝对定位 */
+    right: 0; /* 定位到右侧 */
+    top: 0;
+    height: 100%; /* 与输入框同高 */
+    display: flex;
+    align-items: center;
+}
+
+:deep(.invite-input .el-input-group__append .el-button) {
+    color: white;
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+:deep(.invite-input .el-input-group__append .el-icon) {
+    color: white;
+    font-size: 14px;
 }
 
 .avatar {
