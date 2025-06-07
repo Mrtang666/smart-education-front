@@ -93,9 +93,6 @@ import {
   Position, 
   Reading, 
   Document, 
-  EditPen, 
-  User, 
-  Collection, 
   DataAnalysis 
 } from '@element-plus/icons-vue'
 
@@ -192,9 +189,6 @@ const menuList = [
   { name: '课程', icon: Reading },
   { name: '知识', icon: Document },
   { name: '考试', icon: Document },
-  { name: '作业', icon: EditPen },
-  { name: '学生', icon: User },
-  { name: '班级', icon: Collection },
   { name: '分析', icon: DataAnalysis },
 ]
 
@@ -229,15 +223,6 @@ function handleMenuClick(menu) {
     case '考试':
       router.push('/teacher/exam')
       break
-    // case '作业':
-    //   router.push('/teacher/homework')
-    //   break
-    // case '学生':
-    //   router.push('/teacher/student')
-    //   break
-    // case '班级':
-    //   router.push('/teacher/class')
-    //   break
     // case '分析':
     //   router.push('/teacher/analysis')
     //   break
