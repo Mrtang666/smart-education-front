@@ -3039,8 +3039,12 @@ async function saveAttendance() {
           remark: attendanceForm.value.remark || ''
         }
         
-        // 提交数据到API
-        await attendanceAPI.saveAttendance(attendanceData)
+        // 保存考勤主记录
+        const mainAttendance = await attendanceAPI.saveAttendance(attendanceData)
+        
+        if (!mainAttendance || !mainAttendance.attendanceId) {
+          throw new Error('创建考勤记录失败')
+        }
         
         // 重新获取考勤列表
         await fetchCourseAttendances()
@@ -3049,7 +3053,7 @@ async function saveAttendance() {
         addAttendanceDialogVisible.value = false
       } catch (error) {
         console.error('添加考勤失败:', error)
-        ElMessage.error('添加考勤失败，请稍后重试')
+        ElMessage.error(`添加考勤失败: ${error.message || '请稍后重试'}`)
       } finally {
         isSavingAttendance.value = false
       }
@@ -3162,40 +3166,81 @@ function showAddAttendanceDialog() {
 async function viewAttendanceDetail(attendance) {
   currentAttendance.value = attendance
   attendanceDetailDialogVisible.value = true
+  
+  try {
+    isLoadingAttendanceStudents.value = true
+    
+    // 获取课程所有学生
+    const students = courseStudents.value
+    
+    // 将学生转换为考勤记录格式
+    attendanceStudents.value = students.map(student => ({
+      ...student,
+      attendanceStatus: '出勤',  // 默认状态
+      remark: ''
+    }))
+    
+  } catch (error) {
+    console.error('获取考勤学生记录失败:', error)
+    ElMessage.error('获取考勤学生记录失败，请稍后重试')
+    attendanceStudents.value = []
+  } finally {
+    isLoadingAttendanceStudents.value = false
+  }
 }
 
 // 更新学生考勤状态
-function updateStudentAttendanceStatus(row) {
-  // 这里可以实现更新学生考勤状态的功能
-  // 可以复用添加考勤的对话框，只需要预填充表单数据
-  attendanceForm.value = {
-    attendanceDate: currentAttendance.value.attendanceDate,
-    status: row.attendanceStatus,
-    remark: currentAttendance.value.remark
+async function updateStudentAttendanceStatus(row) {
+  if (!currentAttendance.value || currentAttendance.value.status === '已结束') {
+    ElMessage.warning('考勤已结束，无法修改状态')
+    return
   }
   
-  addAttendanceDialogVisible.value = true
-  ElMessage.info('请在表单中修改考勤信息后点击确认')
+  try {
+    // 确保考勤ID是字符串形式
+    const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId
+    
+    // 更新考勤状态 - 使用已有的API方法
+    await attendanceAPI.updateAttendanceStatus(attendanceIdStr, row.attendanceStatus, row.remark || '')
+    
+    ElMessage.success('学生考勤状态已更新')
+  } catch (error) {
+    console.error('更新学生考勤状态失败:', error)
+    ElMessage.error('更新学生考勤状态失败，请稍后重试')
+    // 恢复之前的状态
+    const index = attendanceStudents.value.findIndex(s => s.studentId === row.studentId)
+    if (index !== -1) {
+      // 重新获取考勤详情
+      await viewAttendanceDetail(currentAttendance.value)
+    }
+  }
 }
 
 // 更新学生考勤备注
-function updateStudentAttendanceRemark(row) {
-  // 这里可以实现更新学生考勤备注的功能
-  // 可以复用添加考勤的对话框，只需要预填充表单数据
-  attendanceForm.value = {
-    attendanceDate: currentAttendance.value.attendanceDate,
-    status: currentAttendance.value.status,
-    remark: row.remark
+async function updateStudentAttendanceRemark(row) {
+  if (!currentAttendance.value || currentAttendance.value.status === '已结束') {
+    ElMessage.warning('考勤已结束，无法修改备注')
+    return
   }
   
-  addAttendanceDialogVisible.value = true
-  ElMessage.info('请在表单中修改考勤信息后点击确认')
+  try {
+    // 确保考勤ID是字符串形式
+    const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId
+    
+    // 更新考勤备注 - 使用已有的API方法
+    await attendanceAPI.updateAttendanceStatus(attendanceIdStr, row.attendanceStatus, row.remark || '')
+    
+    ElMessage.success('学生考勤备注已更新')
+  } catch (error) {
+    console.error('更新学生考勤备注失败:', error)
+    ElMessage.error('更新学生考勤备注失败，请稍后重试')
+  }
 }
 
 // 结束考勤
-function finishAttendance() {
+async function finishAttendance() {
   ElMessageBox.confirm(
-    `确定要结束考勤"${currentAttendance.value.attendanceDate}"吗？`,
+    `确定要结束考勤"${formatDate(currentAttendance.value.attendanceDate)}"吗？未签到的学生将被标记为缺勤。`,
     '结束确认',
     {
       confirmButtonText: '确定',
@@ -3204,19 +3249,32 @@ function finishAttendance() {
     }
   ).then(async () => {
     try {
-      // 确保courseId和attendanceId都是字符串形式
-      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
-      const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId;
+      const loadingInstance = ElLoading.service({
+        target: '.attendance-detail',
+        text: '正在结束考勤...',
+        background: 'rgba(255, 255, 255, 0.7)'
+      })
+
+      // 确保考勤ID是字符串形式
+      const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId
       
-      await courseSelectionAPI.finishAttendance(courseIdStr, attendanceIdStr)
+      // 直接更新考勤状态为已结束，简化处理
+      await attendanceAPI.updateAttendanceStatus(attendanceIdStr, '已结束')
+      
       // 重新获取考勤列表
-      await fetchCourseAttendances();
+      await fetchCourseAttendances()
       
-      ElMessage.success('考勤已结束');
-      attendanceDetailDialogVisible.value = false;
+      // 更新当前考勤记录
+      currentAttendance.value.status = '已结束'
+      
+      // 重新获取学生考勤记录
+      await viewAttendanceDetail(currentAttendance.value)
+      
+      loadingInstance.close()
+      ElMessage.success('考勤已结束')
     } catch (error) {
-      console.error('结束考勤失败:', error);
-      ElMessage.error('结束考勤失败，请稍后重试');
+      console.error('结束考勤失败:', error)
+      ElMessage.error('结束考勤失败，请稍后重试')
     }
   }).catch(() => {
     // 用户取消结束
