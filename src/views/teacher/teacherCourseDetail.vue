@@ -1009,7 +1009,8 @@ const homeworkForm = ref({
   description: '',
   totalScore: 100,
   deadline: '',
-  homeworkId: null
+  homeworkId: null,
+  type: 'homework' // 添加type字段，指定为作业类型
 })
 const homeworkFormTitle = ref('创建作业')
 const isSavingHomework = ref(false)
@@ -1071,7 +1072,8 @@ async function fetchCourseHomeworks() {
     const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
     console.log('获取课程作业，课程ID:', courseIdStr)
     
-    const response = await examAPI.getExamsInCourse(courseIdStr, 'homework')
+    // 修改为使用getExamsInCourseByType接口，指定type为'homework'
+    const response = await examAPI.getExamsInCourseByType(courseIdStr, 'homework')
     console.log('获取到的作业数据:', response)
     
     if (Array.isArray(response)) {
@@ -1101,7 +1103,8 @@ function showAddHomeworkDialog() {
     description: '',
     totalScore: 100,
     deadline: '',
-    homeworkId: null
+    homeworkId: null,
+    type: 'homework' // 添加type字段，指定为作业类型
   }
   
   homeworkFileList.value = []
@@ -1117,7 +1120,8 @@ function editHomework(homework) {
     description: homework.description || '',
     totalScore: homework.totalScore,
     deadline: homework.deadline,
-    homeworkId: homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
+    homeworkId: homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId,
+    type: 'homework' // 确保type字段设置为作业类型
   }
   
   // 如果有附件，加载附件列表
@@ -1556,7 +1560,8 @@ const examForm = ref({
   durationMinutes: 120,
   startTime: '',
   endTime: '',
-  examId: null
+  examId: null,
+  type: 'exam' // 添加type字段，指定为考试类型
 })
 const examFormTitle = ref('创建考试')
 const isSavingExam = ref(false)
@@ -1749,7 +1754,8 @@ async function fetchCourseExams() {
     const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
     console.log('获取课程考试，课程ID:', courseIdStr)
     
-    const response = await examAPI.getExamsInCourse(courseIdStr)
+    // 修改为使用getExamsInCourseByType接口，指定type为'exam'
+    const response = await examAPI.getExamsInCourseByType(courseIdStr, 'exam')
     console.log('获取到的考试数据:', response)
     
     if (Array.isArray(response)) {
@@ -2609,7 +2615,8 @@ function showAddExamDialog() {
     durationMinutes: 120,
     startTime: '',
     endTime: '',
-    examId: null
+    examId: null,
+    type: 'exam' // 添加type字段，指定为考试类型
   }
   
   addExamDialogVisible.value = true
@@ -2626,7 +2633,8 @@ function editExam(exam) {
     durationMinutes: exam.durationMinutes,
     startTime: exam.startTime,
     endTime: exam.endTime,
-    examId: exam.examId ? new BigNumber(exam.examId).toString() : exam.examId
+    examId: exam.examId ? new BigNumber(exam.examId).toString() : exam.examId,
+    type: 'exam' // 确保type字段设置为考试类型
   }
   
   addExamDialogVisible.value = true
@@ -2682,7 +2690,8 @@ async function saveExam() {
             durationMinutes: examForm.value.durationMinutes,
             startTime: examForm.value.startTime,
             endTime: examForm.value.endTime,
-            status: status // 使用自动判断的状态
+            status: status, // 使用自动判断的状态
+            type: 'exam' // 添加type字段，指定为考试类型
           }
           
           await examAPI.updateExam(examData)
@@ -2698,7 +2707,8 @@ async function saveExam() {
             durationMinutes: examForm.value.durationMinutes,
             startTime: examForm.value.startTime,
             endTime: examForm.value.endTime,
-            status: status // 使用自动判断的状态
+            status: status, // 使用自动判断的状态
+            type: 'exam' // 添加type字段，指定为考试类型
           }
           
           await examAPI.saveExam(examData)

@@ -264,7 +264,8 @@ const examForm = ref({
     totalScore: 100,
     durationMinutes: 60,
     examTime: [],
-    status: '未开始'
+    status: '未开始',
+    type: 'exam'
 })
 
 // 表单验证规则
@@ -328,7 +329,18 @@ const loadCourses = async () => {
 const loadExams = async () => {
     loading.value = true
     try {
+        // 使用getExamsByTeacher接口获取所有考试/作业数据
         let res = await examAPI.getExamsByTeacher(teacherId)
+        console.log('获取到的教师所有考试/作业数据:', res)
+        
+        // 在前端筛选出type为'exam'的考试数据
+        if (Array.isArray(res)) {
+            res = res.filter(item => item.type === 'exam')
+            console.log('筛选后的考试数据:', res)
+        } else {
+            console.warn('API返回的数据不是数组格式:', res)
+            res = []
+        }
 
         // 存储所有考试供下拉框使用
         allExams.value = res
@@ -355,6 +367,7 @@ const loadExams = async () => {
     } catch (error) {
         console.error('加载考试失败:', error)
         ElMessage.error('加载考试列表失败')
+        examList.value = []
     } finally {
         loading.value = false
     }
@@ -627,7 +640,8 @@ const showCreateDialog = () => {
         totalScore: 100,
         durationMinutes: 60,
         examTime: [],
-        status: '未开始'
+        status: '未开始',
+        type: 'exam'
     }
     dialogVisible.value = true
 }
@@ -644,7 +658,8 @@ const editExam = (exam) => {
         totalScore: exam.totalScore,
         durationMinutes: exam.durationMinutes,
         examTime: [exam.startTime, exam.endTime],
-        status: exam.status
+        status: exam.status,
+        type: 'exam'
     }
     dialogVisible.value = true
 }
@@ -659,7 +674,8 @@ const submitExam = async () => {
                 const submitData = {
                     ...examForm.value,
                     startTime: examForm.value.examTime[0],
-                    endTime: examForm.value.examTime[1]
+                    endTime: examForm.value.examTime[1],
+                    type: 'exam'
                 }
                 delete submitData.examTime
                 
@@ -718,7 +734,8 @@ const viewResults = (exam) => {
         query: {
             title: exam.title,
             courseId: exam.courseId,
-            courseName: getCourseNameById(exam.courseId)
+            courseName: getCourseNameById(exam.courseId),
+            type: 'exam'
         }
     })
 }
@@ -759,11 +776,26 @@ const handleCourseSelect = async () => {
         // 加载该课程的考试
         try {
             loading.value = true
-            const res = await examAPI.getExamsInCourse(selectedCourseId.value)
+            console.log('加载课程考试，课程ID:', selectedCourseId.value)
+            
+            // 使用getExamsInCourse接口获取所有考试/作业数据
+            let res = await examAPI.getExamsInCourse(selectedCourseId.value)
+            console.log('获取到的课程所有考试/作业数据:', res)
+            
+            // 在前端筛选出type为'exam'的考试数据
+            if (Array.isArray(res)) {
+                res = res.filter(item => item.type === 'exam')
+                console.log('筛选后的课程考试数据:', res)
+            } else {
+                console.warn('API返回的课程考试数据不是数组格式:', res)
+                res = []
+            }
+            
+            // 存储该课程的考试列表
             courseExams.value = res
 
             // 如果有搜索关键词，进行过滤
-            let filteredExams = res
+            let filteredExams = [...courseExams.value]
             if (searchKeyword.value) {
                 filteredExams = filteredExams.filter(exam =>
                     exam.title.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
@@ -781,6 +813,8 @@ const handleCourseSelect = async () => {
         } catch (error) {
             console.error('加载课程考试失败:', error)
             ElMessage.error('加载课程考试失败')
+            courseExams.value = []
+            examList.value = []
         } finally {
             loading.value = false
         }

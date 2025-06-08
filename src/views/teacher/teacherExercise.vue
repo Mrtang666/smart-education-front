@@ -1,8 +1,1365 @@
 <template>
-    <div class="teacher-exercise">
-        <div class="exercise-header">
+    <div class="exercise-container">
+        <div class="header-row">
             <h2 class="section-title">作业管理</h2>
+
+            <!-- 搜索和操作栏 -->
+            <div class="action-bar">
+                <div class="search-area">
+                    <el-select v-model="selectedCourseId" placeholder="选择课程" @change="handleCourseSelect"
+                        class="course-select">
+                        <el-option label="全部课程" value="" />
+                        <el-option v-for="course in courseList" :key="course.id" :label="course.name"
+                            :value="course.id" />
+                    </el-select>
+                    <el-select v-if="selectedCourseId" v-model="selectedHomeworkId" placeholder="选择作业"
+                        @change="handleHomeworkSelect" class="homework-select">
+                        <el-option label="全部作业" value="" />
+                        <el-option v-for="homework in courseHomeworks" :key="homework.examId" :label="homework.title"
+                            :value="homework.examId" />
+                    </el-select>
+                    <el-input v-model="searchKeyword" placeholder="搜索作业" class="search-input" @input="handleSearch">
+                        <template #suffix>
+                            <el-icon class="search-icon">
+                                <Search />
+                            </el-icon>
+                        </template>
+                    </el-input>
+                </div>
+                <div class="action-buttons">
+                    <el-button type="primary" @click="showCreateDialog">
+                        <el-icon>
+                            <Plus />
+                        </el-icon>新建作业
+                    </el-button>
+                </div>
+            </div>
         </div>
+
+        <!-- 数据统计图表区域 -->
+        <div v-if="!selectedCourseId" class="charts-container">
+            <div class="chart-wrapper full-width">
+                <div id="courseHomeworkChart" class="chart"></div>
+            </div>
+        </div>
+
+        <!-- 课程作业统计图表区域 -->
+        <div v-if="selectedCourseId" class="charts-container">
+            <div class="chart-wrapper">
+                <div id="scoreDistributionChart" class="chart"></div>
+            </div>
+            <div class="chart-wrapper">
+                <div id="submissionRateChart" class="chart"></div>
+            </div>
+        </div>
+
+        <!-- 作业详情区域 -->
+        <div v-if="selectedCourseId && selectedHomeworkId && selectedHomework" class="homework-detail-container">
+            <h3 class="detail-title">作业详情</h3>
+            <el-descriptions :column="2" border>
+                <el-descriptions-item label="作业标题">{{ selectedHomework.title }}</el-descriptions-item>
+                <el-descriptions-item label="作业状态">
+                    <el-tag :type="getStatusType(selectedHomework.status)" effect="dark">
+                        <el-icon v-if="selectedHomework.status === '未开始' || selectedHomework.status === '未设置截止日期'">
+                            <Calendar />
+                        </el-icon>
+                        <el-icon v-else-if="selectedHomework.status === '进行中' || selectedHomework.status === '即将截止'">
+                            <Loading />
+                        </el-icon>
+                        <el-icon v-else-if="selectedHomework.status === '已截止'">
+                            <Timer />
+                        </el-icon>
+                        {{ getHomeworkStatusDescription(selectedHomework) }}
+                    </el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item label="截止时间">
+                    {{ formatDateTimeLocal(selectedHomework.deadline) || '未设置截止时间' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="总分">
+                    {{ selectedHomework.totalScore }}分
+                </el-descriptions-item>
+                <el-descriptions-item label="描述" :span="2">
+                    {{ selectedHomework.description || '暂无描述' }}
+                </el-descriptions-item>
+            </el-descriptions>
+
+            <div class="detail-actions">
+                <el-button type="primary" @click="editHomework(selectedHomework)">
+                    <el-icon>
+                        <Edit />
+                    </el-icon>编辑作业
+                </el-button>
+                <el-button type="success" @click="viewSubmissions(selectedHomework)">
+                    <el-icon>
+                        <DataAnalysis />
+                    </el-icon>查看提交
+                </el-button>
+                <el-button type="danger" @click="confirmDeleteHomework(selectedHomework)">
+                    <el-icon>
+                        <Delete />
+                    </el-icon>删除作业
+                </el-button>
+            </div>
+        </div>
+
+        <!-- 作业列表 -->
+        <div v-if="!selectedCourseId || (selectedCourseId && !selectedHomeworkId)" v-loading="loading"
+            class="homework-table-container">
+            <div v-if="loading" class="loading-container">
+                <el-skeleton :rows="5" animated />
+            </div>
+            <div v-else-if="homeworkList.length === 0" class="empty-container">
+                <el-empty description="暂无作业" />
+            </div>
+            <div v-else>
+                <el-table :data="homeworkList" style="width: 100%" border stripe
+                    :header-cell-style="{ background: '#f5f7fa' }">
+                    <el-table-column prop="title" label="作业标题" min-width="180" />
+                    <el-table-column prop="description" label="描述" min-width="200">
+                        <template #default="scope">
+                            {{ scope.row.description || '暂无描述' }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="totalScore" label="总分" width="80" />
+                    <el-table-column label="截止日期" min-width="180">
+                        <template #default="scope">
+                            {{ formatDateTimeLocal(scope.row.deadline) || '未设置截止时间' }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="所属课程" min-width="150" v-if="!selectedCourseId">
+                        <template #default="scope">
+                            <el-button link type="primary" @click="goToCourseDetail(scope.row.courseId)">
+                                {{ getCourseNameById(scope.row.courseId) }}
+                            </el-button>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="状态" width="100">
+                        <template #default="scope">
+                            <el-tag :type="getStatusType(scope.row.status)" effect="dark">
+                                <el-icon v-if="scope.row.status === '未开始' || scope.row.status === '未设置截止日期'">
+                                    <Calendar />
+                                </el-icon>
+                                <el-icon v-else-if="scope.row.status === '进行中' || scope.row.status === '即将截止'">
+                                    <Loading />
+                                </el-icon>
+                                <el-icon v-else-if="scope.row.status === '已截止'">
+                                    <Timer />
+                                </el-icon>
+                                {{ getHomeworkStatusDescription(scope.row) }}
+                            </el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="220" fixed="right">
+                        <template #default="scope">
+                            <el-button type="primary" link @click="editHomework(scope.row)">
+                                <el-icon>
+                                    <Edit />
+                                </el-icon>编辑
+                            </el-button>
+                            <el-button type="success" link @click="viewSubmissions(scope.row)">
+                                <el-icon>
+                                    <DataAnalysis />
+                                </el-icon>提交
+                            </el-button>
+                            <el-button type="danger" link @click="confirmDeleteHomework(scope.row)">
+                                <el-icon>
+                                    <Delete />
+                                </el-icon>删除
+                            </el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+
+                <!-- 分页 -->
+                <div class="pagination-container" v-if="homeworkList.length > 0">
+                    <el-pagination background layout="prev, pager, next" :total="total" :page-size="pageSize"
+                        :current-page="currentPage" @current-change="handlePageChange" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 创建/编辑作业对话框 -->
+        <el-dialog v-model="dialogVisible" :title="homeworkFormTitle" width="600px"
+            :close-on-click-modal="false">
+            <el-form :model="homeworkForm" :rules="rules" ref="homeworkFormRef" label-width="100px">
+                <el-form-item label="作业标题" prop="title">
+                    <el-input v-model="homeworkForm.title" placeholder="请输入作业标题" />
+                </el-form-item>
+                <el-form-item label="所属课程" prop="courseId">
+                    <el-select v-model="homeworkForm.courseId" placeholder="请选择课程" style="width: 100%">
+                        <el-option v-for="course in courseList" :key="course.id" :label="course.name"
+                            :value="course.id" />
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="总分" prop="totalScore">
+                    <el-input-number v-model="homeworkForm.totalScore" :min="1" :max="100" />
+                    <span class="unit-label">分</span>
+                </el-form-item>
+                <el-form-item label="截止日期" prop="deadline">
+                    <el-date-picker
+                        v-model="homeworkForm.deadline"
+                        type="datetime"
+                        placeholder="选择截止日期"
+                        format="YYYY-MM-DD HH:mm"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                        :disabledDate="disablePastDates"
+                        :shortcuts="dateShortcuts"
+                        style="width: 100%" />
+                    <div class="form-tip">设置截止日期后，学生将在此日期前提交作业</div>
+                </el-form-item>
+                <el-form-item label="状态" prop="status">
+                    <el-select v-model="homeworkForm.status" placeholder="请选择状态" style="width: 100%">
+                        <el-option label="未设置截止日期" value="未设置截止日期" disabled />
+                        <el-option label="未开始" value="未开始" />
+                        <el-option label="进行中" value="进行中" />
+                        <el-option label="即将截止" value="即将截止" disabled />
+                        <el-option label="已截止" value="已截止" />
+                    </el-select>
+                    <div class="form-tip">状态将根据截止日期自动计算，也可手动设置</div>
+                </el-form-item>
+                <el-form-item label="作业附件">
+                    <el-upload
+                        action="/api/upload"
+                        :auto-upload="true"
+                        :file-list="homeworkFileList"
+                        :limit="5"
+                        :on-success="handleFileUploadSuccess"
+                        :on-error="handleFileUploadError"
+                        :on-remove="handleFileRemove"
+                        :on-exceed="handleFileExceed"
+                        :headers="uploadHeaders"
+                        multiple
+                        list-type="text">
+                        <el-button type="primary">选择文件</el-button>
+                        <template #tip>
+                            <div class="upload-tip">可上传作业附件，最多5个文件，支持常见文档格式</div>
+                        </template>
+                    </el-upload>
+                </el-form-item>
+                <el-form-item label="描述" prop="description">
+                    <el-input v-model="homeworkForm.description" type="textarea" :rows="3" placeholder="请输入作业描述" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <div class="dialog-footer">
+                    <el-button @click="dialogVisible = false">取消</el-button>
+                    <el-button type="primary" @click="submitHomework">确认</el-button>
+                </div>
+            </template>
+        </el-dialog>
     </div>
 </template>
+
+<script setup>
+import { ref, onMounted, nextTick, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { examAPI, courseAPI } from '@/api/api'
+import { Plus, Edit, Delete, Search, DataAnalysis, Timer, Calendar, Loading } from '@element-plus/icons-vue'
+import { getUserInfo } from '@/utils/auth'
+import { useRouter } from 'vue-router'
+import { formatDateTime } from '@/utils/examManager'
+
+// 初始化路由
+const router = useRouter()
+
+// 用户信息
+const userInfo = getUserInfo()
+const teacherId = userInfo ? userInfo.teacherId : null
+
+// 课程和作业列表
+const courseList = ref([])
+const selectedCourseId = ref('')
+const courseHomeworks = ref([])
+const homeworkList = ref([])
+const loading = ref(false)
+const total = ref(0)
+const pageSize = ref(10)
+const currentPage = ref(1)
+const searchKeyword = ref('')
+const selectedHomeworkId = ref('')
+const allHomeworks = ref([])
+const selectedHomework = ref(null)
+
+// 对话框相关
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const homeworkFormRef = ref(null)
+const homeworkForm = ref({
+    title: '',
+    description: '',
+    courseId: '',
+    teacherId: teacherId,
+    totalScore: 100,
+    deadline: '',
+    status: '未开始',
+    type: 'homework' // 指定类型为作业
+})
+const homeworkFormTitle = ref('创建作业')
+const homeworkFileList = ref([])
+
+// 表单验证规则
+const rules = {
+    title: [
+        { required: true, message: '请输入作业标题', trigger: 'blur' },
+        { min: 2, max: 50, message: '标题长度应在2-50个字符之间', trigger: 'blur' }
+    ],
+    courseId: [
+        { required: true, message: '请选择所属课程', trigger: 'change' }
+    ],
+    totalScore: [
+        { required: true, message: '请输入总分', trigger: 'blur' },
+        { type: 'number', min: 1, max: 100, message: '总分应在1-100之间', trigger: 'blur' }
+    ],
+    deadline: [
+        { required: false, message: '请选择截止日期', trigger: 'change' },
+        {
+            validator: (rule, value, callback) => {
+                if (value) {
+                    const now = new Date();
+                    const deadline = new Date(value);
+                    
+                    // 如果选择的截止日期是过去的日期，给出警告
+                    if (deadline < now) {
+                        callback(new Error('截止日期不能早于当前时间'));
+                    } else {
+                        callback();
+                    }
+                } else {
+                    // 如果没有设置截止日期，视为有效
+                    callback();
+                }
+            },
+            trigger: 'change'
+        }
+    ],
+    status: [
+        { required: true, message: '请选择状态', trigger: 'change' }
+    ],
+    description: [
+        { max: 500, message: '描述不能超过500个字符', trigger: 'blur' }
+    ]
+}
+
+// 添加自动更新作业状态的功能
+const currentTime = ref(new Date())
+let timeInterval = null
+
+// 在组件挂载时设置定时器
+onMounted(async () => {
+    console.log('作业管理页面组件挂载')
+    
+    // 先加载课程列表
+    try {
+        await loadCourses()
+        console.log('课程列表加载完成:', courseList.value)
+    } catch (error) {
+        console.error('加载课程列表失败:', error)
+    }
+    
+    // 然后加载作业列表
+    try {
+        await loadHomeworks()
+        console.log('作业列表加载完成:', homeworkList.value)
+    } catch (error) {
+        console.error('加载作业列表失败:', error)
+    }
+    
+    // 等待DOM更新后初始化图表
+    nextTick(() => {
+        console.log('初始化图表')
+        initCharts()
+    })
+    
+    // 设置定时器，每分钟更新一次当前时间和作业状态
+    timeInterval = setInterval(() => {
+        currentTime.value = new Date()
+        
+        // 更新作业状态
+        homeworkList.value.forEach(homework => {
+            if (!homework.deadline) {
+                homework.status = '未设置截止日期'
+                return
+            }
+            
+            const deadline = new Date(homework.deadline)
+            const now = currentTime.value
+            
+            if (now > deadline && homework.status !== '已截止') {
+                homework.status = '已截止'
+                console.log(`作业状态已更新: ${homework.title} 已截止`)
+            } else if (now <= deadline) {
+                // 计算剩余时间
+                const timeRemaining = deadline.getTime() - now.getTime()
+                const hoursRemaining = timeRemaining / (1000 * 60 * 60)
+                
+                if (hoursRemaining <= 24 && homework.status !== '即将截止') {
+                    homework.status = '即将截止'
+                    console.log(`作业状态已更新: ${homework.title} 即将截止，剩余${Math.round(hoursRemaining)}小时`)
+                } else if (hoursRemaining > 24 && homework.status !== '进行中') {
+                    homework.status = '进行中'
+                    console.log(`作业状态已更新: ${homework.title} 进行中`)
+                }
+            }
+        })
+    }, 60000) // 每分钟更新一次
+})
+
+// 在组件卸载时清除定时器
+onUnmounted(() => {
+    if (timeInterval) {
+        clearInterval(timeInterval)
+    }
+})
+
+// 跳转到课程详情页面
+const goToCourseDetail = (courseId) => {
+    if (!courseId) return
+    router.push(`/teacher/course/${courseId}`)
+}
+
+// 加载课程列表
+const loadCourses = async () => {
+    try {
+        const res = await courseAPI.getAllCourses()
+        courseList.value = res
+    } catch (error) {
+        console.error('加载课程失败:', error)
+        ElMessage.error('加载课程列表失败')
+    }
+}
+
+// 加载作业列表
+const loadHomeworks = async () => {
+    loading.value = true
+    try {
+        // 确保teacherId是有效的
+        if (!teacherId) {
+            console.error('教师ID不存在')
+            ElMessage.error('无法获取教师信息，请重新登录')
+            loading.value = false
+            return
+        }
+
+        console.log('正在获取教师作业，教师ID:', teacherId)
+        
+        // 使用getExamsByTeacher接口获取所有考试/作业数据
+        let res = await examAPI.getExamsByTeacher(teacherId)
+        console.log('获取到的教师所有考试/作业数据:', res)
+        
+        // 在前端筛选出type为'homework'的作业数据
+        if (Array.isArray(res)) {
+            res = res.filter(item => item.type === 'homework')
+            console.log('筛选后的作业数据:', res)
+        } else {
+            console.warn('API返回的数据不是数组格式:', res)
+            res = []
+        }
+
+        // 存储所有作业供下拉框使用
+        allHomeworks.value = res
+
+        // 如果有搜索关键词，进行过滤
+        if (searchKeyword.value && res) {
+            res = res.filter(homework =>
+                homework.title.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
+                (homework.description && homework.description.toLowerCase().includes(searchKeyword.value.toLowerCase()))
+            )
+        }
+
+        // 更新状态 - 根据截止时间判断作业状态
+        const now = new Date()
+        res.forEach(homework => {
+            if (!homework.deadline) {
+                homework.status = '未设置截止日期'
+                return
+            }
+            
+            const deadline = new Date(homework.deadline)
+            
+            if (now > deadline) {
+                homework.status = '已截止'
+            } else {
+                // 计算剩余时间
+                const timeRemaining = deadline.getTime() - now.getTime()
+                const hoursRemaining = timeRemaining / (1000 * 60 * 60)
+                
+                if (hoursRemaining <= 24) {
+                    homework.status = '即将截止'
+                } else {
+                    homework.status = '进行中'
+                }
+            }
+        })
+
+        total.value = res.length
+
+        // 分页处理
+        const startIndex = (currentPage.value - 1) * pageSize.value
+        const endIndex = startIndex + pageSize.value
+        homeworkList.value = res.slice(startIndex, endIndex)
+
+        // 重新初始化图表
+        nextTick(() => {
+            initCharts()
+        })
+    } catch (error) {
+        console.error('加载作业失败:', error)
+        ElMessage.error('加载作业列表失败')
+        homeworkList.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+// 初始化图表
+const initCharts = () => {
+    const echarts = window.echarts
+    if (!echarts) {
+        console.error('echarts 未加载')
+        return
+    }
+
+    // 课程作业数量分布图表
+    const courseHomeworkChart = echarts.init(document.getElementById('courseHomeworkChart'))
+    
+    // 准备图表数据
+    const chartData = []
+    
+    // 使用实际数据：计算每个课程的作业数量
+    if (courseList.value.length > 0 && allHomeworks.value.length > 0) {
+        // 创建一个映射来统计每个课程的作业数量
+        const courseHomeworkCounts = {}
+        
+        // 初始化每个课程的作业计数为0
+        courseList.value.forEach(course => {
+            courseHomeworkCounts[course.id] = 0
+        })
+        
+        // 统计每个课程的作业数量
+        allHomeworks.value.forEach(homework => {
+            if (homework.courseId && courseHomeworkCounts[homework.courseId] !== undefined) {
+                courseHomeworkCounts[homework.courseId]++
+            }
+        })
+        
+        // 转换为图表所需的数据格式
+        courseList.value.forEach(course => {
+            chartData.push({
+                name: course.name,
+                value: courseHomeworkCounts[course.id]
+            })
+        })
+    }
+    
+    // 如果没有数据，显示暂无数据
+    if (chartData.length === 0 || chartData.every(item => item.value === 0)) {
+        chartData.push({ name: '暂无数据', value: 1 })
+    }
+    
+    courseHomeworkChart.setOption({
+        title: {
+            text: '各课程作业数量分布',
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+            type: 'scroll',
+            orient: 'horizontal',
+            bottom: 10,
+            data: chartData.map(item => item.name)
+        },
+        series: [
+            {
+                name: '作业数量',
+                type: 'pie',
+                radius: ['30%', '60%'],
+                center: ['50%', '50%'],
+                avoidLabelOverlap: true,
+                itemStyle: {
+                    borderRadius: 10,
+                    borderColor: '#fff',
+                    borderWidth: 2
+                },
+                label: {
+                    show: true,
+                    formatter: '{b}: {c} ({d}%)'
+                },
+                emphasis: {
+                    label: {
+                        show: true,
+                        fontSize: '14',
+                        fontWeight: 'bold'
+                    }
+                },
+                data: chartData
+            }
+        ]
+    })
+
+    // 监听窗口大小变化，重绘图表
+    window.addEventListener('resize', () => {
+        courseHomeworkChart.resize()
+    })
+}
+
+// 初始化课程作业图表
+const initCourseCharts = async () => {
+    const echarts = window.echarts
+    if (!echarts) {
+        console.error('echarts 未加载')
+        return
+    }
+
+    // 学生成绩分布图表
+    const scoreChart = echarts.init(document.getElementById('scoreDistributionChart'))
+    
+    // 成绩区间
+    const scoreRanges = ['0-60', '60-70', '70-80', '80-90', '90-100']
+    const scoreData = [0, 0, 0, 0, 0]
+    
+    try {
+        // 如果有选中的作业，获取该作业的成绩数据
+        if (selectedHomeworkId.value) {
+            // 这里可以调用API获取作业成绩数据
+            // 例如: const homeworkScores = await examAPI.getExamScores(selectedHomeworkId.value)
+            
+            // 由于目前没有直接获取作业成绩分布的API，这里先使用模拟数据
+            // 实际项目中应替换为真实API调用
+            const homeworkScores = [65, 72, 85, 92, 78, 55, 68, 75, 88, 95, 82, 76, 91, 63, 79]
+            
+            // 统计各分数段的学生人数
+            homeworkScores.forEach(score => {
+                if (score < 60) scoreData[0]++
+                else if (score < 70) scoreData[1]++
+                else if (score < 80) scoreData[2]++
+                else if (score < 90) scoreData[3]++
+                else scoreData[4]++
+            })
+        }
+    } catch (error) {
+        console.error('获取作业成绩数据失败:', error)
+    }
+    
+    scoreChart.setOption({
+        title: {
+            text: '学生成绩分布',
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        xAxis: {
+            type: 'category',
+            data: scoreRanges
+        },
+        yAxis: {
+            type: 'value',
+            name: '学生人数'
+        },
+        series: [
+            {
+                name: '学生人数',
+                type: 'bar',
+                data: scoreData,
+                itemStyle: {
+                    color: function (params) {
+                        const colorList = ['#FF4D4F', '#FAAD14', '#1890FF', '#52C41A', '#722ED1']
+                        return colorList[params.dataIndex]
+                    }
+                }
+            }
+        ]
+    })
+
+    // 提交率图表
+    const submissionRateChart = echarts.init(document.getElementById('submissionRateChart'))
+    
+    // 准备提交率数据 - 使用模拟数据
+    const submissionData = [
+        { value: 70, name: '已提交' },
+        { value: 30, name: '未提交' }
+    ]
+    
+    submissionRateChart.setOption({
+        title: {
+            text: '作业提交率',
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'item'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+        },
+        series: [
+            {
+                name: '提交情况',
+                type: 'pie',
+                radius: '60%',
+                data: submissionData,
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowOffsetX: 0,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                    }
+                },
+                itemStyle: {
+                    color: function(params) {
+                        const colors = ['#52C41A', '#FF4D4F'];
+                        return colors[params.dataIndex];
+                    }
+                }
+            }
+        ]
+    })
+
+    // 监听窗口大小变化，重绘图表
+    window.addEventListener('resize', () => {
+        scoreChart.resize()
+        submissionRateChart.resize()
+    })
+}
+
+// 处理搜索
+const handleSearch = () => {
+    currentPage.value = 1
+    loadHomeworks()
+}
+
+// 处理分页
+const handlePageChange = (page) => {
+    currentPage.value = page
+    loadHomeworks()
+}
+
+// 获取作业状态描述，添加剩余时间显示
+const getHomeworkStatusDescription = (homework) => {
+    if (!homework.deadline) {
+        return '未设置截止日期';
+    }
+    
+    const now = new Date();
+    const deadline = new Date(homework.deadline);
+    
+    if (now > deadline) {
+        // 已截止，显示已过去多长时间
+        const passedTime = now.getTime() - deadline.getTime();
+        const passedDays = Math.floor(passedTime / (1000 * 60 * 60 * 24));
+        const passedHours = Math.floor((passedTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        if (passedDays > 0) {
+            return `已截止 (${passedDays}天${passedHours}小时前)`;
+        } else {
+            return `已截止 (${passedHours}小时前)`;
+        }
+    } else {
+        // 未截止，显示剩余多长时间
+        const remainingTime = deadline.getTime() - now.getTime();
+        const remainingDays = Math.floor(remainingTime / (1000 * 60 * 60 * 24));
+        const remainingHours = Math.floor((remainingTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        if (remainingDays > 0) {
+            return `剩余 ${remainingDays}天${remainingHours}小时`;
+        } else if (remainingHours > 0) {
+            return `剩余 ${remainingHours}小时`;
+        } else {
+            const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+            return `剩余 ${remainingMinutes}分钟`;
+        }
+    }
+}
+
+// 显示添加作业对话框
+const showCreateDialog = () => {
+    homeworkFormTitle.value = '创建作业'
+    isEdit.value = false
+    
+    // 获取当前时间，设置默认截止日期为一周后
+    const now = new Date();
+    const nextWeek = new Date(now);
+    nextWeek.setDate(now.getDate() + 7);
+    
+    // 格式化为YYYY-MM-DD HH:mm:ss格式
+    const formattedDeadline = nextWeek.toISOString().slice(0, 19).replace('T', ' ');
+    
+    homeworkForm.value = {
+        title: '',
+        description: '',
+        courseId: selectedCourseId.value || '', // 如果已选择课程，默认使用该课程
+        teacherId: teacherId,
+        totalScore: 100,
+        deadline: formattedDeadline, // 设置默认截止时间为一周后
+        status: '进行中',
+        type: 'homework' // 指定类型为作业
+    }
+    
+    homeworkFileList.value = []
+    dialogVisible.value = true
+}
+
+// 编辑作业
+const editHomework = (homework) => {
+    homeworkFormTitle.value = '编辑作业'
+    isEdit.value = true
+    
+    // 处理截止日期格式
+    let formattedDeadline = homework.deadline;
+    if (formattedDeadline && formattedDeadline.includes('T')) {
+        // 将ISO格式转换为YYYY-MM-DD HH:mm:ss格式
+        formattedDeadline = formattedDeadline.replace('T', ' ').substring(0, 19);
+    }
+    
+    homeworkForm.value = {
+        examId: homework.examId,
+        title: homework.title,
+        description: homework.description || '',
+        courseId: homework.courseId,
+        teacherId: homework.teacherId,
+        totalScore: homework.totalScore,
+        deadline: formattedDeadline,
+        status: homework.status || '未开始',
+        type: 'homework' // 确保type字段设置为作业类型
+    }
+    
+    // 如果有附件，加载附件列表
+    homeworkFileList.value = homework.attachments ? homework.attachments.map(attachment => ({
+        name: attachment.fileName,
+        url: attachment.fileUrl,
+        size: attachment.fileSize,
+        type: attachment.fileType
+    })) : []
+    
+    dialogVisible.value = true
+}
+
+// 提交作业表单
+const submitHomework = async () => {
+    if (!homeworkFormRef.value) return
+
+    await homeworkFormRef.value.validate(async (valid) => {
+        if (valid) {
+            try {
+                // 准备提交数据
+                const submitData = {
+                    ...homeworkForm.value,
+                    type: 'homework' // 确保type字段设置为作业类型
+                }
+                
+                // 处理截止日期 - 确保数据格式正确
+                if (submitData.deadline) {
+                    // 如果截止日期不是ISO格式字符串，则转换为ISO格式
+                    if (!(typeof submitData.deadline === 'string' && submitData.deadline.includes('T'))) {
+                        const deadlineDate = new Date(submitData.deadline);
+                        submitData.deadline = deadlineDate.toISOString();
+                    }
+                }
+                
+                // 根据截止日期自动判断状态
+                const now = new Date();
+                const deadline = submitData.deadline ? new Date(submitData.deadline) : null;
+                
+                if (!deadline) {
+                    // 如果没有设置截止日期
+                    submitData.status = '未设置截止日期';
+                } else if (now > deadline) {
+                    // 如果当前时间已经超过截止日期
+                    submitData.status = '已截止';
+                } else {
+                    // 计算剩余时间
+                    const timeRemaining = deadline.getTime() - now.getTime();
+                    const hoursRemaining = timeRemaining / (1000 * 60 * 60);
+                    
+                    if (hoursRemaining <= 24) {
+                        submitData.status = '即将截止';
+                    } else {
+                        submitData.status = '进行中';
+                    }
+                }
+                
+                // 处理附件 - 如果有新上传的附件
+                if (homeworkFileList.value && homeworkFileList.value.length > 0) {
+                    // 将附件信息转换为API需要的格式
+                    submitData.attachments = homeworkFileList.value.map(file => ({
+                        fileName: file.name,
+                        fileUrl: file.url || '',
+                        fileSize: file.size || 0,
+                        fileType: file.type || ''
+                    }));
+                }
+                
+                // 记录操作类型，用于日志
+                const operationType = isEdit.value ? '更新' : '创建';
+                
+                console.log(`${operationType}作业数据:`, submitData);
+
+                // 发送API请求
+                let response;
+                if (isEdit.value) {
+                    response = await examAPI.updateExam(submitData);
+                    ElMessage.success('作业更新成功');
+                } else {
+                    response = await examAPI.saveExam(submitData);
+                    ElMessage.success('作业创建成功');
+                }
+                
+                console.log(`${operationType}作业成功，服务器返回:`, response);
+                
+                // 关闭对话框
+                dialogVisible.value = false;
+                
+                // 刷新作业列表
+                if (selectedCourseId.value && selectedCourseId.value === submitData.courseId) {
+                    // 如果选择了特定课程，只刷新该课程的作业
+                    handleCourseSelect();
+                } else {
+                    // 否则刷新所有作业
+                    loadHomeworks();
+                }
+            } catch (error) {
+                console.error('保存作业失败:', error);
+                let errorMessage = '保存作业失败';
+                
+                // 获取详细的错误信息
+                if (error.response && error.response.data) {
+                    if (error.response.data.message) {
+                        errorMessage += ': ' + error.response.data.message;
+                    } else if (error.response.data.error) {
+                        errorMessage += ': ' + error.response.data.error;
+                    }
+                } else if (error.message) {
+                    errorMessage += ': ' + error.message;
+                }
+                
+                ElMessage.error(errorMessage);
+            }
+        } else {
+            ElMessage.warning('请完善表单信息');
+        }
+    });
+}
+
+// 确认删除作业
+const confirmDeleteHomework = (homework) => {
+    ElMessageBox.confirm(`确定要删除作业 "${homework.title}" 吗?`, '删除确认', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+    }).then(async () => {
+        try {
+            await examAPI.deleteExamById(homework.examId)
+            ElMessage.success('删除成功')
+            
+            // 如果当前有选中课程，且删除的作业是这个课程的，重新加载该课程作业
+            if (selectedCourseId.value && selectedCourseId.value === homework.courseId) {
+                // 如果删除的就是当前选中的作业，重置选中状态
+                if (selectedHomeworkId.value === homework.examId) {
+                    selectedHomeworkId.value = ''
+                    selectedHomework.value = null
+                }
+                handleCourseSelect()
+            } else {
+                // 否则重新加载所有作业
+                loadHomeworks()
+            }
+        } catch (error) {
+            console.error('删除作业失败:', error)
+            ElMessage.error('删除作业失败: ' + (error.response?.data?.message || error.message))
+        }
+    }).catch(() => {
+        // 用户取消删除
+    })
+}
+
+// 查看作业提交情况
+const viewSubmissions = (homework) => {
+    // 如果作业状态是未开始，提示未开始
+    if (homework.status === '未开始') {
+        ElMessage.warning('作业尚未开始，暂无提交数据')
+        return
+    }
+    
+    // 跳转到作业提交页面
+    router.push({
+        path: `/teacher/homework/submissions/${homework.examId}`,
+        query: {
+            title: homework.title,
+            courseId: homework.courseId,
+            courseName: getCourseNameById(homework.courseId),
+            type: 'homework' // 确保传递type参数
+        }
+    })
+}
+
+// 格式化日期时间
+const formatDateTimeLocal = (dateTimeStr) => {
+    return formatDateTime(dateTimeStr)
+}
+
+// 获取状态对应的类型
+const getStatusType = (status) => {
+    switch(status) {
+        case '未设置截止日期':
+            return 'info';
+        case '未开始':
+            return 'info';
+        case '进行中':
+            return 'primary';
+        case '即将截止':
+            return 'warning';
+        case '已截止':
+            return 'success';
+        default:
+            return 'info';
+    }
+}
+
+// 处理作业选择
+const handleHomeworkSelect = () => {
+    if (selectedHomeworkId.value) {
+        // 从已加载的作业中查找选中的作业
+        selectedHomework.value = courseHomeworks.value.find(homework => homework.examId === selectedHomeworkId.value)
+
+        // 如果找不到，可能需要重新加载
+        if (!selectedHomework.value) {
+            handleCourseSelect()
+        }
+    } else {
+        // 未选择作业，清空选中的作业
+        selectedHomework.value = null
+    }
+}
+
+// 处理课程选择
+const handleCourseSelect = async () => {
+    // 重置作业选择
+    selectedHomeworkId.value = ''
+    selectedHomework.value = null
+
+    if (selectedCourseId.value) {
+        // 加载该课程的作业
+        try {
+            loading.value = true
+            console.log('加载课程作业，课程ID:', selectedCourseId.value)
+            
+            // 使用getExamsInCourse接口获取所有考试/作业数据
+            let res = await examAPI.getExamsInCourse(selectedCourseId.value)
+            console.log('获取到的课程所有考试/作业数据:', res)
+            
+            // 在前端筛选出type为'homework'的作业数据
+            if (Array.isArray(res)) {
+                res = res.filter(item => item.type === 'homework')
+                console.log('筛选后的课程作业数据:', res)
+            } else {
+                console.warn('API返回的课程作业数据不是数组格式:', res)
+                res = []
+            }
+            
+            // 存储该课程的作业列表
+            courseHomeworks.value = res
+
+            // 更新作业状态
+            const now = new Date()
+            courseHomeworks.value.forEach(homework => {
+                if (!homework.deadline) {
+                    homework.status = '未设置截止日期'
+                    return
+                }
+                
+                const deadline = new Date(homework.deadline)
+                
+                if (now > deadline) {
+                    homework.status = '已截止'
+                } else {
+                    // 计算剩余时间
+                    const timeRemaining = deadline.getTime() - now.getTime()
+                    const hoursRemaining = timeRemaining / (1000 * 60 * 60)
+                    
+                    if (hoursRemaining <= 24) {
+                        homework.status = '即将截止'
+                    } else {
+                        homework.status = '进行中'
+                    }
+                }
+            })
+
+            // 如果有搜索关键词，进行过滤
+            let filteredHomeworks = [...courseHomeworks.value]
+            if (searchKeyword.value) {
+                filteredHomeworks = filteredHomeworks.filter(homework =>
+                    homework.title.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
+                    (homework.description && homework.description.toLowerCase().includes(searchKeyword.value.toLowerCase()))
+                )
+            }
+
+            homeworkList.value = filteredHomeworks
+            total.value = filteredHomeworks.length
+
+            // 重新初始化图表
+            nextTick(async () => {
+                await initCourseCharts()
+            })
+        } catch (error) {
+            console.error('加载课程作业失败:', error)
+            ElMessage.error('加载课程作业失败')
+            courseHomeworks.value = []
+            homeworkList.value = []
+        } finally {
+            loading.value = false
+        }
+    } else {
+        // 加载所有作业
+        await loadHomeworks()
+        // 确保重新初始化全部课程的图表
+        nextTick(() => {
+            initCharts()
+        })
+    }
+}
+
+// 根据课程ID获取课程名称
+const getCourseNameById = (courseId) => {
+    if (!courseId) return '未知课程'
+    const course = courseList.value.find(c => c.id === courseId)
+    return course ? course.name : '未知课程'
+}
+
+// 添加截止日期验证
+const disablePastDates = (date) => {
+    const now = new Date();
+    return date < now;
+}
+
+// 添加日期快捷选项
+const dateShortcuts = [
+    {
+        text: '今天',
+        value: new Date()
+    },
+    {
+        text: '明天',
+        value: new Date(new Date().setDate(new Date().getDate() + 1))
+    },
+    {
+        text: '一周后',
+        value: new Date(new Date().setDate(new Date().getDate() + 7))
+    }
+]
+
+// 文件上传相关处理函数
+const handleFileUploadSuccess = (response, file, fileList) => {
+    console.log('文件上传成功:', response);
+    
+    // 将上传成功的文件信息添加到附件列表
+    homeworkFileList.value = fileList.map(file => ({
+        name: file.name,
+        url: file.response?.url || file.url || '',
+        size: file.size || 0,
+        type: file.type || ''
+    }));
+    
+    ElMessage.success(`文件 ${file.name} 上传成功`);
+}
+
+const handleFileUploadError = (error, file) => {
+    console.error('文件上传失败:', error);
+    ElMessage.error(`文件 ${file.name} 上传失败: ${error.message || '未知错误'}`);
+}
+
+const handleFileRemove = (file, fileList) => {
+    console.log('文件被移除:', file);
+    
+    // 更新附件列表
+    homeworkFileList.value = fileList.map(file => ({
+        name: file.name,
+        url: file.response?.url || file.url || '',
+        size: file.size || 0,
+        type: file.type || ''
+    }));
+}
+
+const handleFileExceed = () => {
+    ElMessage.warning('最多只能上传5个文件');
+}
+
+// 上传请求头，添加认证信息
+const uploadHeaders = {
+    Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+    'Content-Type': 'multipart/form-data'
+}
+</script>
+
+<style scoped>
+.exercise-container {
+    padding: 0;
+    height: 100%;
+    overflow-y: auto;
+    position: relative;
+}
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    margin-top: -20px;
+}
+
+.section-title {
+    text-align: left;
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0;
+    color: #303133;
+    position: relative;
+    padding-left: 12px;
+    border-left: 4px solid #409EFF;
+}
+
+.action-bar {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 90%;
+    margin-bottom: 20px;
+}
+
+.search-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    flex: 1;
+}
+
+.course-select {
+    width: 180px;
+    flex-shrink: 0;
+}
+
+.homework-select {
+    width: 180px;
+    flex-shrink: 0;
+}
+
+.search-input {
+    width: 200px;
+    flex-shrink: 0;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+.charts-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.chart-wrapper {
+    flex: 1;
+    background-color: #fff;
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.full-width {
+    width: 100%;
+    max-width: 100%;
+}
+
+.chart-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: #303133;
+    text-align: center;
+}
+
+.chart {
+    height: 300px;
+}
+
+.loading-container {
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 4px;
+}
+
+.empty-container {
+    padding: 40px 0;
+    background-color: #fff;
+    border-radius: 4px;
+}
+
+.homework-table-container {
+    background-color: #fff;
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.pagination-container {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.homework-detail-container {
+    background-color: #fff;
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.detail-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: #303133;
+}
+
+.detail-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.unit-label {
+    margin-left: 8px;
+    color: #606266;
+}
+
+.upload-tip {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 8px;
+}
+
+.form-tip {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 8px;
+}
+</style>
 
