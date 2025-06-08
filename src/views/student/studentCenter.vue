@@ -253,6 +253,12 @@ function handleUserAction(action) {
         console.log('修改密码')
         ElMessage.success('修改密码成功')
     }
+    
+    if (action === 'clearMenuActive') {
+        // 清空左侧导航栏选中状态
+        activeMenu.value = ''
+        console.log('清空导航栏选中状态')
+    }
 }
 
 function handleAvatarChange(newAvatarUrl) {

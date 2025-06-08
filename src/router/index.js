@@ -102,12 +102,12 @@ const routes = [
         path: "course",
         component: () => import("@/views/student/studentCourse.vue"),
       },
-      // {
-      //   path: "course/:courseId",
-      //   component: () => import("@/views/student/studentCourseDetail.vue"),
-      //   props: true,
-      //   name: "studentCourseDetail"
-      // },
+      {
+        path: "course/:courseId",
+        component: () => import("@/views/student/studentCourseDetail.vue"),
+        props: true,
+        name: "studentCourseDetail"
+      },
       // {
       //   path: "learning",
       //   component: () => import("@/views/student/studentLearning.vue"),

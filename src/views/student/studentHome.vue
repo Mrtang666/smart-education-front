@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Reading, Notebook, Document, Calendar, Timer } from '@element-plus/icons-vue'
@@ -284,6 +284,9 @@ const showMessage = (type, message) => {
 const router = useRouter()
 const userInfo = ref(null) // 改为ref，不再使用inject
 
+// 注入setActiveMenu方法
+const setActiveMenu = inject('setActiveMenu', null)
+
 // 状态变量
 const loading = ref(true)
 const courses = ref([])
@@ -359,6 +362,27 @@ function getAssignmentStatusText(daysLeft) {
 
 // 导航到不同页面
 function navigateTo(page) {
+  // 更新左侧导航栏选中状态
+  if (setActiveMenu) {
+    switch (page) {
+      case 'course':
+        setActiveMenu('课程')
+        break
+      case 'assignment':
+        setActiveMenu('作业')
+        break
+      case 'exam':
+        setActiveMenu('考试')
+        break
+      case 'schedule':
+        setActiveMenu('计划')
+        break
+      default:
+        break
+    }
+  }
+
+  // 路由跳转
   switch (page) {
     case 'course':
       router.push('/student/course')
@@ -379,12 +403,22 @@ function navigateTo(page) {
 
 // 进入课程
 function enterCourse(course) {
+  // 更新左侧导航栏选中状态
+  if (setActiveMenu) {
+    setActiveMenu('课程')
+  }
+  
   router.push(`/student/course/${course.id}`)
   showMessage('success', `正在进入课程: ${course.name}`)
 }
 
 // 开始作业
 function startAssignment(assignment) {
+  // 更新左侧导航栏选中状态
+  if (setActiveMenu) {
+    setActiveMenu('作业')
+  }
+  
   router.push(`/student/assignment/${assignment.id}`)
   showMessage('success', `开始完成作业: ${assignment.title}`)
 }

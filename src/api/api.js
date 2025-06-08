@@ -1477,51 +1477,6 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据知识点ID和内容关键词搜索题目（需要token）
-     * @param {string} knowledgeId 知识点ID
-     * @returns {Promise<Array<Object>>} 问题列表
-     * 每项字段：
-     *   - questionId: string 问题ID (返回时转为字符串)
-     *   - teacherId: string 教师ID (返回时转为字符串)
-     *   - content: string 问题内容
-     *   - questionType: string 问题类型
-     *   - difficulty: string 难度
-     *   - knowledgeId: string 知识点ID (返回时转为字符串)
-     *   - referenceAnswer: string 参考答案
-     *   - scorePoints: number 分值
-     *   - answer: string 答案
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
-     */
-    async searchQuestionsInKnowledge(knowledgeId, keyword) {
-        const axios = createTeacherAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const knowledgeIdStr = String(knowledgeId);
-            
-            console.log(`搜索知识点题目，知识点ID: ${knowledgeIdStr}, 关键词: ${keyword}`);
-            
-            const response = await axios.get(`/api/question/knowledge/${knowledgeIdStr}/search/content`, {
-                params: { keyword }
-            });
-            
-            // 确保返回的所有ID字段都是字符串类型
-            if (Array.isArray(response.data)) {
-                response.data.forEach(item => {
-                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
-                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
-                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
-                });
-            }
-            
-            return response.data;
-        } catch (error) {
-            console.error('搜索知识点题目失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
      * 根据条件搜索知识点下的题目（需要token）
      * @param {string} knowledgeId 知识点ID
      * @param {Object} questionQueryDTO 查询条件
@@ -1687,6 +1642,137 @@ export const knowledgeAPI = {
         }
     },
     
+    /**
+     * 根据ID获取题目详情（需要token）
+     * @param {string} questionId 题目ID
+     * @returns {Promise<Object>} 题目详情
+     * 返回字段：
+     *   - questionId: string 问题ID
+     *   - teacherId: string 教师ID
+     *   - content: string 问题内容
+     *   - questionType: string 问题类型
+     *   - difficulty: string 难度
+     *   - knowledgeId: string 知识点ID
+     *   - referenceAnswer: string 参考答案
+     *   - scorePoints: number 分值
+     *   - options: Array 选项（选择题）
+     *   - analysis: string 解析
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async getQuestionById(questionId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const questionIdStr = String(questionId);
+            
+            console.log(`获取题目详情，题目ID: ${questionIdStr}`);
+            
+            const response = await axios.get(`/api/question/${questionIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (response.data) {
+                if (response.data.questionId !== undefined) response.data.questionId = String(response.data.questionId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取题目详情失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 根据题目类型获取题目列表（需要token）
+     * @param {string} questionType 题目类型
+     * @returns {Promise<Array<Object>>} 题目列表
+     * 每项字段同getQuestionById方法返回字段
+     */
+    async getQuestionsByType(questionType) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log(`根据类型获取题目列表，类型: ${questionType}`);
+            
+            const response = await axios.get(`/api/question/type/${questionType}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('根据类型获取题目列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 根据教师ID获取题目列表（需要token）
+     * @param {string} teacherId 教师ID
+     * @returns {Promise<Array<Object>>} 题目列表
+     * 每项字段同getQuestionById方法返回字段
+     */
+    async getQuestionsByTeacher(teacherId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const teacherIdStr = String(teacherId);
+            
+            console.log(`根据教师ID获取题目列表，教师ID: ${teacherIdStr}`);
+            
+            const response = await axios.get(`/api/question/teacher/${teacherIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('根据教师ID获取题目列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 根据难度级别获取题目列表（需要token）
+     * @param {string} difficulty 难度级别
+     * @returns {Promise<Array<Object>>} 题目列表
+     * 每项字段同getQuestionById方法返回字段
+     */
+    async getQuestionsByDifficulty(difficulty) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log(`根据难度获取题目列表，难度: ${difficulty}`);
+            
+            const response = await axios.get(`/api/question/difficulty/${difficulty}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('根据难度获取题目列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
 };
 
 export const examAPI = {
@@ -1698,6 +1784,8 @@ export const examAPI = {
      * @param {string} updateExamData.description 描述
      * @param {number} updateExamData.courseId 课程ID
      * @param {number} updateExamData.teacherId 教师ID
+     * @param {number} [updateExamData.knowledgeId] 知识点ID（可选）
+     * @param {string} updateExamData.type 类型（考试/作业等）
      * @param {number} updateExamData.totalScore 总分
      * @param {number} updateExamData.durationMinutes 时长（分钟）
      * @param {string} updateExamData.startTime 开始时间（ISO格式）
@@ -1705,11 +1793,13 @@ export const examAPI = {
      * @param {string} updateExamData.status 状态
      * @returns {Promise<Object>} 更新后的考试信息
      * 返回字段：
-     *   - examId: number 考试ID
+     *   - examId: string 考试ID（返回时转为字符串）
      *   - title: string 考试标题
      *   - description: string 描述
-     *   - courseId: number 课程ID
-     *   - teacherId: number 教师ID
+     *   - courseId: string 课程ID（返回时转为字符串）
+     *   - teacherId: string 教师ID（返回时转为字符串）
+     *   - knowledgeId: string 知识点ID（返回时转为字符串，可能为空）
+     *   - type: string 类型（考试/作业等）
      *   - totalScore: number 总分
      *   - durationMinutes: number 时长（分钟）
      *   - startTime: string 开始时间（ISO格式）
@@ -1720,8 +1810,31 @@ export const examAPI = {
      */
     async updateExam(updateExamData) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.put('/api/exam/update', updateExamData);
-        return response.data;
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...updateExamData };
+            
+            // 确保ID字段是字符串类型
+            if (dataToSend.examId !== undefined) dataToSend.examId = String(dataToSend.examId);
+            if (dataToSend.courseId !== undefined) dataToSend.courseId = String(dataToSend.courseId);
+            if (dataToSend.teacherId !== undefined) dataToSend.teacherId = String(dataToSend.teacherId);
+            if (dataToSend.knowledgeId !== undefined) dataToSend.knowledgeId = String(dataToSend.knowledgeId);
+            
+            const response = await axios.put('/api/exam/update', dataToSend);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.examId !== undefined) response.data.examId = String(response.data.examId);
+                if (response.data.courseId !== undefined) response.data.courseId = String(response.data.courseId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('更新考试失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
@@ -1731,102 +1844,167 @@ export const examAPI = {
      * @param {string} examData.description 描述
      * @param {number} examData.courseId 课程ID
      * @param {number} examData.teacherId 教师ID
+     * @param {number} [examData.knowledgeId] 知识点ID（可选）
+     * @param {string} examData.type 类型（考试/作业等）
      * @param {number} examData.totalScore 总分
      * @param {number} examData.durationMinutes 时长（分钟）
      * @param {string} examData.startTime 开始时间（ISO格式）
      * @param {string} examData.endTime 结束时间（ISO格式）
      * @param {string} examData.status 状态
      * @returns {Promise<Object>} 新增后的考试信息
-     * 返回字段：
-     *   - examId: number 考试ID
-     *   - title: string 考试标题
-     *   - description: string 描述
-     *   - courseId: number 课程ID
-     *   - teacherId: number 教师ID
-     *   - totalScore: number 总分
-     *   - durationMinutes: number 时长（分钟）
-     *   - startTime: string 开始时间（ISO格式）
-     *   - endTime: string 结束时间（ISO格式）
-     *   - status: string 状态
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 返回字段：同 updateExam 返回字段
      */
     async saveExam(examData) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.post('/api/exam/save', examData);
-        return response.data;
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...examData };
+            
+            // 确保ID字段是字符串类型
+            if (dataToSend.courseId !== undefined) dataToSend.courseId = String(dataToSend.courseId);
+            if (dataToSend.teacherId !== undefined) dataToSend.teacherId = String(dataToSend.teacherId);
+            if (dataToSend.knowledgeId !== undefined) dataToSend.knowledgeId = String(dataToSend.knowledgeId);
+            
+            const response = await axios.post('/api/exam/save', dataToSend);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.examId !== undefined) response.data.examId = String(response.data.examId);
+                if (response.data.courseId !== undefined) response.data.courseId = String(response.data.courseId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('保存考试失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
      * 根据考试ID获取考试信息（需要token）
      * @param {number} examId 考试ID
      * @returns {Promise<Object>} 考试信息
-     * 返回字段：
-     *   - examId: number 考试ID
-     *   - title: string 考试标题
-     *   - description: string 描述
-     *   - courseId: number 课程ID
-     *   - teacherId: number 教师ID
-     *   - totalScore: number 总分
-     *   - durationMinutes: number 时长（分钟）
-     *   - startTime: string 开始时间（ISO格式）
-     *   - endTime: string 结束时间（ISO格式）
-     *   - status: string 状态
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 返回字段：同 updateExam 返回字段
      */
     async getExamById(examId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/exam/${examId}`);
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const examIdStr = String(examId);
+            
+            const response = await axios.get(`/api/exam/${examIdStr}`);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.examId !== undefined) response.data.examId = String(response.data.examId);
+                if (response.data.courseId !== undefined) response.data.courseId = String(response.data.courseId);
+                if (response.data.teacherId !== undefined) response.data.teacherId = String(response.data.teacherId);
+                if (response.data.knowledgeId !== undefined) response.data.knowledgeId = String(response.data.knowledgeId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取考试信息失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
      * 根据教师ID获取考试列表（需要token）
      * @param {number} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 考试列表
-     * 每项字段：
-     *   - examId: number 考试ID
-     *   - title: string 考试标题
-     *   - description: string 描述
-     *   - courseId: number 课程ID
-     *   - teacherId: number 教师ID
-     *   - totalScore: number 总分
-     *   - durationMinutes: number 时长（分钟）
-     *   - startTime: string 开始时间（ISO格式）
-     *   - endTime: string 结束时间（ISO格式）
-     *   - status: string 状态
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 每项字段：同 updateExam 返回字段
      */
     async getExamsByTeacher(teacherId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/exam/teacher/${teacherId}`);
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const teacherIdStr = String(teacherId);
+            
+            const response = await axios.get(`/api/exam/teacher/${teacherIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.examId !== undefined) item.examId = String(item.examId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取教师考试列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
      * 根据课程ID获取考试列表（需要token）
      * @param {number} courseId 课程ID
      * @returns {Promise<Array<Object>>} 考试列表
-     * 每项字段：
-     *   - examId: number 考试ID
-     *   - title: string 考试标题
-     *   - description: string 描述
-     *   - courseId: number 课程ID
-     *   - teacherId: number 教师ID
-     *   - totalScore: number 总分
-     *   - durationMinutes: number 时长（分钟）
-     *   - startTime: string 开始时间（ISO格式）
-     *   - endTime: string 结束时间（ISO格式）
-     *   - status: string 状态
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 每项字段：同 updateExam 返回字段
      */
     async getExamsInCourse(courseId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/exam/course/${courseId}`);
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            const response = await axios.get(`/api/exam/course/${courseIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.examId !== undefined) item.examId = String(item.examId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程考试列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据课程ID和考试类型获取考试列表（需要token）
+     * @param {number} courseId 课程ID
+     * @param {string} type 考试类型
+     * @returns {Promise<Array<Object>>} 考试列表
+     * 每项字段：同 updateExam 返回字段
+     */
+    async getExamsInCourseByType(courseId, type) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            console.log(`获取课程的考试列表，课程ID: ${courseIdStr}, 类型: ${type}`);
+            
+            const response = await axios.get(`/api/exam/course/${courseIdStr}/type/${type}`);
+            
+            // 确保返回的所有ID字段都是字符串类型，避免精度丢失
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.examId !== undefined) item.examId = String(item.examId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程考试列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
@@ -1834,24 +2012,32 @@ export const examAPI = {
      * @param {number} courseId 课程ID
      * @param {number} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 考试列表
-     * 每项字段：
-     *   - examId: number 考试ID
-     *   - title: string 考试标题
-     *   - description: string 描述
-     *   - courseId: number 课程ID
-     *   - teacherId: number 教师ID
-     *   - totalScore: number 总分
-     *   - durationMinutes: number 时长（分钟）
-     *   - startTime: string 开始时间（ISO格式）
-     *   - endTime: string 结束时间（ISO格式）
-     *   - status: string 状态
-     *   - createdAt: string 创建时间（ISO格式）
-     *   - updatedAt: string 更新时间（ISO格式）
+     * 每项字段：同 updateExam 返回字段
      */
     async getExamsInCourseByTeacher(courseId, teacherId) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.get(`/api/exam/course/${courseId}/teacher/${teacherId}`);
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            const teacherIdStr = String(teacherId);
+            
+            const response = await axios.get(`/api/exam/course/${courseIdStr}/teacher/${teacherIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.examId !== undefined) item.examId = String(item.examId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                    if (item.teacherId !== undefined) item.teacherId = String(item.teacherId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程教师考试列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
@@ -1864,25 +2050,22 @@ export const examAPI = {
      */
     async deleteExamById(id) {
         const axios = createTeacherAuthorizedAxios();
-        const response = await axios.delete(`/api/exam/${id}`);
-        return response.data;
+        try {
+            // 确保ID是字符串类型
+            const idStr = String(id);
+            
+            const response = await axios.delete(`/api/exam/${idStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除考试失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**
      * 获取参加考试的学生列表（需要token）
      * @param {number} examId 考试ID
-     * @returns {Promise<Array<Object>>} 学生列表
-     * 每项字段：
-     *   - studentId: string 学生ID
-     *   - username: string 用户名
-     *   - fullName: string 姓名
-     *   - email: string 邮箱
-     *   - phone: string 电话
-     *   - grade: string 年级
-     *   - className: string 班级
-     *   - score: number 考试得分
-     *   - submitTime: string 提交时间（ISO格式）
-     *   - status: string 考试状态（已完成/进行中/未开始）
+     * @returns {Promise<Array<number>>} 学生ID列表
      */
     async getExamStudents(examId) {
         const axios = createTeacherAuthorizedAxios();
@@ -1894,11 +2077,9 @@ export const examAPI = {
             
             const response = await axios.get(`/api/student-exam/exam/${examIdStr}/students`);
             
-            // 确保返回的所有ID字段都是字符串类型
+            // 确保返回的所有ID都是字符串类型，避免精度丢失
             if (Array.isArray(response.data)) {
-                response.data.forEach(item => {
-                    if (item.studentId !== undefined) item.studentId = String(item.studentId);
-                });
+                return response.data.map(id => String(id));
             }
             
             return response.data;
@@ -2881,63 +3062,47 @@ export const courseSelectionAPI = {
     },
 
     /**
-     * 批量删除学生选课（需要token）
+     * 删除单个学生选课（需要token）
      * @param {string} studentId 学生ID
-     * @param {Array<string>} courseIds 课程ID数组
+     * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 删除结果
-     * 返回字段：
-     *   - success: boolean 是否删除成功
-     *   - message: string 提示信息
-     *   - count: number 成功删除的数量
+     * 返回字段：由后端返回，通常包含删除成功状态和消息
      */
-    async batchDeleteStudentCourses(studentId, courseIds) {
+    async deleteCourseSelection(studentId, courseId) {
         const axios = createStudentAuthorizedAxios();
         try {
             // 确保ID是字符串类型
             const studentIdStr = String(studentId);
+            const courseIdStr = String(courseId);
 
-            // 确保所有courseId都是字符串类型
-            const courseIdsStr = courseIds.map(id => String(id));
+            console.log(`删除学生选课，学生ID: ${studentIdStr}, 课程ID: ${courseIdStr}`);
 
-            console.log(`批量删除学生选课，学生ID: ${studentIdStr}, 课程数量: ${courseIdsStr.length}`);
-
-            const response = await axios.delete(`/api/course-selection/batch/student/${studentIdStr}/course`, {
-                data: courseIdsStr
-            });
+            const response = await axios.delete(`/api/course-selection/batch/student/${studentIdStr}/course/${courseIdStr}`);
             return response.data;
         } catch (error) {
-            console.error('批量删除学生选课失败:', error.response ? error.response.data : error.message);
+            console.error('删除学生选课失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     },
 
     /**
-     * 批量删除课程中的学生（需要token）
+     * 删除指定课程的所有选课关系（需要token）
      * @param {string} courseId 课程ID
-     * @param {Array<string>} studentIds 学生ID数组
      * @returns {Promise<Object>} 删除结果
-     * 返回字段：
-     *   - success: boolean 是否删除成功
-     *   - message: string 提示信息
-     *   - count: number 成功删除的数量
+     * 返回字段：由后端返回，通常包含删除成功状态和消息
      */
-    async batchDeleteCourseStudents(courseId, studentIds) {
+    async batchDeleteCoursesSelections(courseId) {
         const axios = createStudentAuthorizedAxios();
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
 
-            // 确保所有studentId都是字符串类型
-            const studentIdsStr = studentIds.map(id => String(id));
+            console.log(`删除课程的所有选课关系，课程ID: ${courseIdStr}`);
 
-            console.log(`批量删除课程中的学生，课程ID: ${courseIdStr}, 学生数量: ${studentIdsStr.length}`);
-
-            const response = await axios.delete(`/api/course-selection/batch/course/${courseIdStr}`, {
-                data: studentIdsStr
-            });
+            const response = await axios.delete(`/api/course-selection/batch/course/${courseIdStr}`);
             return response.data;
         } catch (error) {
-            console.error('批量删除课程中的学生失败:', error.response ? error.response.data : error.message);
+            console.error('删除课程的所有选课关系失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     }
