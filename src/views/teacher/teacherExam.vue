@@ -187,7 +187,14 @@
                     <el-input v-model="examForm.title" placeholder="请输入考试标题" />
                 </el-form-item>
                 <el-form-item label="所属课程" prop="courseId">
-                    <el-input v-model="examForm.courseId" placeholder="请输入课程ID" />
+                    <el-select v-model="examForm.courseId" placeholder="请选择课程" filterable>
+                        <el-option
+                            v-for="course in courseList"
+                            :key="course.id"
+                            :label="course.name"
+                            :value="course.id"
+                        />
+                    </el-select>
                 </el-form-item>
                 <el-form-item label="总分" prop="totalScore">
                     <el-input-number v-model="examForm.totalScore" :min="1" :max="1000" />
@@ -198,15 +205,14 @@
                 </el-form-item>
                 <el-form-item label="考试时间" prop="examTime">
                     <el-date-picker v-model="examForm.examTime" type="datetimerange" range-separator="至"
-                        start-placeholder="开始时间" end-placeholder="结束时间" format="YYYY-MM-DD HH:mm"
-                        value-format="YYYY-MM-DD HH:mm:ss" />
+                        start-placeholder="开始时间" end-placeholder="结束时间" 
+                        format="YYYY-MM-DD HH:mm:ss"
+                        value-format="YYYY-MM-DDTHH:mm:ss"
+                        :disabled-date="disablePastDates" />
                 </el-form-item>
-                <el-form-item label="状态" prop="status">
-                    <el-select v-model="examForm.status" placeholder="请选择状态">
-                        <el-option label="未开始" value="未开始" />
-                        <el-option label="进行中" value="进行中" />
-                        <el-option label="已结束" value="已结束" />
-                    </el-select>
+                <el-form-item label="状态">
+                    <el-tag type="info">未开始</el-tag>
+                    <div class="status-hint">新创建的考试状态为未开始，系统会自动根据时间更新状态</div>
                 </el-form-item>
                 <el-form-item label="描述" prop="description">
                     <el-input v-model="examForm.description" type="textarea" :rows="3" placeholder="请输入考试描述" />
@@ -229,7 +235,7 @@ import { examAPI, courseAPI, knowledgeAPI } from '@/api/api'
 import { Plus, Edit, Delete, Search, DataAnalysis, Timer, Calendar, Loading } from '@element-plus/icons-vue'
 import { getUserInfo } from '@/utils/auth'
 import { useRouter } from 'vue-router'
-import { getExamStatusType, updateExamsStatus, formatDateTime, setExamStatus } from '@/utils/examManager'
+import { getExamStatusType, updateExamsStatus, formatDateTime } from '@/utils/examManager'
 
 // 初始化路由
 const router = useRouter()
@@ -264,7 +270,6 @@ const examForm = ref({
     totalScore: 100,
     durationMinutes: 60,
     examTime: [],
-    status: '未开始',
     type: 'exam'
 })
 
@@ -274,8 +279,7 @@ const rules = {
     courseId: [{ required: true, message: '请选择所属课程', trigger: 'change' }],
     totalScore: [{ required: true, message: '请输入总分', trigger: 'blur' }],
     durationMinutes: [{ required: true, message: '请输入考试时长', trigger: 'blur' }],
-    examTime: [{ required: true, message: '请选择考试时间', trigger: 'change' }],
-    status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+    examTime: [{ required: true, message: '请选择考试时间', trigger: 'change' }]
 }
 
 // 添加自动更新考试状态的功能
@@ -344,6 +348,13 @@ const loadExams = async () => {
 
         // 存储所有考试供下拉框使用
         allExams.value = res
+        
+        // 更新考试状态
+        const updatedExams = await updateExamsStatus(allExams.value, new Date())
+        if (updatedExams) {
+            console.log('考试状态已更新')
+            allExams.value = updatedExams
+        }
 
         // 如果有搜索关键词，进行过滤
         if (searchKeyword.value) {
@@ -635,12 +646,11 @@ const showCreateDialog = () => {
     examForm.value = {
         title: '',
         description: '',
-        courseId: '',
+        courseId: selectedCourseId.value || '', // 如果已选择课程，则默认使用该课程
         teacherId: teacherId,
         totalScore: 100,
         durationMinutes: 60,
         examTime: [],
-        status: '未开始',
         type: 'exam'
     }
     dialogVisible.value = true
@@ -658,10 +668,14 @@ const editExam = (exam) => {
         totalScore: exam.totalScore,
         durationMinutes: exam.durationMinutes,
         examTime: [exam.startTime, exam.endTime],
-        status: exam.status,
         type: 'exam'
     }
     dialogVisible.value = true
+}
+
+// 禁用过去的日期
+const disablePastDates = (time) => {
+    return time.getTime() < Date.now() - 8.64e7; // 禁用今天之前的日期
 }
 
 // 提交考试表单
@@ -675,12 +689,14 @@ const submitExam = async () => {
                     ...examForm.value,
                     startTime: examForm.value.examTime[0],
                     endTime: examForm.value.examTime[1],
-                    type: 'exam'
+                    type: 'exam',
+                    status: '未开始' // 新创建的考试状态始终为未开始
                 }
-                delete submitData.examTime
                 
-                // 根据开始和结束时间自动判断状态
-                setExamStatus(submitData)
+                // 删除examTime字段，不需要发送给后端
+                delete submitData.examTime
+
+                console.log('提交的考试数据:', submitData)
 
                 if (isEdit.value) {
                     await examAPI.updateExam(submitData)
@@ -691,10 +707,15 @@ const submitExam = async () => {
                 }
 
                 dialogVisible.value = false
-                loadExams()
+                loadExams() // 重新加载考试列表
             } catch (error) {
                 console.error('保存考试失败:', error)
-                ElMessage.error('保存考试失败')
+                if (error.response && error.response.data) {
+                    console.error('错误详情:', error.response.data)
+                    ElMessage.error(`保存考试失败: ${error.response.data.detail || '未知错误'}`)
+                } else {
+                    ElMessage.error('保存考试失败')
+                }
             }
         }
     })
@@ -989,5 +1010,16 @@ const getCourseNameById = (courseId) => {
     margin-top: 16px;
     display: flex;
     justify-content: flex-end;
+}
+
+.status-hint {
+    font-size: 0.8em;
+    color: #909399;
+    margin-top: 8px;
+}
+
+.el-tag {
+    padding: 5px 10px;
+    font-weight: 500;
 }
 </style>

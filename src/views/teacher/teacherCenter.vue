@@ -298,7 +298,6 @@ function sendChat() {
   display: flex;
   flex-direction: column;
   background: #f5f7fa;
-  overflow: hidden;
 }
 
 /* 覆盖Element Plus按钮样式 */
@@ -327,14 +326,23 @@ function sendChat() {
   background-color: transparent;
 }
 
+/* 顶部导航栏固定 */
+:deep(.header) {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
 .main-content {
   flex: 1;
   display: flex;
-  overflow: hidden;
   margin: 0;
   padding: 0;
+  height: calc(100vh - 60px); /* 减去顶部导航栏高度 */
+  overflow: hidden; /* 防止整体滚动 */
 }
 
+/* 侧边栏固定 */
 .sidebar {
   width: 100px;
   background: #2e3a4f;
@@ -344,9 +352,10 @@ function sendChat() {
   flex-direction: column;
   align-items: center;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 5;
-  margin-top: 0; /* Remove any top margin */
+  height: 100%;
   overflow-y: auto;
 }
 
@@ -421,7 +430,7 @@ function sendChat() {
   background: #f5f7fa;
   min-width: 0;
   overflow-y: auto;
-  height: calc(100vh - 60px); /* 假设顶部导航栏高度为60px */
+  height: 100%;
 }
 
 .content-placeholder {

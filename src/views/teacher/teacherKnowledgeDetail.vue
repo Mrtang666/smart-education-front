@@ -17,6 +17,28 @@
     </div>
 
     <div class="knowledge-content">
+      <!-- 题型统计图表 -->
+      <div class="detail-card chart-card" v-if="questions.length > 0">
+        <div class="card-header">
+          <h3>习题统计</h3>
+        </div>
+        <div class="card-body chart-body">
+          <div class="charts-container">
+            <!-- 题型分布图表 -->
+            <div class="chart-item">
+              <div class="chart-title">题型分布</div>
+              <div id="questionTypeChart" class="question-type-chart"></div>
+            </div>
+            
+            <!-- 难度分布图表 -->
+            <div class="chart-item">
+              <div class="chart-title">难度分布</div>
+              <div id="difficultyChart" class="difficulty-chart"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 习题区域 -->
       <div class="detail-card questions-card">
         <div class="card-header">
@@ -53,6 +75,12 @@
               </div>
               <div class="question-content">
                 <div class="question-title">{{ question.content }}</div>
+                <div class="question-options">
+                  <div v-for="(option, index) in question.options" :key="index" class="question-option">
+                    <div class="option-key">{{ option.key }}.</div>
+                    <div class="option-text">{{ option.text }}</div>
+                  </div>
+                </div>
                 <div class="question-answer-row" v-if="question.referenceAnswer">
                   <div class="answer-label">参考答案:</div>
                   <div class="answer-content">{{ question.referenceAnswer }}</div>
@@ -194,12 +222,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit, Plus, DocumentRemove, Delete } from '@element-plus/icons-vue'
 import { knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
+import * as echarts from 'echarts'
 
 const route = useRoute()
 const router = useRouter()
@@ -239,6 +268,27 @@ const questions = ref([])
 // 分页相关
 const currentPage = ref(1)
 const pageSize = ref(10)
+
+// 图表相关
+let typeChart = null;
+let difficultyChart = null;
+
+// 题型颜色映射
+const typeColors = {
+  '选择题': '#4B8DE6',
+  '填空题': '#67C23A',
+  '判断题': '#E6A23C',
+  '简答题': '#F56C6C',
+  '未知类型': '#909399'
+}
+
+// 难度颜色映射
+const difficultyColors = {
+  '简单': '#67C23A',
+  '中等': '#E6A23C',
+  '困难': '#F56C6C',
+  '未知难度': '#909399'
+}
 
 // 计算属性：当前页显示的题目
 const displayQuestions = computed(() => {
@@ -310,6 +360,221 @@ watch(() => questionForm.value.questionType, (newType) => {
   }
 })
 
+// 监听习题数据变化，更新图表
+watch(() => questions.value, () => {
+  if (questions.value.length > 0) {
+    nextTick(() => {
+      initCharts()
+    })
+  }
+}, { deep: true })
+
+// 初始化图表
+function initCharts() {
+  nextTick(() => {
+    initTypeChart();
+    initDifficultyChart();
+  });
+}
+
+// 初始化题型分布图表
+function initTypeChart() {
+  const chartDom = document.getElementById('questionTypeChart');
+  if (!chartDom) {
+    console.error('找不到题型图表容器元素');
+    return;
+  }
+  
+  // 设置图表容器高度
+  chartDom.style.height = '100%';
+  
+  // 清空现有图表实例
+  if (typeChart) {
+    typeChart.dispose();
+  }
+  
+  // 创建图表实例
+  typeChart = echarts.init(chartDom);
+  
+  // 计算题型统计数据
+  const typeCount = {};
+  questions.value.forEach(question => {
+    const type = question.questionType || '未知类型';
+    typeCount[type] = (typeCount[type] || 0) + 1;
+  });
+  
+  // 对数据排序，确保图表显示有序
+  const sortedTypes = Object.keys(typeCount).sort();
+  const data = sortedTypes.map(type => ({
+    name: type,
+    value: typeCount[type],
+    itemStyle: {
+      color: typeColors[type] || typeColors['未知类型']
+    }
+  }));
+  
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c}题 ({d}%)',
+      confine: true
+    },
+    legend: {
+      orient: 'horizontal',
+      bottom: 0,
+      left: 'center',
+      itemWidth: 12,
+      itemHeight: 8,
+      textStyle: {
+        fontSize: 11
+      },
+      data: sortedTypes
+    },
+    series: [
+      {
+        name: '题型分布',
+        type: 'pie',
+        radius: ['30%', '70%'],
+        center: ['50%', '40%'],
+        avoidLabelOverlap: true,
+        itemStyle: {
+          borderRadius: 4,
+          borderColor: '#fff',
+          borderWidth: 1
+        },
+        label: {
+          show: true,
+          position: 'outside',
+          formatter: '{b}: {c}题',
+          fontSize: 11
+        },
+        labelLine: {
+          show: true,
+          length: 10,
+          length2: 8,
+          smooth: true
+        },
+        emphasis: {
+          focus: 'series',
+          scaleSize: 5,
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.2)'
+          }
+        },
+        data: data
+      }
+    ]
+  };
+  
+  typeChart.setOption(option);
+  
+  // 响应窗口大小变化
+  window.addEventListener('resize', handleResize);
+}
+
+// 初始化难度分布图表
+function initDifficultyChart() {
+  const chartDom = document.getElementById('difficultyChart');
+  if (!chartDom) {
+    console.error('找不到难度图表容器元素');
+    return;
+  }
+  
+  // 设置图表容器高度
+  chartDom.style.height = '100%';
+  
+  // 清空现有图表实例
+  if (difficultyChart) {
+    difficultyChart.dispose();
+  }
+  
+  // 创建图表实例
+  difficultyChart = echarts.init(chartDom);
+  
+  // 计算难度分布数据
+  const difficultyCount = {};
+  questions.value.forEach(question => {
+    const difficulty = question.difficulty || '未知难度';
+    difficultyCount[difficulty] = (difficultyCount[difficulty] || 0) + 1;
+  });
+  
+  // 对难度进行排序：简单、中等、困难
+  const difficultyOrder = ['简单', '中等', '困难', '未知难度'];
+  const sortedDifficulties = Object.keys(difficultyCount).sort((a, b) => {
+    return difficultyOrder.indexOf(a) - difficultyOrder.indexOf(b);
+  });
+  
+  const data = sortedDifficulties.map(difficulty => ({
+    name: difficulty,
+    value: difficultyCount[difficulty],
+    itemStyle: {
+      color: difficultyColors[difficulty] || difficultyColors['未知难度']
+    }
+  }));
+  
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c}题 ({d}%)',
+      confine: true
+    },
+    legend: {
+      orient: 'horizontal',
+      bottom: 0,
+      left: 'center',
+      itemWidth: 12,
+      itemHeight: 8,
+      textStyle: {
+        fontSize: 11
+      },
+      data: sortedDifficulties
+    },
+    series: [
+      {
+        name: '难度分布',
+        type: 'pie',
+        radius: ['30%', '70%'],
+        center: ['50%', '40%'],
+        avoidLabelOverlap: true,
+        itemStyle: {
+          borderRadius: 4,
+          borderColor: '#fff',
+          borderWidth: 1
+        },
+        label: {
+          show: true,
+          position: 'outside',
+          formatter: '{b}: {c}题',
+          fontSize: 11
+        },
+        labelLine: {
+          show: true,
+          length: 10,
+          length2: 8,
+          smooth: true
+        },
+        emphasis: {
+          focus: 'series',
+          scaleSize: 5,
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.2)'
+          }
+        },
+        data: data
+      }
+    ]
+  };
+  
+  difficultyChart.setOption(option);
+  
+  // 响应窗口大小变化
+  window.addEventListener('resize', handleResize);
+}
+
 // 获取知识点详情
 async function fetchKnowledgeDetail() {
   loading.value = true
@@ -360,6 +625,18 @@ async function fetchQuestions() {
     
     if (Array.isArray(response)) {
       questions.value = response
+      
+      // 确保在DOM更新后初始化图表
+      if (response.length > 0) {
+        // 使用nextTick确保DOM已更新
+        nextTick(() => {
+          // 再使用setTimeout确保图表容器已渲染
+          setTimeout(() => {
+            console.log('尝试初始化图表...')
+            initCharts()
+          }, 300)
+        })
+      }
     } else {
       questions.value = []
     }
@@ -669,16 +946,49 @@ onMounted(async () => {
   
   try {
     await fetchKnowledgeDetail()
+    
+    // 额外的图表初始化尝试
+    if (questions.value.length > 0) {
+      // 延迟一段时间再初始化图表，确保DOM已完全渲染
+      setTimeout(() => {
+        console.log('组件挂载后尝试初始化图表...')
+        initCharts()
+      }, 500)
+    }
   } catch (error) {
     console.error('初始化知识点详情失败:', error)
     ElMessage.error('加载知识点详情失败，请稍后重试')
   }
 })
+
+// 组件卸载时清理图表实例
+onUnmounted(() => {
+  if (typeChart) {
+    typeChart.dispose();
+    typeChart = null;
+  }
+  if (difficultyChart) {
+    difficultyChart.dispose();
+    difficultyChart = null;
+  }
+  // 移除窗口大小变化监听器
+  window.removeEventListener('resize', handleResize);
+});
+
+// 窗口大小变化处理函数
+const handleResize = () => {
+  if (typeChart) {
+    typeChart.resize();
+  }
+  if (difficultyChart) {
+    difficultyChart.resize();
+  }
+};
 </script>
 
 <style scoped>
 .knowledge-detail-container {
-  height: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -687,19 +997,21 @@ onMounted(async () => {
 .knowledge-header {
   padding: 0 10px;
   color: #303133;
-  position: relative;
+  position: sticky;
+  top: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-radius: 0;
   box-shadow: none;
   border: none;
-  background-color: transparent;
+  background-color: #f5f7fa;
   text-align: left;
   min-height: 32px;
   height: 32px;
   flex-shrink: 0;
   line-height: 32px;
+  z-index: 10;
 }
 
 .header-content {
@@ -738,9 +1050,13 @@ onMounted(async () => {
 
 .knowledge-content {
   flex: 1;
-  padding: 32px 40px;
+  padding: 12px 20px;
   background-color: #f5f7fa;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 30px;
 }
 
 .loading-container, .empty-container {
@@ -757,25 +1073,108 @@ onMounted(async () => {
 }
 
 .detail-card {
-  background-color: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 16px;
+  background-color: #fff;
   overflow: hidden;
+  border: none;
+  transition: all 0.3s ease;
+  position: relative;
+  width: 100%;
+}
+
+.chart-card {
+  height: auto;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.chart-body {
+  height: 380px;
+  padding: 10px;
+  position: relative;
+}
+
+.detail-card.chart-card {
+  padding-bottom: 10px;
 }
 
 .card-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #ebeef5;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: linear-gradient(to right, #f8f9fa, #fff);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #67C23A, #4B8DE6);
 }
 
 .card-header h3 {
-  margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
+  margin: 0;
   color: #303133;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 12px;
+}
+
+.card-header h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  background: linear-gradient(to bottom, #67C23A, #4B8DE6);
+  border-radius: 2px;
+}
+
+.card-body {
+  padding: 16px 20px;
+}
+
+.questions-card .card-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.header-actions .el-button {
+  border-radius: 10px;
+  font-weight: 500;
+  padding: 10px 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-size: 14px;
+}
+
+.header-actions .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.header-actions .el-button .el-icon {
+  margin-right: 6px;
+  font-size: 16px;
 }
 
 .search-filter-container {
@@ -802,10 +1201,6 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-}
-
-.card-body {
-  padding: 20px;
 }
 
 .detail-item {
@@ -838,7 +1233,27 @@ onMounted(async () => {
 .empty-tip {
   color: #909399;
   text-align: center;
-  padding: 20px 0;
+  padding: 40px 0;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.empty-tip .el-empty {
+  margin-bottom: 20px;
+}
+
+.empty-tip .el-button {
+  padding: 12px 24px;
+  font-weight: 500;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.empty-tip .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .questions-list {
@@ -887,112 +1302,290 @@ onMounted(async () => {
 }
 
 .questions-card {
-  border-left: 4px solid #67C23A;
+  flex: 1;
+  min-height: 300px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
+.questions-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2367c23a' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.5;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .question-item {
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-  overflow: hidden;
+  border: none;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  overflow: visible;
   background-color: #fff;
-  transition: box-shadow 0.3s ease;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .question-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.question-item:last-child {
+  margin-bottom: 0;
 }
 
 .question-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  background-color: #f8f9fa;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8f9fa, #fff);
   border-bottom: 1px solid #ebeef5;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+.question-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 4px;
+  background: linear-gradient(to bottom, #409EFF, #4B8DE6);
 }
 
 .question-index {
-  width: 24px;
-  height: 24px;
-  background-color: #409EFF;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #409EFF, #4B8DE6);
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  margin-right: 10px;
-  font-size: 12px;
+  margin-right: 16px;
+  font-size: 16px;
+  box-shadow: 0 4px 10px rgba(64, 158, 255, 0.3);
 }
 
 .question-type {
-  margin-right: 12px;
+  margin-right: 16px;
+  margin-bottom: 5px;
+}
+
+.question-difficulty {
+  margin-bottom: 5px;
+}
+
+.question-type .el-tag, .question-difficulty .el-tag {
+  font-weight: 500;
+  padding: 2px 12px;
+  height: 28px;
+  line-height: 24px;
+  border-radius: 14px;
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
 }
 
 .question-content {
-  padding: 12px;
+  padding: 16px;
+  background-color: #fff;
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  height: auto;
 }
 
 .question-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-  color: #333;
-  margin-bottom: 12px;
+  color: #303133;
+  margin-bottom: 14px;
   line-height: 1.5;
   white-space: pre-wrap;
   text-align: left;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #ebeef5;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.question-options {
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.question-option {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 14px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border-left: 2px solid transparent;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.question-option:hover {
+  background-color: #f0f7ff;
+  border-left-color: #409EFF;
+  transform: translateX(4px);
+}
+
+.option-key {
+  font-weight: 600;
+  color: #409EFF;
+  margin-right: 12px;
+  min-width: 24px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.option-text {
+  color: #606266;
+  flex: 1;
+  font-size: 15px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: calc(100% - 36px);
 }
 
 .question-answer-row {
   display: flex;
-  align-items: center;
-  margin-top: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+  background-color: #f0f9eb;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: none;
+  box-shadow: 0 2px 6px rgba(103, 194, 58, 0.1);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .answer-label {
   font-weight: 600;
   color: #67C23A;
-  margin-right: 8px;
-  font-size: 13px;
+  margin-right: 12px;
+  font-size: 15px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .answer-content {
   color: #303133;
-  line-height: 1.4;
-  font-size: 13px;
+  line-height: 1.6;
+  font-size: 15px;
   text-align: left;
+  flex: 1;
+  font-weight: 500;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: calc(100% - 100px);
 }
 
 .question-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  padding: 12px 16px;
   border-top: 1px solid #ebeef5;
   background-color: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .score-tag {
   font-weight: 500;
-  font-size: 12px;
+  font-size: 14px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background-color: #f0f9eb;
+  color: #67C23A;
+  border-color: transparent;
+  box-shadow: 0 2px 6px rgba(103, 194, 58, 0.1);
+  white-space: nowrap;
 }
 
 .question-actions {
   display: flex;
-  gap: 6px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.question-actions .el-button {
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.question-actions .el-button:hover {
+  background-color: #ecf5ff;
+  color: #409EFF;
+  transform: translateY(-2px);
+}
+
+.question-actions .el-button--danger:hover {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  transform: translateY(-2px);
 }
 
 .pagination-container {
-  margin-top: 24px;
+  margin-top: 32px;
+  margin-bottom: 16px;
   display: flex;
   justify-content: center;
+}
+
+.pagination-container .el-pagination {
+  padding: 0;
+  font-weight: normal;
+  color: #606266;
+  background-color: white;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pagination-container .el-pagination .el-pagination__total,
+.pagination-container .el-pagination .el-pagination__jump {
+  font-weight: 500;
 }
 
 .teach-plan-card {
@@ -1015,5 +1608,129 @@ onMounted(async () => {
 
 .add-option-button {
   margin-top: 12px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .knowledge-content {
+    padding: 12px;
+  }
+  
+  .chart-card {
+    height: auto;
+  }
+  
+  .chart-body {
+    height: 300px;
+  }
+  
+  .card-header {
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+  
+  .card-body {
+    padding: 16px;
+  }
+  
+  .header-actions {
+    margin-top: 8px;
+    width: 100%;
+  }
+  
+  .pagination-container .el-pagination {
+    padding: 8px;
+  }
+}
+
+.chart-container {
+  width: 100%;
+  height: 360px;
+  margin: 0 auto;
+  background-color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  padding: 15px;
+  box-sizing: border-box;
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+#questionTypeChart {
+  width: 100%;
+  height: 300px;
+  margin: 0 auto;
+}
+
+.question-type-chart {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.detail-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.charts-container {
+  display: flex;
+  width: 100%;
+  height: 360px;
+  gap: 20px;
+}
+
+.chart-item {
+  flex: 1;
+  height: 100%;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 10px;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 5px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.question-type-chart, .difficulty-chart {
+  width: 100%;
+  flex: 1;
+  position: relative;
+}
+
+.chart-body {
+  height: 360px;
+  padding: 10px;
+  position: relative;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .charts-container {
+    flex-direction: column;
+    height: 600px;
+  }
+  
+  .chart-item {
+    height: 300px;
+  }
 }
 </style> 

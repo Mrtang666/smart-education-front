@@ -92,14 +92,14 @@ const emit = defineEmits(['userAction', 'search', 'searchInput', 'joinCourse'])
 const inviteCode = ref('')
 
 function handleProfileClick() {
-    // 获取用户信息，确定角色
-    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}')
+    // 获取用户角色信息，确定角色
+    const userRole = localStorage.getItem('user_role')
     
     // 清空左侧导航栏选中状态
     emit('userAction', 'clearMenuActive')
     
     // 根据角色跳转到不同的个人中心页面
-    if (userInfo.roles && userInfo.roles.includes('ROLE_TEACHER')) {
+    if (userRole && userRole.includes('ROLE_TEACHER')) {
         // 教师角色
         router.push('/teacher/center')
     } else {

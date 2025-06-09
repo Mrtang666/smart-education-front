@@ -1,12 +1,20 @@
 <template>
   <router-view />
+  <StagewiseToolbar v-if="isDevelopment" :config="stagewiseConfig" />
 </template>
 
 <script>
+import { StagewiseToolbar } from '@stagewise/toolbar-vue';
+import { stagewiseConfig } from './plugins/stagewise';
+
 export default {
+  components: {
+    StagewiseToolbar
+  },
   data() {
     return {
-      isDevelopment: process.env.NODE_ENV === 'development'
+      isDevelopment: process.env.NODE_ENV === 'development',
+      stagewiseConfig
     };
   }
 };
@@ -17,12 +25,12 @@ body {
   margin: 0;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 html {
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 #app {
@@ -33,7 +41,7 @@ html {
   color: #2c3e50;
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 nav {

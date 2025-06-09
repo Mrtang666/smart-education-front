@@ -133,7 +133,7 @@
                             </el-button>
                         </template>
                     </el-table-column>
-                    <el-table-column label="状态" width="100">
+                    <el-table-column label="状态" width="140">
                         <template #default="scope">
                             <el-tag :type="getStatusType(scope.row.status)" effect="dark">
                                 <el-icon v-if="scope.row.status === '未开始' || scope.row.status === '未设置截止日期'">
