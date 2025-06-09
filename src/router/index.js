@@ -55,6 +55,10 @@ const routes = [
       {
         path: "exercise",
         component: () => import("@/views/teacher/teacherExercise.vue"),
+      }, 
+      {
+        path: "analysis",
+        component: () => import("@/views/teacher/teacherAnalysis.vue"),
       },
       
       
@@ -97,6 +101,10 @@ const routes = [
       {
         path: "homework",
         component: () => import("@/views/student/studentHomework.vue"),
+      },
+      {
+        path: "exam",
+        component: () => import("@/views/student/studentExam.vue"),
       },
       {
         path: "course",

@@ -2521,7 +2521,58 @@ export const attendanceAPI = {
             console.error('获取课程考勤记录失败:', error.response ? error.response.data : error.message);
             throw error;
         }
-    }
+    },
+
+    /**
+     * 根据考勤ID删除考勤实体（需要token）
+     * @param {number} attendanceId 考勤ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     */
+    async deleteAttendance(attendanceId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const attendanceIdStr = String(attendanceId);
+            
+            console.log(`删除考勤记录，考勤ID: ${attendanceIdStr}`);
+            
+            const response = await axios.delete(`/api/attendance/${attendanceIdStr}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除考勤记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 批量删除考勤实体（需要token）
+     * @param {Array<number>} attendanceIds 考勤ID数组
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - success: boolean 是否删除成功
+     *   - message: string 提示信息
+     *   - count: number 成功删除的记录数
+     */
+    async batchDeleteAttendance(attendanceIds) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保所有ID都是字符串类型
+            const attendanceIdsStr = attendanceIds.map(id => String(id));
+            
+            console.log(`批量删除考勤记录，考勤ID数量: ${attendanceIdsStr.length}`);
+            
+            const response = await axios.delete('/api/attendance/batch', {
+                data: attendanceIdsStr
+            });
+            return response.data;
+        } catch (error) {
+            console.error('批量删除考勤记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
 };
 
 // 学生考试相关 API

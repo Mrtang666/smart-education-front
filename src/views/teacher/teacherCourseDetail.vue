@@ -311,10 +311,16 @@
             <div class="content-section">
               <div class="section-header">
                 <h3>考勤列表</h3>
-                <el-button type="primary" size="small" @click="showAddAttendanceDialog">
-                  <el-icon><Plus /></el-icon>
-                  添加考勤
-                </el-button>
+                <div class="header-actions">
+                  <el-button type="danger" size="small" v-if="selectedAttendances.length > 0" @click="batchRemoveAttendances">
+                    <el-icon><Delete /></el-icon>
+                    批量删除 ({{ selectedAttendances.length }})
+                  </el-button>
+                  <el-button type="primary" size="small" @click="showAddAttendanceDialog">
+                    <el-icon><Plus /></el-icon>
+                    添加考勤
+                  </el-button>
+                </div>
               </div>
               <div class="section-body">
                 <div class="table-toolbar" v-if="attendances.length > 0">
@@ -332,19 +338,22 @@
                   暂无考勤记录，请点击"添加考勤"按钮添加
                 </div>
                 <div v-else class="attendance-list">
-                  <div v-for="attendance in filteredAttendances" :key="attendance.attendanceId" class="attendance-item" @click="viewAttendanceDetail(attendance)">
-                    <div class="attendance-header">
-                      <h4>{{ formatDate(attendance.attendanceDate) }} 考勤</h4>
-                      <el-tag :type="getAttendanceStatusType(attendance.status)">{{ attendance.status }}</el-tag>
-                    </div>
-                    <div class="attendance-info">
-                      <p>出勤人数: {{ getAttendanceStats(attendance).present }} / {{ courseStudents.length }}</p>
-                      <p>缺勤人数: {{ getAttendanceStats(attendance).absent }}</p>
-                      <p>迟到人数: {{ getAttendanceStats(attendance).late }}</p>
-                    </div>
-                    <div class="attendance-actions">
-                      <el-button link type="primary" @click.stop="editAttendance(attendance)">编辑</el-button>
-                      <el-button link type="danger" @click.stop="removeAttendance(attendance)">删除</el-button>
+                  <div v-for="attendance in filteredAttendances" :key="attendance.attendanceId" class="attendance-item">
+                    <el-checkbox v-model="attendance.selected" @change="handleAttendanceSelectionChange"></el-checkbox>
+                    <div class="attendance-content" @click="viewAttendanceDetail(attendance)">
+                      <div class="attendance-header">
+                        <h4>{{ formatDate(attendance.attendanceDate) }} 考勤</h4>
+                        <el-tag :type="getAttendanceStatusType(attendance.status)">{{ attendance.status }}</el-tag>
+                      </div>
+                      <div class="attendance-info">
+                        <p>出勤人数: {{ getAttendanceStats(attendance).present }} / {{ courseStudents.length }}</p>
+                        <p>缺勤人数: {{ getAttendanceStats(attendance).absent }}</p>
+                        <p>迟到人数: {{ getAttendanceStats(attendance).late }}</p>
+                      </div>
+                      <div class="attendance-actions">
+                        <el-button link type="primary" @click.stop="editAttendance(attendance)">编辑</el-button>
+                        <el-button link type="danger" @click.stop="removeAttendance(attendance)">删除</el-button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1543,6 +1552,7 @@ const attendanceCurrentPage = ref(1)
 const attendancePageSize = ref(10)
 const attendanceStudents = ref([])
 const attendanceDetailSearchKeyword = ref('')
+const selectedAttendances = ref([]) // 添加选中考勤数组
 
 // 添加计算属性跟踪当前时间
 const currentTime = ref(new Date())
@@ -3080,7 +3090,7 @@ function editAttendance(attendance) {
 // 删除考勤
 function removeAttendance(attendance) {
   ElMessageBox.confirm(
-    `确定要删除考勤"${attendance.attendanceDate}"吗？`,
+    `确定要删除${formatDate(attendance.attendanceDate)}的考勤记录吗？`,
     '删除确认',
     {
       confirmButtonText: '确定',
@@ -3089,11 +3099,12 @@ function removeAttendance(attendance) {
     }
   ).then(async () => {
     try {
-      // 确保courseId和attendanceId都是字符串形式
-      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+      // 确保attendanceId是字符串形式
       const attendanceIdStr = attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId;
       
-      await courseSelectionAPI.deleteAttendanceById(courseIdStr, attendanceIdStr)
+      // 使用正确的API删除考勤
+      await attendanceAPI.deleteAttendance(attendanceIdStr)
+      
       // 重新获取考勤列表
       await fetchCourseAttendances()
       ElMessage.success('考勤删除成功')
@@ -3131,16 +3142,19 @@ async function fetchCourseAttendances() {
     console.log('获取到的考勤数据:', response);
     
     if (Array.isArray(response)) {
-      // 确保所有ID都是字符串形式
+      // 确保所有ID都是字符串形式，并添加selected属性用于多选
       attendances.value = response.map(attendance => ({
         ...attendance,
         attendanceId: attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId,
         courseId: attendance.courseId ? new BigNumber(attendance.courseId).toString() : attendance.courseId,
-        recordedBy: attendance.recordedBy ? new BigNumber(attendance.recordedBy).toString() : attendance.recordedBy
+        recordedBy: attendance.recordedBy ? new BigNumber(attendance.recordedBy).toString() : attendance.recordedBy,
+        selected: false // 添加选择状态
       }));
     } else {
       attendances.value = []
     }
+    // 清空选择
+    selectedAttendances.value = []
   } catch (error) {
     console.error('获取考勤列表失败:', error)
     ElMessage.error('获取考勤列表失败，请稍后重试')
@@ -3349,6 +3363,52 @@ const attendanceRules = {
   status: [
     { required: true, message: '请选择考勤状态', trigger: 'change' }
   ]
+}
+
+// 处理考勤选择变化
+function handleAttendanceSelectionChange() {
+  selectedAttendances.value = attendances.value.filter(item => item.selected)
+}
+
+// 批量删除考勤
+function batchRemoveAttendances() {
+  if (selectedAttendances.value.length === 0) {
+    ElMessage.warning('请先选择要删除的考勤记录')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedAttendances.value.length} 条考勤记录吗？`,
+    '批量删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 获取所有选中的考勤ID
+      const attendanceIds = selectedAttendances.value.map(attendance => 
+        attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId
+      )
+      
+      // 调用批量删除API
+      await attendanceAPI.batchDeleteAttendance(attendanceIds)
+      
+      // 重新获取考勤列表
+      await fetchCourseAttendances()
+      
+      // 清空选择
+      selectedAttendances.value = []
+      
+      ElMessage.success(`已成功删除 ${attendanceIds.length} 条考勤记录`)
+    } catch (error) {
+      console.error('批量删除考勤失败:', error)
+      ElMessage.error('批量删除考勤失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
 }
 </script>
 
@@ -3824,7 +3884,7 @@ const attendanceRules = {
 
 .attendance-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding: 16px 20px;
   border-bottom: 1px solid #ebeef5;
   transition: background-color 0.3s;
@@ -3836,6 +3896,16 @@ const attendanceRules = {
 
 .attendance-item:last-child {
   border-bottom: none;
+}
+
+.attendance-content {
+  flex: 1;
+  margin-left: 15px;
+  cursor: pointer;
+}
+
+.attendance-item .el-checkbox {
+  margin-top: 6px;
 }
 
 .attendance-header {

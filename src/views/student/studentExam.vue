@@ -180,7 +180,7 @@ import { useRouter } from 'vue-router'
 import { Search, Edit, DataAnalysis, Timer, Calendar, Loading, WarningFilled } from '@element-plus/icons-vue'
 
 // 注入setActiveMenu方法
-const setActiveMenu = inject('setActiveMenu')
+// const setActiveMenu = inject('setActiveMenu')
 const router = useRouter()
 
 // 注入用户信息

@@ -227,6 +227,9 @@ function handleMenuClick(menu) {
     case '考试':
       router.push('/teacher/exam')
       break
+    case '分析':
+      router.push('/teacher/analysis')
+      break
     
     // case '分析':
     //   router.push('/teacher/analysis')
