@@ -412,7 +412,13 @@
         <el-tab-pane label="添加已有知识点" name="add">
           <el-form label-width="100px">
             <el-form-item label="搜索知识点">
-              <el-input v-model="knowledgeSearchKeyword" placeholder="输入关键词搜索知识点" clearable>
+              <el-input 
+                v-model="knowledgeSearchKeyword" 
+                placeholder="输入关键词搜索知识点" 
+                clearable
+                @input="handleKnowledgeSearchInput"
+                @clear="handleKnowledgeSearchClear"
+              >
                 <template #append>
                   <el-button @click="searchExistingKnowledge">
                     <el-icon><Search /></el-icon>
@@ -421,15 +427,9 @@
               </el-input>
             </el-form-item>
             
-            <el-form-item>
-              <el-button type="primary" @click="searchExistingKnowledge">
-                <el-icon><Search /></el-icon> 搜索知识点
-              </el-button>
-            </el-form-item>
-            
             <div class="knowledge-search-results" v-if="searchedKnowledges.length > 0">
               <el-table 
-                :data="searchedKnowledges" 
+                :data="currentPageKnowledges" 
                 style="width: 100%" 
                 @row-click="selectKnowledge" 
                 :row-class-name="getRowClassName"
@@ -444,8 +444,27 @@
                 </el-table-column>
                 <el-table-column prop="description" label="描述" />
               </el-table>
+              
+              <!-- 添加分页控件 -->
+              <div class="pagination-container" v-if="searchedKnowledges.length > knowledgePageSize">
+                <el-pagination
+                  v-model:current-page="knowledgeCurrentPage"
+                  v-model:page-size="knowledgePageSize"
+                  :page-sizes="[5, 10, 20, 50]"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  :total="knowledgeTotalCount"
+                  @size-change="handleKnowledgePageSizeChange"
+                  @current-change="handleKnowledgePageChange"
+                />
+              </div>
             </div>
-            <div v-else-if="knowledgeSearchKeyword && !isSearching" class="empty-search-results">
+            <div v-else-if="!knowledgeSearchKeyword && !isSearching && !hasLoadedKnowledges" class="empty-search-results">
+              正在加载知识点...
+            </div>
+            <div v-else-if="isSearching" class="searching-indicator">
+              <el-skeleton :rows="3" animated />
+            </div>
+            <div v-else-if="hasLoadedKnowledges && searchedKnowledges.length === 0" class="empty-search-results">
               没有找到匹配的知识点
             </div>
             
@@ -1526,6 +1545,30 @@ const searchedKnowledges = ref([])
 const selectedKnowledges = ref([])
 // 是否正在搜索
 const isSearching = ref(false)
+// 知识点分页相关
+const knowledgeCurrentPage = ref(1)
+const knowledgePageSize = ref(10)
+const knowledgeTotalCount = ref(0)
+// 是否已加载知识点列表
+const hasLoadedKnowledges = ref(false)
+
+// 计算当前页的知识点
+const currentPageKnowledges = computed(() => {
+  const startIndex = (knowledgeCurrentPage.value - 1) * knowledgePageSize.value
+  const endIndex = startIndex + knowledgePageSize.value
+  return searchedKnowledges.value.slice(startIndex, endIndex)
+})
+
+// 处理知识点分页变化
+function handleKnowledgePageChange(page) {
+  knowledgeCurrentPage.value = page
+}
+
+// 处理知识点每页条数变化
+function handleKnowledgePageSizeChange(size) {
+  knowledgePageSize.value = size
+  knowledgeCurrentPage.value = 1
+}
 
 // 添加学生对话框
 const addStudentDialogVisible = ref(false)
@@ -1862,7 +1905,7 @@ async function saveCourseEdit() {
 }
 
 // 显示添加知识点对话框
-function showAddKnowledgeDialog() {
+async function showAddKnowledgeDialog() {
   // 重置表单
   newKnowledge.value = {
     name: '',
@@ -1877,17 +1920,11 @@ function showAddKnowledgeDialog() {
   searchedKnowledges.value = []
   selectedKnowledges.value = []
   knowledgeDialogTab.value = 'add'
+  knowledgeCurrentPage.value = 1
   
   addKnowledgeDialogVisible.value = true
-}
-
-// 搜索已有知识点
-async function searchExistingKnowledge() {
-  if (!knowledgeSearchKeyword.value.trim()) {
-    ElMessage.warning('请输入搜索关键词')
-    return
-  }
   
+  // 打开对话框后立即加载所有知识点
   try {
     isSearching.value = true
     
@@ -1905,22 +1942,83 @@ async function searchExistingKnowledge() {
     // 确保教师ID是字符串形式
     const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
     
-    // 搜索知识点
-    const results = await knowledgeAPI.getKnowledgeByTeacherId(knowledgeSearchKeyword.value, teacherId)
+    // 获取该教师的所有知识点
+    const results = await knowledgeAPI.getKnowledgeByTeacherId(teacherId)
     
     // 过滤掉已经在课程中的知识点
     const courseKnowledgeIds = courseKnowledges.value.map(k => k.knowledgeId)
-    searchedKnowledges.value = results.filter(knowledge => 
+    const filteredResults = results.filter(knowledge => 
       !courseKnowledgeIds.includes(knowledge.knowledgeId)
     )
     
-    if (searchedKnowledges.value.length === 0 && results.length > 0) {
+    searchedKnowledges.value = filteredResults
+    knowledgeTotalCount.value = filteredResults.length
+    
+    if (filteredResults.length === 0 && results.length > 0) {
+      ElMessage.info('您的所有知识点已全部在当前课程中')
+    }
+    
+    hasLoadedKnowledges.value = true
+  } catch (error) {
+    console.error('获取知识点失败:', error)
+    ElMessage.error(`获取知识点失败: ${error.message || '请稍后重试'}`)
+    searchedKnowledges.value = []
+    knowledgeTotalCount.value = 0
+  } finally {
+    isSearching.value = false
+  }
+}
+
+// 搜索已有知识点
+async function searchExistingKnowledge() {
+  try {
+    isSearching.value = true
+    
+    // 从localstorage中获取教师ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      throw new Error('未找到用户信息，请重新登录')
+    }
+    
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.teacherId) {
+      throw new Error('用户信息不完整或不是教师账号')
+    }
+    
+    // 确保教师ID是字符串形式
+    const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+    
+    let results = []
+    
+    if (knowledgeSearchKeyword.value.trim()) {
+      // 如果有搜索关键词，使用searchKnowledge接口
+      results = await knowledgeAPI.searchKnowledge(knowledgeSearchKeyword.value)
+    } else {
+      // 如果没有搜索关键词，获取该教师的所有知识点
+      results = await knowledgeAPI.getKnowledgeByTeacherId(teacherId)
+    }
+    
+    // 过滤掉已经在课程中的知识点
+    const courseKnowledgeIds = courseKnowledges.value.map(k => k.knowledgeId)
+    const filteredResults = results.filter(knowledge => 
+      !courseKnowledgeIds.includes(knowledge.knowledgeId)
+    )
+    
+    searchedKnowledges.value = filteredResults
+    knowledgeTotalCount.value = filteredResults.length
+    knowledgeCurrentPage.value = 1 // 重置为第一页
+    
+    if (filteredResults.length === 0 && results.length > 0) {
       ElMessage.info('搜索到的知识点已全部在当前课程中')
     }
+    
+    // 标记已加载知识点列表
+    hasLoadedKnowledges.value = true
   } catch (error) {
     console.error('搜索知识点失败:', error)
     ElMessage.error(`搜索知识点失败: ${error.message || '请稍后重试'}`)
     searchedKnowledges.value = []
+    knowledgeTotalCount.value = 0
   } finally {
     isSearching.value = false
   }
@@ -3410,6 +3508,26 @@ function batchRemoveAttendances() {
     // 用户取消删除
   })
 }
+
+// 处理知识点搜索输入
+function handleKnowledgeSearchInput() {
+  // 如果输入框不为空，延迟500ms后执行搜索，避免频繁请求
+  if (knowledgeSearchKeyword.value.trim()) {
+    clearTimeout(knowledgeSearchTimer)
+    knowledgeSearchTimer = setTimeout(() => {
+      searchExistingKnowledge()
+    }, 500)
+  }
+}
+
+// 处理知识点搜索清空
+function handleKnowledgeSearchClear() {
+  // 清空搜索框后，显示所有知识点
+  searchExistingKnowledge()
+}
+
+// 知识点搜索定时器
+let knowledgeSearchTimer = null
 </script>
 
 <style scoped>
@@ -3792,7 +3910,7 @@ function batchRemoveAttendances() {
 }
 
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 16px;
   display: flex;
   justify-content: flex-end;
 }
@@ -4013,5 +4131,11 @@ function batchRemoveAttendances() {
 
 :deep(.attendance-detail .el-alert) {
   margin-bottom: 10px;
+}
+
+.searching-indicator {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
 }
 </style> 
