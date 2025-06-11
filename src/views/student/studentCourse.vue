@@ -468,8 +468,15 @@ const displayCourseList = computed(() => {
 function enterCourse(course) {
     console.log('进入课程:', course)
     ElMessage.success(`进入课程: ${course.name}`)
-    // 跳转到课程详情页，使用课程ID作为路径参数
-    router.push(`/student/course/${course.id}`)
+    // 跳转到课程详情页，使用课程ID作为路径参数，并传递课程名称和其他信息
+    router.push({
+        path: `/student/course/${course.id}`,
+        query: {
+            courseName: course.name,
+            courseCode: course.code || course.id,
+            category: course.category
+        }
+    })
 }
 
 // 提取描述中的标签

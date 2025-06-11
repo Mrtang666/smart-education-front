@@ -95,6 +95,24 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       {
+        path: "knowledge/:knowledgeId",
+        component: () => import("@/views/student/studentKnowledgeDetail.vue"),
+        props: true,
+        name: "studentKnowledgeDetail"
+      },
+      {
+        path: "homework/:homeworkId",
+        component: () => import("@/views/student/studentHomeworkDetail.vue"),
+        props: true,
+        name: "studentHomeworkDetail"
+      },
+      {
+        path: "exam/:examId",
+        component: () => import("@/views/student/studentExamDetail.vue"),
+        props: true,
+        name: "studentExamDetail"
+      },
+      {
         path: "center",
         component: () => import("@/views/student/studentHome.vue"),
       },
