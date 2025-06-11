@@ -114,8 +114,41 @@
                 </el-icon>
               </div>
               <div class="item-content">
-                <div class="item-title">{{ course.name }}</div>
-                <div class="item-subtitle">{{ course.teacherName }}</div>
+                <div class="item-title">
+                  {{ course.name }}
+                  <el-tag size="small" effect="plain" class="course-code-tag" v-if="course.code && course.code !== 'string'">
+                    {{ course.code }}
+                  </el-tag>
+                </div>
+                <div class="item-subtitle">
+                  <span class="course-info">
+                    <el-icon><Collection /></el-icon>
+                    {{ course.category === 'string' ? '未分类' : course.category }} · {{ course.credit }}学分
+                  </span>
+                </div>
+                <div v-if="course.description && course.description !== 'string'" class="course-description-container">
+                  <div class="course-tags" v-if="getDescriptionTags(course.description).length > 0">
+                    <el-tag 
+                      v-for="(tag, tagIndex) in getDescriptionTags(course.description)" 
+                      :key="tagIndex"
+                      size="small"
+                      type="info"
+                      effect="plain"
+                      class="tag-item"
+                    >
+                      {{ tag }}
+                    </el-tag>
+                  </div>
+                  <el-tooltip
+                    :content="processDescription(course.description).text"
+                    placement="top"
+                    :show-after="500"
+                  >
+                    <div class="course-description">
+                      {{ getShortDescription(course.description) }}
+                    </div>
+                  </el-tooltip>
+                </div>
               </div>
               <div class="item-action">
                 <el-button link type="primary">进入</el-button>
@@ -158,7 +191,7 @@
                 </div>
               </div>
               <div class="item-status">
-                <el-tag :type="getAssignmentStatusType(assignment.daysLeft)" size="small">
+                <el-tag :type="getAssignmentStatusType(assignment.daysLeft)" size="small" class="status-tag">
                   {{ getAssignmentStatusText(assignment.daysLeft) }}
                 </el-tag>
               </div>
@@ -174,7 +207,7 @@
 import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Reading, Notebook, Document, Calendar, Timer } from '@element-plus/icons-vue'
+import { Reading, Notebook, Document, Calendar, Timer, Collection } from '@element-plus/icons-vue'
 import { courseSelectionAPI, studentExamAPI, learningPlanAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
@@ -324,6 +357,42 @@ function getRandomColor(index) {
   return colors[index % colors.length]
 }
 
+// 处理课程描述中的标签
+function processDescription(description) {
+  if (!description || description === 'string') return { text: '', tags: [] };
+  
+  // 提取所有 #标签# 格式的标签
+  const tagRegex = /#([^#]+)#/g;
+  const tags = [];
+  let match;
+  let processedDesc = description;
+  
+  // 收集所有标签
+  while ((match = tagRegex.exec(description)) !== null) {
+    tags.push(match[1]);
+  }
+  
+  // 从描述中移除所有标签
+  processedDesc = processedDesc.replace(tagRegex, '').trim();
+  
+  return {
+    text: processedDesc,
+    tags: tags
+  };
+}
+
+// 获取短描述（不包含标签）
+function getShortDescription(description) {
+  const processed = processDescription(description);
+  if (!processed.text) return '';
+  return processed.text.length > 20 ? processed.text.substring(0, 20) + '...' : processed.text;
+}
+
+// 获取描述中的标签
+function getDescriptionTags(description) {
+  return processDescription(description).tags;
+}
+
 // 格式化日期
 function formatDate(dateString) {
   const date = new Date(dateString)
@@ -450,12 +519,20 @@ async function fetchStudentCourses(isRetry = false) {
       return
     }
     
-    courses.value = response.map(course => ({
-      id: course.courseId,
-      name: course.courseName || '未命名课程',
-      teacherName: course.teacherName || '未知教师',
-      completionRate: course.completionRate || 0
-    }))
+    courses.value = response.map(course => {
+      return {
+        id: course.id,
+        name: course.name || '未命名课程',
+        code: course.code,
+        description: course.description || '暂无描述',
+        credit: course.credit || 0,
+        category: course.category || '未分类',
+        createTime: course.createTime,
+        updateTime: course.updateTime,
+        status: course.status,
+        teacherName: course.teacherName || '未知教师'
+      };
+    })
     
     // 重置错误状态
     apiErrorShown.courses = false
@@ -770,6 +847,10 @@ onUnmounted(() => {
 <style scoped>
 .student-home {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh; /* 限制最大高度为视口高度 */
+  overflow-y: auto; /* 添加滚动条 */
 }
 
 /* 欢迎区域样式 */
@@ -777,12 +858,13 @@ onUnmounted(() => {
   display: flex;
   background: linear-gradient(135deg, #4B8DE6, #6A5ACD);
   border-radius: 12px;
-  padding: 32px 40px;
-  margin-bottom: 24px;
+  padding: 24px 32px; /* 减少内边距 */
+  margin-bottom: 20px;
   color: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   position: relative;
+  flex-shrink: 0; /* 防止被压缩 */
 }
 
 .welcome-content {
@@ -827,8 +909,9 @@ onUnmounted(() => {
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 16px; /* 减少间距 */
+  margin-bottom: 20px;
+  flex-shrink: 0; /* 防止被压缩 */
 }
 
 .feature-card {
@@ -904,17 +987,24 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
+  height: auto; /* 改为自适应高度 */
+  margin-bottom: 20px; /* 确保底部有足够空间 */
 }
 
 .recent-card {
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: auto; /* 改为自适应高度 */
+  max-height: 450px; /* 设置最大高度 */
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0; /* 防止头部被压缩 */
 }
 
 .card-header h3 {
@@ -942,12 +1032,15 @@ onUnmounted(() => {
 .recent-list {
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  max-height: 350px; /* 减小最大高度 */
+  padding-right: 4px; /* 为滚动条留出空间 */
 }
 
 .recent-item {
   display: flex;
   align-items: center;
-  padding: 12px 0;
+  padding: 10px 0; /* 减少上下内边距 */
   border-bottom: 1px solid #EBEEF5;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -962,30 +1055,98 @@ onUnmounted(() => {
 }
 
 .item-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px; /* 减小图标尺寸 */
+  height: 36px; /* 减小图标尺寸 */
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 16px;
+  margin-right: 12px; /* 减小右边距 */
   color: white;
+  flex-shrink: 0;
 }
 
 .item-content {
   flex: 1;
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 .item-title {
   font-size: 16px;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 4px;
+  color: #606266;
+  margin: 0 0 6px 0; /* 减小下边距 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.course-code-tag {
+  font-size: 10px;
+  padding: 0 6px;
+  height: 20px;
+  line-height: 18px;
+  flex-shrink: 0;
 }
 
 .item-subtitle {
   font-size: 12px;
   color: #909399;
+  margin-bottom: 3px; /* 减小下边距 */
+}
+
+.course-info, .teacher-info, .time-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #909399;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.course-info .el-icon,
+.teacher-info .el-icon,
+.time-info .el-icon {
+  font-size: 14px;
+  color: #409EFF;
+}
+
+.course-description-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.course-description {
+  font-size: 12px;
+  color: #909399;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+  margin: 0;
+}
+
+.course-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+}
+
+.tag-item {
+  font-size: 10px;
+  padding: 0 6px;
+  height: 18px;
+  line-height: 16px;
+  border-radius: 4px;
+  margin: 0;
 }
 
 .item-action,
@@ -998,13 +1159,29 @@ onUnmounted(() => {
   .feature-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  
+  .recent-section {
+    height: auto; /* 小屏幕上取消固定高度 */
+  }
+  
+  .recent-list {
+    max-height: 300px; /* 小屏幕上减小列表高度 */
+  }
 }
 
 @media (max-width: 768px) {
-
   .feature-grid,
   .recent-section {
     grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .recent-card {
+    margin-bottom: 20px;
+  }
+  
+  .recent-list {
+    max-height: 250px; /* 手机屏幕上进一步减小列表高度 */
   }
 
   .welcome-section {
@@ -1027,6 +1204,38 @@ onUnmounted(() => {
 .deadline-info .el-icon {
   font-size: 14px;
   color: #E6A23C;
+}
+
+.status-tag {
+  font-size: 10px;
+  padding: 0 6px;
+  height: 20px;
+  line-height: 18px;
+}
+
+/* 自定义滚动条样式 */
+.recent-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.recent-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.recent-list::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.recent-list::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+/* 确保在Firefox中也有类似的滚动条体验 */
+.recent-list {
+  scrollbar-width: thin;
+  scrollbar-color: #ccc #f1f1f1;
 }
 </style>
 
