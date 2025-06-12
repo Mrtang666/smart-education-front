@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
+    "@stagewise-plugins/vue": "^0.4.4",
     "@vant/touch-emulator": "^1.4.0",
     "axios": "^1.9.0",
     "bignumber.js": "^9.3.0",

@@ -134,10 +134,10 @@ const routes = [
         props: true,
         name: "studentCourseDetail"
       },
-      // {
-      //   path: "learning",
-      //   component: () => import("@/views/student/studentLearning.vue"),
-      // },
+      {
+        path: "learning",
+        component: () => import("@/views/student/studentLearning.vue"),
+      },
       // {
       //   path: "exam",
       //   component: () => import("@/views/student/studentExam.vue"),
@@ -152,10 +152,10 @@ const routes = [
       //   path: "schedule",
       //   component: () => import("@/views/student/studentSchedule.vue"),
       // },
-      // {
-      //   path: "report",
-      //   component: () => import("@/views/student/studentReport.vue"),
-      // },
+      {
+        path: "plan",
+        component: () => import("@/views/student/studentPlan.vue"),
+      },
     ]
   },
   {

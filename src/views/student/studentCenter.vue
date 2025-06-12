@@ -173,7 +173,7 @@ const menuList = [
     { name: '作业', icon: Notebook },
     { name: '考试', icon: Document },
     { name: '日程', icon: Calendar },
-    { name: '报告', icon: DataAnalysis },
+    { name: '计划', icon: DataAnalysis },
 ]
 
 const activeMenu = ref('') // 默认不选中任何菜单
@@ -231,8 +231,8 @@ function handleMenuClick(menu) {
         case '日程':
             router.push('/student/schedule')
             break
-        case '报告':
-            router.push('/student/report')
+        case '计划':
+            router.push('/student/plan')
             break
         default:
             break
@@ -476,12 +476,15 @@ function handleJoinCourse(code) {
 
 .content-area {
     flex: 1;
-    padding: 32px;
+    padding: 20px 32px 100px 32px; /* 大幅增加底部padding */
     background: #f5f7fa;
     min-width: 0;
     overflow-y: auto;
-    height: calc(100vh - 60px);
-    /* 假设顶部导航栏高度为60px */
+    min-height: calc(100vh - 60px); /* 最小高度为视口高度减去导航栏高度 */
+    height: auto; /* 高度自适应内容 */
+    display: flex;
+    flex-direction: column;
+    position: relative; /* 添加相对定位 */
 }
 
 .content-placeholder {

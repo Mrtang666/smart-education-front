@@ -2103,7 +2103,14 @@ export const learningPlanAPI = {
      */
     async updatePlanProgress(params) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.put('/api/learning-plan/update-progress', null, { params });
+        const response = await axios.put('/api/learning-plan/update-progress', null, { 
+            params: {
+                planId: params.planId,
+                activityId: params.activityId,
+                status: params.status,
+                feedback: params.feedback
+            } 
+        });
         return response.data;
     },
 
