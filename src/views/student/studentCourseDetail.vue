@@ -47,11 +47,6 @@
         <i class="el-icon-folder"></i>
         <span>资料</span>
       </div>
-      
-      <div class="nav-item" :class="{ active: activeSection === 'record' }" @click="setActiveSection('record')">
-        <i class="el-icon-time"></i>
-        <span>学习记录</span>
-      </div>
     </div>
     
     <!-- 右侧内容区 -->
@@ -261,7 +256,7 @@
         <!-- 其他部分可以根据需要添加 -->
       </div>
     </div>
-  </div>
+    </div>
 </template>
 
 <script>
