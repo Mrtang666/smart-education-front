@@ -28,33 +28,41 @@
               <span v-else-if="question.questionType === 'MULTIPLE_CHOICE'">[多选题]</span>
               <span v-else-if="question.questionType === 'FILL_BLANK'">[填空题]</span>
               <span v-else-if="question.questionType === 'SUBJECTIVE'">[主观题]</span>
+              <span v-else-if="question.questionType === 'TRUE_FALSE'">[判断题]</span>
               <span v-else>[{{ question.questionType }}]</span>
               {{ question.content }}
             </div>
             
             <!-- 未回答时显示作答区域 -->
             <div v-if="!answeredQuestions[question.questionId]">
-              <!-- 选择题选项 -->
+              <!-- 选择题选项（自定义渲染） -->
               <div v-if="question.questionType === 'SINGLE_CHOICE'" class="question-options">
-                <el-radio-group v-model="userAnswers[question.questionId]">
-                  <div v-for="(option, optIndex) in question.options" :key="optIndex" class="option-item">
-                    <el-radio :label="String.fromCharCode(65 + optIndex)">
-                      <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
-                      <span class="option-content">{{ option }}</span>
-                    </el-radio>
-                  </div>
-                </el-radio-group>
+                <div
+                  v-for="(option, optIndex) in question.options"
+                  :key="optIndex"
+                  class="option-item"
+                  :class="{ selected: userAnswers[question.questionId] === String.fromCharCode(65 + optIndex) }"
+                  @click="userAnswers[question.questionId] = String.fromCharCode(65 + optIndex)"
+                >
+                  <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
+                  <span class="option-separator">、</span>
+                  <span class="option-content">{{ option }}</span>
+                </div>
               </div>
               
+              <!-- 多选题选项（自定义渲染） -->
               <div v-else-if="question.questionType === 'MULTIPLE_CHOICE'" class="question-options">
-                <el-checkbox-group v-model="userAnswers[question.questionId]">
-                  <div v-for="(option, optIndex) in question.options" :key="optIndex" class="option-item">
-                    <el-checkbox :label="String.fromCharCode(65 + optIndex)">
-                      <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
-                      <span class="option-content">{{ option }}</span>
-                    </el-checkbox>
-                  </div>
-                </el-checkbox-group>
+                <div
+                  v-for="(option, optIndex) in question.options"
+                  :key="optIndex"
+                  class="option-item"
+                  :class="{ selected: userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex)) }"
+                  @click="toggleMultipleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
+                >
+                  <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
+                  <span class="option-separator">、</span>
+                  <span class="option-content">{{ option }}</span>
+                </div>
               </div>
               
               <div v-else-if="question.questionType === 'FILL_BLANK'" class="question-options">
@@ -73,6 +81,28 @@
                   :rows="4" 
                   placeholder="请输入您的答案"
                 ></el-input>
+              </div>
+              
+              <!-- 判断题选项（自定义渲染） -->
+              <div v-else-if="question.questionType === 'TRUE_FALSE'" class="question-options">
+                <div
+                  class="option-item"
+                  :class="{ selected: userAnswers[question.questionId] === 'true' }"
+                  @click="userAnswers[question.questionId] = 'true'"
+                >
+                  <span class="option-label">A</span>
+                  <span class="option-separator">、</span>
+                  <span class="option-content">正确</span>
+                </div>
+                <div
+                  class="option-item"
+                  :class="{ selected: userAnswers[question.questionId] === 'false' }"
+                  @click="userAnswers[question.questionId] = 'false'"
+                >
+                  <span class="option-label">B</span>
+                  <span class="option-separator">、</span>
+                  <span class="option-content">错误</span>
+                </div>
               </div>
               
               <!-- 提交按钮 -->
@@ -402,6 +432,19 @@ export default {
       } else {
         return false;
       }
+    },
+    
+    // 多选题选项切换
+    toggleMultipleChoice(questionId, optionLabel) {
+      const arr = this.userAnswers[questionId] || [];
+      const idx = arr.indexOf(optionLabel);
+      if (idx > -1) {
+        arr.splice(idx, 1);
+      } else {
+        arr.push(optionLabel);
+      }
+      // 触发响应式
+      this.$set(this.userAnswers, questionId, [...arr]);
     }
   }
 };
@@ -472,43 +515,108 @@ export default {
 }
 
 .option-item {
-  margin-bottom: 10px;
   display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #bfbfbf;
+  font-weight: normal;
+  cursor: pointer;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.option-item.selected {
+  color: #222;
+  font-weight: bold;
 }
 
 .option-label {
-  margin-right: 8px;
+  margin-right: 4px;
   min-width: 20px;
+  font-weight: bold;
+  color: inherit;
 }
 
+.option-separator {
+  margin-right: 8px;
+  color: inherit;
+}
+
+.option-content {
+  flex: 1;
+  color: inherit;
+}
+
+/* 选项组样式 */
+.question-options .el-radio,
+.question-options .el-checkbox {
+  display: none !important;
+}
+
+/* 答案区样式 */
 .answer-section {
   margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px dotted #ebeef5;
-}
-
-.submit-btn-container {
-  margin-top: 15px;
-  text-align: right;
+  padding: 0;
+  background: none;
+  border-radius: 0;
 }
 
 .my-answer,
 .correct-answer {
   margin-top: 10px;
-  font-size: 14px;
+  font-size: 16px;
+  padding: 12px 20px;
+  border-radius: 6px;
+  background-color: #f7f8fa;
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  position: relative;
+}
+
+.my-answer::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 80%;
+  background: #409EFF;
+  border-radius: 2px;
+  position: absolute;
+  left: 8px;
+  top: 10%;
+}
+
+.correct-answer {
+  color: #13c26b;
+}
+
+.correct-answer::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 80%;
+  background: #13c26b;
+  border-radius: 2px;
+  position: absolute;
+  left: 8px;
+  top: 10%;
 }
 
 .answer-label {
   font-weight: bold;
   margin-right: 5px;
+  color: #606266;
 }
 
 .my-answer .answer-content {
-  color: #409EFF;
+  color: #222;
 }
 
 .correct-answer .answer-content {
-  color: #67C23A;
+  color: #13c26b;
 }
 
 /* 右侧目录区样式 */
