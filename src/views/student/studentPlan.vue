@@ -627,6 +627,7 @@ export default {
 .student-plan-container {
   padding: 20px;
   width: 100%;
+
   height: auto;
   box-sizing: border-box;
   margin-bottom: 100px;
