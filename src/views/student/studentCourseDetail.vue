@@ -253,14 +253,55 @@
           </el-skeleton>
         </div>
         
-        <!-- 其他部分可以根据需要添加 -->
+        <!-- 资料部分 -->
+        <div v-if="activeSection === 'material'" class="material-content">
+          <div class="material-header">
+            <h3>课程资料</h3>
+            <div class="material-search">
+              <el-input
+                v-model="materialSearchKeyword"
+                placeholder="搜索文件名"
+                prefix-icon="el-icon-search"
+                clearable
+                @clear="materialSearchKeyword = ''"
+                style="width: 250px;"
+              />
+            </div>
+          </div>
+          
+          <el-skeleton :loading="materialLoading" animated :rows="3">
+            <template #default>
+              <el-empty v-if="filteredMaterialFiles.length === 0" description="暂无课程资料"></el-empty>
+              <div v-else class="material-list">
+                <div v-for="file in filteredMaterialFiles" :key="file.fileId" class="material-item">
+                  <div class="material-icon">
+                    <i class="el-icon-document"></i>
+                  </div>
+                  <div class="material-info">
+                    <div class="material-name">{{ file.fileName }}</div>
+                    <div class="material-meta">
+                      <span class="material-size">{{ formatFileSize(file.fileSize) }}</span>
+                      <span class="material-uploader">{{ file.uploaderName || '未知上传者' }}</span>
+                      <span class="material-date">{{ formatDate(file.uploadTime) }}</span>
+                    </div>
+                  </div>
+                  <div class="material-actions">
+                    <el-button type="primary" size="small" @click="handleDownload(file)">
+                      <i class="el-icon-download"></i> 下载
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </el-skeleton>
+        </div>
       </div>
     </div>
     </div>
 </template>
 
 <script>
-import { knowledgeAPI, examAPI, attendanceAPI } from '@/api/api';
+import { knowledgeAPI, examAPI, attendanceAPI, courseFileAPI } from '@/api/api';
 import { getUserInfo } from '@/utils/auth';
 
 export default {
@@ -303,7 +344,12 @@ export default {
       
       // 考勤对话框
       attendanceDialogVisible: false,
-      selectedAttendance: null
+      selectedAttendance: null,
+      
+      // 资料区数据
+      materialFiles: [],
+      materialLoading: false,
+      materialSearchKeyword: '',
     }
   },
   computed: {
@@ -351,7 +397,18 @@ export default {
       });
       
       return stats;
-    }
+    },
+    
+    // 过滤后的资料文件列表
+    filteredMaterialFiles() {
+      if (!this.materialSearchKeyword) {
+        return this.materialFiles;
+      }
+      const keyword = this.materialSearchKeyword.toLowerCase();
+      return this.materialFiles.filter(file => 
+        file.fileName && file.fileName.toLowerCase().includes(keyword)
+      );
+    },
   },
   created() {
     // 从路由参数获取课程ID
@@ -372,11 +429,21 @@ export default {
     
     // 加载数据
     this.loadCourseData();
+    
+    // 如果当前选中的是资料区，则加载资料
+    if (this.activeSection === 'material') {
+      this.fetchMaterialFiles();
+    }
   },
   methods: {
     // 设置当前激活的部分
     setActiveSection(section) {
       this.activeSection = section;
+      
+      // 如果切换到资料区，则加载资料
+      if (section === 'material' && this.materialFiles.length === 0) {
+        this.fetchMaterialFiles();
+      }
     },
     
     // 处理知识点点击
@@ -494,6 +561,8 @@ export default {
       this.fetchAssignments();
       // 获取考试
       this.fetchExams();
+      // 获取课程资料
+      this.fetchMaterialFiles();
     },
     
     // 获取知识点
@@ -798,7 +867,123 @@ export default {
           examId: exam.id
         }
       });
-    }
+    },
+    
+    // 资料区：获取文件
+    async fetchMaterialFiles() {
+      this.materialLoading = true;
+      try {
+        // 确保courseId是字符串形式
+        const courseIdStr = this.courseId ? this.courseId.toString() : this.courseId;
+        console.log('获取课程文件，课程ID:', courseIdStr);
+        
+        // 调用API获取课程文件
+        const response = await courseFileAPI.getCourseFiles(courseIdStr);
+        console.log('获取到的文件数据:', response);
+        
+        if (Array.isArray(response)) {
+          // 处理文件数据
+          this.materialFiles = response.map(file => {
+            // 根据文件扩展名判断文件类型
+            const fileExt = file.fileName ? file.fileName.split('.').pop().toLowerCase() : '';
+            const fileType = this.getFileTypeByExt(fileExt);
+            
+            return {
+              ...file,
+              fileType: fileType
+            };
+          });
+        } else {
+          this.materialFiles = [];
+        }
+      } catch (error) {
+        console.error('获取课程文件失败:', error);
+        this.$message.error('获取课程文件失败，请稍后再试');
+        this.materialFiles = [];
+      } finally {
+        this.materialLoading = false;
+      }
+    },
+    
+    // 资料区：下载文件
+    async handleDownload(file) {
+      try {
+        this.$message.info('开始下载文件...');
+        
+        // 确保文件ID是字符串形式
+        const fileIdStr = file.fileId ? file.fileId.toString() : file.fileId;
+        if (!fileIdStr) {
+          this.$message.error('文件ID无效，无法下载');
+          return;
+        }
+        
+        // 调用API下载文件
+        const blob = await courseFileAPI.downloadCourseFile(fileIdStr);
+        
+        // 检查blob是否有效
+        if (!blob || blob.size === 0) {
+          throw new Error('下载的文件为空或无效');
+        }
+        
+        // 创建下载链接
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.fileName || `下载文件_${new Date().getTime()}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 延迟释放URL对象，确保下载开始
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 100);
+        
+        this.$message.success('文件下载成功');
+      } catch (error) {
+        console.error('下载文件失败:', error);
+        this.$message.error(`下载文件失败: ${error.message || '请稍后再试'}`);
+      }
+    },
+    
+    // 根据文件扩展名获取文件类型
+    getFileTypeByExt(ext) {
+      const docTypes = ['doc', 'docx', 'rtf', 'txt'];
+      const pptTypes = ['ppt', 'pptx'];
+      const excelTypes = ['xls', 'xlsx', 'csv'];
+      const pdfTypes = ['pdf'];
+      const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'];
+      const videoTypes = ['mp4', 'avi', 'mov', 'wmv', 'flv'];
+      const audioTypes = ['mp3', 'wav', 'ogg', 'flac'];
+      const codeTypes = ['java', 'py', 'js', 'html', 'css', 'c', 'cpp', 'h', 'json', 'xml'];
+      
+      if (docTypes.includes(ext)) return 'document';
+      if (pptTypes.includes(ext)) return 'presentation';
+      if (excelTypes.includes(ext)) return 'spreadsheet';
+      if (pdfTypes.includes(ext)) return 'pdf';
+      if (imageTypes.includes(ext)) return 'image';
+      if (videoTypes.includes(ext)) return 'video';
+      if (audioTypes.includes(ext)) return 'audio';
+      if (codeTypes.includes(ext)) return 'code';
+      
+      return 'other';
+    },
+    
+    // 格式化文件大小
+    formatFileSize(size) {
+      if (!size) return '未知大小';
+      
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let fileSize = size;
+      let unitIndex = 0;
+      
+      while (fileSize >= 1024 && unitIndex < units.length - 1) {
+        fileSize /= 1024;
+        unitIndex++;
+      }
+      
+      return `${fileSize.toFixed(2)} ${units[unitIndex]}`;
+    },
   }
 }
 </script>
@@ -1151,5 +1336,75 @@ export default {
 .detail-value {
   flex: 1;
   color: #303133;
+}
+
+/* 资料区样式 */
+.material-content {
+  padding: 20px 0;
+}
+
+.material-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.material-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.material-list {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.material-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+  transition: background-color 0.3s;
+}
+
+.material-item:hover {
+  background-color: #f5f7fa;
+}
+
+.material-item:last-child {
+  border-bottom: none;
+}
+
+.material-icon {
+  font-size: 24px;
+  color: #909399;
+  margin-right: 16px;
+}
+
+.material-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.material-name {
+  font-size: 15px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-meta {
+  font-size: 13px;
+  color: #909399;
+  display: flex;
+  gap: 16px;
+}
+
+.material-actions {
+  margin-left: 16px;
 }
 </style>

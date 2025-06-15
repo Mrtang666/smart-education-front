@@ -46,8 +46,8 @@
                 >
                   <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
                   <span class="option-separator">、</span>
-                  <span class="option-content">{{ option }}</span>
-                </div>
+                      <span class="option-content">{{ option }}</span>
+                  </div>
               </div>
               
               <!-- 多选题选项（自定义渲染） -->
@@ -61,8 +61,8 @@
                 >
                   <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
                   <span class="option-separator">、</span>
-                  <span class="option-content">{{ option }}</span>
-                </div>
+                      <span class="option-content">{{ option }}</span>
+                  </div>
               </div>
               
               <div v-else-if="question.questionType === 'FILL_BLANK'" class="question-options">
@@ -139,7 +139,14 @@
     <div class="catalog-area">
       <el-card class="catalog-card">
         <div class="catalog-header">
-          <h3>目录</h3>
+          <!-- 任务点进度条区域 -->
+          <div class="task-progress-bar">
+            <span class="task-progress-dot"></span>
+            <span class="task-progress-text">已完成任务点：{{ completedTaskCount }}/{{ totalTaskCount }}</span>
+            <div class="task-progress-outer">
+              <div class="task-progress-inner" :style="{ width: taskProgressPercent + '%' }"></div>
+            </div>
+          </div>
           <div class="catalog-search">
             <el-input v-model="searchKeyword" placeholder="搜索" prefix-icon="el-icon-search" clearable />
           </div>
@@ -221,6 +228,22 @@ export default {
         ...point,
         label: point.name
       }));
+    },
+    
+    // 任务点总数
+    totalTaskCount() {
+      return this.knowledgePoints.length;
+    },
+    
+    // 已完成任务点数
+    completedTaskCount() {
+      return this.knowledgePoints.filter(kp => kp.completed).length;
+    },
+    
+    // 进度百分比
+    taskProgressPercent() {
+      if (this.totalTaskCount === 0) return 0;
+      return Math.round((this.completedTaskCount / this.totalTaskCount) * 100);
     }
   },
   watch: {
@@ -656,5 +679,42 @@ export default {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+/* 目录区顶部任务点进度条样式 */
+.task-progress-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+.task-progress-dot {
+  width: 16px;
+  height: 16px;
+  background: #ffa940;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.task-progress-text {
+  font-size: 15px;
+  color: #222;
+  margin-right: 10px;
+}
+.task-progress-outer {
+  flex: 1;
+  height: 18px;
+  background: #f2f3f5;
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+  min-width: 120px;
+  max-width: 180px;
+}
+.task-progress-inner {
+  height: 100%;
+  background: #409eff;
+  border-radius: 9px 0 0 9px;
+  transition: width 0.3s;
 }
 </style>
