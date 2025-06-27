@@ -3,7 +3,7 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane label="当前学习计划" name="current">
         <div v-if="currentPlan" class="plan-details">
-          <h2>学习计划: {{ currentPlan.planId }}</h2>
+          <h2 class="section-title">学习计划: {{ currentPlan.planId }}</h2>
           <div class="plan-info">
             <p><strong>目标：</strong>{{ currentPlan.targetGoal }}</p>
             <p><strong>时间范围：</strong>{{ currentPlan.timeFrame }}天</p>
@@ -12,7 +12,7 @@
             <el-progress :percentage="currentPlan.progress || 0" :status="getProgressStatus(currentPlan.progress || 0)"></el-progress>
           </div>
           
-          <h3>今日学习任务</h3>
+          <h3 class="section-title">今日学习任务</h3>
           <el-empty v-if="!todayActivities || todayActivities.length === 0" description="暂无今日任务"></el-empty>
           <div v-else class="daily-activities">
             <el-timeline>
@@ -44,7 +44,7 @@
             </el-timeline>
           </div>
           
-          <h3>推荐学习资源</h3>
+          <h3 class="section-title">推荐学习资源</h3>
           <el-empty v-if="!recommendedResources || recommendedResources.length === 0" description="暂无推荐资源"></el-empty>
           <div v-else class="resources-list">
             <el-card v-for="resource in recommendedResources" :key="resource.resourceId" class="resource-card">
@@ -156,14 +156,14 @@
     
     <el-dialog v-model="planDetailsVisible" title="计划详情" width="70%">
       <div v-if="selectedPlan" class="plan-details-dialog">
-        <h2>{{ selectedPlan.planName }}</h2>
+        <h2 class="section-title">{{ selectedPlan.planName }}</h2>
         <p><strong>目标：</strong>{{ selectedPlan.targetGoal }}</p>
         <p><strong>时间范围：</strong>{{ selectedPlan.timeFrame }}天</p>
         <p><strong>开始日期：</strong>{{ formatDate(selectedPlan.startDate) }}</p>
         <p><strong>结束日期：</strong>{{ formatDate(selectedPlan.endDate) }}</p>
         <p><strong>完成进度：</strong>{{ selectedPlan.completionRate || 0 }}%</p>
         
-        <h3>学习活动</h3>
+        <h3 class="section-title">学习活动</h3>
         <el-table :data="selectedPlan.activities || []" style="width: 100%">
           <el-table-column prop="title" label="活动名称"></el-table-column>
           <el-table-column prop="description" label="描述"></el-table-column>
@@ -627,11 +627,19 @@ export default {
 .student-plan-container {
   padding: 20px;
   width: 100%;
-
   height: auto;
   box-sizing: border-box;
   margin-bottom: 100px;
   overflow-y: visible;
+}
+
+.section-title {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  border-left: 4px solid #409EFF;
+  padding-left: 12px;
 }
 
 .plan-details {

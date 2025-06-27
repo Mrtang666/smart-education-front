@@ -484,6 +484,8 @@ function viewExamResult(exam) {
   font-size: 24px;
   font-weight: 600;
   color: #303133;
+  border-left: 4px solid #409EFF;
+  padding-left: 12px;
 }
 
 .action-bar {
