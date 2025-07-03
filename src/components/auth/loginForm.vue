@@ -24,7 +24,7 @@
         <div class="additional-options">
             <van-checkbox v-model="rememberMe" class="remember-me">十天内免登录</van-checkbox>
             <div class="right-links">
-                <span class="forgot-password">忘记密码？</span>
+                <span class="forgot-password" @click="goToPasswordChange">修改密码</span>
                 <span class="register-link" @click="goToRegister">去注册</span>
             </div>
         </div>
@@ -71,6 +71,10 @@ const handleLogin = () => {
 
 const goToRegister = () => {
     router.push('/register');
+};
+
+const goToPasswordChange = () => {
+    router.push('/passwordchange');
 };
 </script>
 
