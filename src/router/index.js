@@ -161,6 +161,43 @@ const routes = [
   {
     path: "/",
     redirect: "/login"
+  },
+  // 教师课程详情路由
+  {
+    path: '/teacher/course/:id',
+    name: 'TeacherCourseDetail',
+    component: () => import('@/views/teacher/teacherCourseDetail.vue'),
+    children: [
+      {
+        path: '',
+        redirect: 'content'
+      },
+      {
+        path: 'content',
+        name: 'CourseContent',
+        component: () => import('@/views/teacher/course-detail/CourseContent.vue')
+      },
+      {
+        path: 'students',
+        name: 'CourseStudents',
+        component: () => import('@/views/teacher/course-detail/CourseStudents.vue')
+      },
+      {
+        path: 'exams',
+        name: 'CourseExams',
+        component: () => import('@/views/teacher/course-detail/CourseExams.vue')
+      },
+      {
+        path: 'assignments',
+        name: 'CourseAssignments',
+        component: () => import('@/views/teacher/course-detail/CourseAssignments.vue')
+      },
+      {
+        path: 'attendance',
+        name: 'CourseAttendance',
+        component: () => import('@/views/teacher/course-detail/CourseAttendance.vue')
+      }
+    ]
   }
 ];
 
