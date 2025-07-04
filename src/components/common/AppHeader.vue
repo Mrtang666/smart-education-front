@@ -40,7 +40,7 @@
                 <template #dropdown>
                     <el-dropdown-menu>
                         <el-dropdown-item @click="handleProfileClick">个人中心</el-dropdown-item>
-                        <el-dropdown-item @click="emit('userAction', 'changePassword')">修改密码</el-dropdown-item>
+                        <el-dropdown-item @click="handleChangePassword">修改密码</el-dropdown-item>
                         <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                     </el-dropdown-menu>
                 </template>
@@ -116,6 +116,10 @@ function handleSearchInput() {
 function handleSearch() {
     // 当按下回车键时执行搜索
     emit('search', searchValue.value)
+}
+
+function handleChangePassword() {
+    router.push('/passwordChange')
 }
 
 function handleLogout() {
