@@ -15,15 +15,32 @@
     </div>
     <div class="section-body">
       <div class="table-toolbar" v-if="attendances.length > 0">
-        <el-input
-          v-model="attendanceSearchKeyword"
-          placeholder="搜索考勤日期或状态"
-          prefix-icon="Search"
-          clearable
-          @clear="handleSearchClear"
-          @input="handleSearchInput"
-          style="width: 250px;"
-        />
+        <div class="filter-container">
+          <el-select
+            v-model="attendanceStatusFilter"
+            placeholder="选择考勤状态"
+            clearable
+            @change="handleStatusFilterChange"
+            @clear="clearStatusFilter"
+            style="width: 150px; margin-right: 10px;"
+          >
+            <el-option label="全部" value=""></el-option>
+            <el-option label="进行中" value="进行中"></el-option>
+            <el-option label="已结束" value="已结束"></el-option>
+          </el-select>
+          
+          <el-date-picker
+            v-model="attendanceDateFilter"
+            type="date"
+            placeholder="选择考勤日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            clearable
+            @change="handleDateFilterChange"
+            @clear="clearDateFilter"
+            style="width: 180px;"
+          />
+        </div>
       </div>
       <div v-if="attendances.length === 0" class="empty-tip">
         暂无考勤记录，请点击"添加考勤"按钮添加
@@ -104,18 +121,26 @@ const emit = defineEmits([
   'update:page-size'
 ])
 
-const attendanceSearchKeyword = ref('')
+const attendanceStatusFilter = ref('')
+const attendanceDateFilter = ref('')
 
 // 过滤考勤列表
 const filteredAttendances = computed(() => {
-  if (!attendanceSearchKeyword.value) {
+  if (!attendanceStatusFilter.value && !attendanceDateFilter.value) {
     return props.attendances
   }
-  const keyword = attendanceSearchKeyword.value.toLowerCase()
-  return props.attendances.filter(attendance => 
-    (attendance.attendanceDate && attendance.attendanceDate.toLowerCase().includes(keyword)) ||
-    (attendance.status && attendance.status.toLowerCase().includes(keyword))
-  )
+  
+  return props.attendances.filter(attendance => {
+    // 状态筛选
+    const statusMatch = !attendanceStatusFilter.value || attendance.status === attendanceStatusFilter.value
+    
+    // 日期筛选
+    const dateMatch = !attendanceDateFilter.value || 
+      (attendance.attendanceDate && attendance.attendanceDate.includes(attendanceDateFilter.value))
+    
+    // 同时满足状态和日期筛选条件
+    return statusMatch && dateMatch
+  })
 })
 
 // 格式化日期
@@ -167,14 +192,25 @@ function handleAttendanceSelectionChange() {
   emit('selection-change', selected)
 }
 
-// 处理搜索输入
-function handleSearchInput() {
+// 处理状态过滤
+function handleStatusFilterChange() {
   emit('search-input')
 }
 
-// 处理搜索清除
-function handleSearchClear() {
-  attendanceSearchKeyword.value = ''
+// 清除状态过滤器
+function clearStatusFilter() {
+  attendanceStatusFilter.value = ''
+  emit('search-clear')
+}
+
+// 处理日期过滤
+function handleDateFilterChange() {
+  emit('search-input')
+}
+
+// 清除日期过滤器
+function clearDateFilter() {
+  attendanceDateFilter.value = ''
   emit('search-clear')
 }
 </script>
@@ -224,6 +260,11 @@ function handleSearchClear() {
   margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.filter-container {
+  display: flex;
   align-items: center;
 }
 

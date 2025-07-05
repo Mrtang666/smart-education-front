@@ -177,31 +177,31 @@ const routes = [
         path: '',
         redirect: 'content'
       },
-      // {
-      //   path: 'content',
-      //   name: 'CourseContent',
-      //   component: () => import('@/views/teacher/course-detail/CourseContent.vue')
-      // },
-      // {
-      //   path: 'students',
-      //   name: 'CourseStudents',
-      //   component: () => import('@/views/teacher/course-detail/CourseStudents.vue')
-      // },
-      // {
-      //   path: 'exams',
-      //   name: 'CourseExams',
-      //   component: () => import('@/views/teacher/course-detail/CourseExams.vue')
-      // },
-      // {
-      //   path: 'assignments',
-      //   name: 'CourseAssignments',
-      //   component: () => import('@/views/teacher/course-detail/CourseAssignments.vue')
-      // },
-      // {
-      //   path: 'attendance',
-      //   name: 'CourseAttendance',
-      //   component: () => import('@/views/teacher/course-detail/CourseAttendance.vue')
-      // }
+      {
+        path: 'content',
+        name: 'CourseContent',
+        component: () => import('@/components/teacher/CourseContent.vue')
+      },
+      {
+        path: 'students',
+        name: 'CourseStudents',
+        component: () => import('@/components/teacher/StudentManagement.vue')
+      },
+      {
+        path: 'exams',
+        name: 'CourseExams',
+        component: () => import('@/components/teacher/ExamManagement.vue')
+      },
+      {
+        path: 'homework',
+        name: 'CourseHomework',
+        component: () => import('@/components/teacher/HomeworkManagement.vue')
+      },
+      {
+        path: 'attendance',
+        name: 'CourseAttendance',
+        component: () => import('@/components/teacher/AttendanceManagement.vue')
+      }
     ]
   }
 ];

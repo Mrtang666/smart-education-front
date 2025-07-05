@@ -481,6 +481,22 @@
         <el-form-item label="备注">
           <el-input v-model="attendanceForm.remark" type="textarea" :rows="3" placeholder="请输入考勤备注" />
         </el-form-item>
+        <el-form-item label="开始时间" prop="startTime">
+          <el-time-picker
+            v-model="attendanceForm.startTime"
+            placeholder="选择开始时间"
+            format="HH:mm"
+            value-format="HH:mm"
+          />
+        </el-form-item>
+        <el-form-item label="迟到阈值" prop="lateThreshold">
+          <el-input-number v-model="attendanceForm.lateThreshold" :min="1" :max="1440" />
+          <span class="form-hint">分钟</span>
+        </el-form-item>
+        <el-form-item label="缺勤阈值" prop="absentThreshold">
+          <el-input-number v-model="attendanceForm.absentThreshold" :min="1" :max="1440" />
+          <span class="form-hint">分钟</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -1317,18 +1333,6 @@ const examForm = ref({
 })
 const examFormTitle = ref('创建考试')
 const isSavingExam = ref(false)
-
-// 过滤考试列表
-// const filteredExams = computed(() => {
-//   if (!examSearchKeyword.value) {
-//     return exams.value
-//   }
-//   const keyword = examSearchKeyword.value.toLowerCase()
-//   return exams.value.filter(exam => 
-//     (exam.title && exam.title.toLowerCase().includes(keyword)) ||
-//     (exam.description && exam.description.toLowerCase().includes(keyword))
-//   )
-// })
 
 // 设置定时器，每分钟更新一次当前时间
 timeInterval = setInterval(() => {
@@ -2847,12 +2851,32 @@ async function fetchCourseAttendances() {
 
 // 显示添加考勤对话框
 function showAddAttendanceDialog() {
+  // 获取当前日期和时间
+  const now = new Date();
+  const currentHour = now.getHours();
+  
+  // 格式化当前日期为YYYY-MM-DD格式
+  const today = now.toISOString().split('T')[0];
+  
+  // 根据当前时间自动设置状态
+  // 如果当前时间是下午4点之后，默认设置为"已结束"，否则为"进行中"
+  const defaultStatus = currentHour >= 16 ? '已结束' : '进行中';
+  
+  // 格式化当前时间为HH:mm格式
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const currentTime = `${hours}:${minutes}`;
+  
   // 重置表单
   attendanceForm.value = {
-    attendanceDate: new Date().toISOString().split('T')[0], // 今天的日期
-    status: '进行中',
-    remark: ''
+    attendanceDate: today,
+    status: defaultStatus,
+    remark: '',
+    startTime: currentTime,
+    lateThreshold: 10, // 迟到阈值，默认10分钟
+    absentThreshold: 120 // 缺勤阈值，默认120分钟（2小时）
   }
+  
   attendanceFormTitle.value = '添加考勤'
   addAttendanceDialogVisible.value = true
 }
@@ -2975,54 +2999,6 @@ async function finishAttendance() {
     // 用户取消结束
   })
 }
-
-// 过滤考勤列表
-// const filteredAttendances = computed(() => {
-//   if (!attendanceSearchKeyword.value) {
-//     return attendances.value
-//   }
-//   const keyword = attendanceSearchKeyword.value.toLowerCase()
-//   return attendances.value.filter(attendance => 
-//     (attendance.attendanceDate && attendance.attendanceDate.toLowerCase().includes(keyword)) ||
-//     (attendance.status && attendance.status.toLowerCase().includes(keyword))
-//   )
-// })
-
-// 获取考勤统计数据
-// function getAttendanceStats(attendance) {
-//   // 根据考勤数据统计学生出勤情况
-  
-//   // 如果考勤记录中有学生考勤状态数据
-//   if (attendance.studentRecords && Array.isArray(attendance.studentRecords)) {
-//     const present = attendance.studentRecords.filter(record => record.status === '出勤').length;
-//     const absent = attendance.studentRecords.filter(record => record.status === '缺勤').length;
-//     const late = attendance.studentRecords.filter(record => record.status === '迟到').length;
-    
-//     return {
-//       present,
-//       absent,
-//       late
-//     };
-//   } else {
-//     // 如果考勤记录中没有详细的学生考勤状态，则使用考勤记录上的汇总数据
-//     if (attendance.presentCount !== undefined && 
-//         attendance.absentCount !== undefined && 
-//         attendance.lateCount !== undefined) {
-//       return {
-//         present: attendance.presentCount,
-//         absent: attendance.absentCount,
-//         late: attendance.lateCount
-//       };
-//     }
-    
-//     // 如果没有任何统计数据，则显示总人数和0
-//     return {
-//       present: 0,
-//       absent: 0,
-//       late: 0
-//     };
-//   }
-// }
 
 // 处理考勤搜索输入
 function handleAttendanceSearchInput() {
