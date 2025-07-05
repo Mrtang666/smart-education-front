@@ -2,19 +2,19 @@ import axios from 'axios';
 import { getValidToken, getRefreshToken, setToken, setRefreshToken } from '@/utils/auth';
 import BigNumber from 'bignumber.js';
 
-// 学生端 Axios 实例
+// 学生端 Axios 实例（√）
 const studentAxios = axios.create({
     baseURL: 'http://118.89.136.119:8081', // 学生端端口
     timeout: 10000,
 });
 
-// 教师端 Axios 实例
+// 教师端 Axios 实例（√）
 const teacherAxios = axios.create({
     baseURL: 'http://118.89.136.119:8081', // 教师端端口
     timeout: 10000,
 });
 
-// 创建带有拦截器的学生端 Axios 实例
+// 创建带有拦截器的学生端 Axios 实例（√）
 const createStudentAuthorizedAxios = () => {
     const instance = axios.create({
         baseURL: 'http://118.89.136.119:8081',
@@ -76,7 +76,7 @@ const createStudentAuthorizedAxios = () => {
     return instance;
 };
 
-// 创建带有拦截器的教师端 Axios 实例
+// 创建带有拦截器的教师端 Axios 实例（√）
 const createTeacherAuthorizedAxios = () => {
     const instance = axios.create({
         baseURL: 'http://118.89.136.119:8081',
@@ -138,10 +138,10 @@ const createTeacherAuthorizedAxios = () => {
     return instance;
 };
 
-// 认证相关 API
+// 认证相关 API(√)
 export const authAPI = {
     /**
-     * 学生登录接口
+     * 学生登录接口(√)
      * @param {string} username 用户名
      * @param {string} password 密码
      * @returns {Promise<{tokens: {accessToken: string, refreshToken: string}, roles: string[]}>} 登录响应，包含token和角色
@@ -152,7 +152,7 @@ export const authAPI = {
     },
 
     /**
-     * 教师登录接口
+     * 教师登录接口(√)
      * @param {string} username 用户名
      * @param {string} password 密码
      * @returns {Promise<{tokens: {accessToken: string, refreshToken: string}, roles: string[]}>} 登录响应，包含token和角色
@@ -163,7 +163,7 @@ export const authAPI = {
     },
 
     /**
-     * 学生注册接口
+     * 学生注册接口(√)
      * @param {Object} studentData 注册信息
      * @param {string} studentData.username 用户名
      * @param {string} studentData.password 密码
@@ -178,7 +178,7 @@ export const authAPI = {
     },
 
     /**
-     * 教师注册（不需要token）
+     * 教师注册（不需要token）（√）
      * @param {Object} teacherData 教师注册信息
      * @param {string} teacherData.username 用户名
      * @param {string} teacherData.password 密码
@@ -193,7 +193,7 @@ export const authAPI = {
     },
 
     /**
-     * 学生修改密码（需要token）
+     * 学生修改密码（需要token）（√）
      * @param {Object} changePasswordData 修改密码信息
      * @param {string} changePasswordData.username 用户名
      * @param {string} changePasswordData.oldPassword 旧密码
@@ -207,7 +207,7 @@ export const authAPI = {
     },
 
     /**
-     * 教师修改密码（需要token）
+     * 教师修改密码（需要token）（√）
      * @param {Object} changePasswordData 修改密码信息
      * @param {string} changePasswordData.username 用户名
      * @param {string} changePasswordData.oldPassword 旧密码
@@ -221,7 +221,7 @@ export const authAPI = {
     },
 
     /**
-       * 检查学生端用户名是否可用（无需token）
+       * 检查学生端用户名是否可用（无需token）(√)
        * @param {string} username - 要检查的用户名
        * @returns {Promise<boolean>} 用户名可用返回true，不可用返回false
        */
@@ -233,7 +233,7 @@ export const authAPI = {
     },
 
     /**
-     * 检查教师端用户名是否可用（不需要token）
+     * 检查教师端用户名是否可用（不需要token）(√)
      * @param {string} username 要检查的用户名
      * @returns {Promise<boolean>} 用户名可用返回true，不可用返回false
      * 返回值：
@@ -248,7 +248,7 @@ export const authAPI = {
     },
 
     /**
-     * 刷新学生端token（无需token）
+     * 刷新学生端token（无需token）(√)
      * @param {Object} refreshData 刷新参数
      * @param {string} refreshData.refreshToken 刷新token
      * @returns {Promise<Object>} 新token
@@ -264,7 +264,7 @@ export const authAPI = {
     },
 
     /**
-     * 刷新教师端token（无需token）
+     * 刷新教师端token（无需token）(√)
      * @param {Object} refreshData 刷新参数
      * @param {string} refreshData.refreshToken 刷新token
      * @returns {Promise<Object>} 新token
@@ -280,10 +280,10 @@ export const authAPI = {
     },
 };
 
-// 学生相关 API
+// 学生相关 API（1添加学生的更改信息，不允许改变年级和班级，）
 export const studentAPI = {
     /**
-     * 新增或更新学生信息（需要token）
+     * 1.新增或更新学生信息（需要token）
      * @param {Object} studentData 学生信息
      * @param {string} studentData.username 用户名
      * @param {string} studentData.password 密码
@@ -312,7 +312,7 @@ export const studentAPI = {
     },
 
     /**
-     * 根据学生ID获取学生信息（需要token）
+     * 2.根据学生ID获取学生信息（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Object>} 学生信息
      * 返回字段：同 saveOrUpdateStudent 返回字段
@@ -324,7 +324,7 @@ export const studentAPI = {
     },
 
     /**
-     * 根据用户名获取学生信息（需要token）
+     * 3.根据用户名获取学生信息（需要token）
      * @param {string} username 用户名
      * @returns {Promise<Object>} 学生信息
      * 返回字段：同 saveOrUpdateStudent 返回字段
@@ -336,7 +336,7 @@ export const studentAPI = {
     },
 
     /**
-     * 获取当前登录学生的自身信息（需要token）
+     * 4.获取当前登录学生的自身信息（需要token）
      * @returns {Promise<Object>} 学生自身信息
      * 返回字段：同 saveOrUpdateStudent 返回字段
      */
@@ -347,7 +347,7 @@ export const studentAPI = {
     },
 
     /**
-     * 搜索学生（需要token）
+     * 5.搜索学生（需要token）
      * @param {Object} params 查询参数
      * @param {string} [params.keywords] 关键词（可选）
      * @param {string} [params.grade] 年级（可选）
@@ -362,7 +362,7 @@ export const studentAPI = {
     },
 
     /**
-     * 根据姓名获取学生列表（需要token）
+     * 6.根据姓名获取学生列表（需要token）
      * @param {string} fullName 姓名
      * @returns {Promise<Array<Object>>} 学生列表
      * 每项字段：同 saveOrUpdateStudent 返回字段
@@ -374,7 +374,7 @@ export const studentAPI = {
     },
 
     /**
-     * 根据年级和班级获取学生列表（需要token）
+     * 7.根据年级和班级获取学生列表（需要token）
      * @param {Object} params 查询参数
      * @param {string} [params.grade] 年级（可选）
      * @param {string} [params.className] 班级（可选）
@@ -388,7 +388,7 @@ export const studentAPI = {
     },
 
     /**
-     * 检查邮箱是否已被注册（需要token）
+     * 8.检查邮箱是否已被注册（需要token）
      * @param {string} email 邮箱
      * @returns {Promise<Object>} 检查结果
      * 返回字段：由后端返回，通常包含邮箱是否可用等信息
@@ -400,10 +400,10 @@ export const studentAPI = {
     }
 };
 
-// 课程相关 API
+// 课程相关 API（7课程编号，11邀请码功能）
 export const courseAPI = {
     /**
-     * 新增或更新课程（需要token）
+     * 1.新增或更新课程（需要token）
      * @param {Object} courseData 课程信息
      * @param {string} [courseData.id] 课程ID（可选，更新时填写）
      * @param {string} courseData.name 课程名称
@@ -472,7 +472,7 @@ export const courseAPI = {
     },
 
     /**
-     * 根据课程ID获取课程信息（需要token）
+     * 2.根据课程ID获取课程信息（需要token）
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 课程信息
      * 返回字段：同 saveOrUpdateCourse 返回字段
@@ -508,7 +508,7 @@ export const courseAPI = {
     },
 
     /**
-     * 删除课程（需要token）
+     * 3.删除课程（需要token）
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -540,7 +540,7 @@ export const courseAPI = {
     },
 
     /**
-     * 搜索课程（需要token）
+     * 4.搜索课程（需要token）
      * @param {string} keywords 关键词
      * @param {string} [category] 课程类别（可选）
      * @returns {Promise<Array<Object>>} 课程列表
@@ -555,7 +555,7 @@ export const courseAPI = {
     },
 
     /**
-     * 按名称模糊搜索课程（需要token）
+     * 5.按名称模糊搜索课程（需要token）
      * @param {string} name 课程名称
      * @returns {Promise<Array<Object>>} 课程列表
      * 每项字段：同 saveOrUpdateCourse 返回字段
@@ -567,7 +567,7 @@ export const courseAPI = {
     },
 
     /**
-     * 根据课程名称获取课程信息（需要token）
+     * 6.根据课程名称获取课程信息（需要token）
      * @param {string} name 课程名称
      * @returns {Promise<Object>} 课程信息
      * 返回字段：同 saveOrUpdateCourse 返回字段
@@ -579,7 +579,7 @@ export const courseAPI = {
     },
 
     /**
-     * 根据课程编码获取课程信息（需要token）
+     * 7.根据课程编码获取课程信息（需要token）
      * @param {string} code 课程编码
      * @returns {Promise<Object>} 课程信息
      * 返回字段：同 saveOrUpdateCourse 返回字段
@@ -591,7 +591,7 @@ export const courseAPI = {
     },
 
     /**
-     * 根据课程类别获取课程列表（需要token）
+     * 8.根据课程类别获取课程列表（需要token）
      * @param {string} category 课程类别
      * @returns {Promise<Array<Object>>} 课程列表
      * 每项字段：同 saveOrUpdateCourse 返回字段
@@ -603,7 +603,7 @@ export const courseAPI = {
     },
 
     /**
-     * 获取所有课程（需要token）
+     * 9.获取所有课程（需要token）
      * @returns {Promise<Array<Object>>} 课程列表
      * 每项字段：同 saveOrUpdateCourse 返回字段
      */
@@ -614,7 +614,7 @@ export const courseAPI = {
     },
 
     /**
-     * 批量删除课程（需要token）
+     * 10.批量删除课程（需要token）
      * @param {Array<number>} courseIdList 课程ID数组
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -628,7 +628,7 @@ export const courseAPI = {
     },
 
     /**
-     * 通过邀请码加入课程（需要token）
+     * 11.通过邀请码加入课程（需要token）
      * @param {Object} joinData 加入课程的数据
      * @param {string} joinData.inviteCode 课程邀请码
      * @param {string} joinData.teacherId 教师ID
@@ -664,10 +664,10 @@ export const courseAPI = {
     }
 };
 
-// 教师相关 API
+// 教师相关 API（3更新教师信息）
 export const teacherAPI = {
     /**
-     * 根据用户名获取教师信息（需要token）
+     * 1.根据用户名获取教师信息（需要token）
      * @param {string} username 用户名
      * @returns {Promise<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>} 教师信息
      */
@@ -678,7 +678,7 @@ export const teacherAPI = {
     },
 
     /**
-     * 获取当前登录教师的自身信息（需要token）
+     * 2.获取当前登录教师的自身信息（需要token）
      * @returns {Promise<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>} 教师自身信息
      */
     async getSelfTeacherInfo() {
@@ -688,7 +688,7 @@ export const teacherAPI = {
     },
 
     /**
-     * 更新教师信息（需要token）
+     * 3.更新教师信息（需要token）
      * @param {Object} updateTeacherData 教师信息对象
      * @param {string} updateTeacherData.username 用户名
      * @param {string} updateTeacherData.email 邮箱
@@ -703,7 +703,7 @@ export const teacherAPI = {
     },
 
     /**
-     * 根据教师ID获取教师信息（需要token）
+     * 4.根据教师ID获取教师信息（需要token）
      * @param {number} id 教师ID
      * @returns {Promise<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>} 教师信息
      */
@@ -713,10 +713,10 @@ export const teacherAPI = {
         return response.data;
     }
 };
-// 学习进度api模块
+// 学习进度api模块（代讨论）
 export const learningProgressAPI = {
     /**
-     * 获取学生整体学习进度（需要token）
+     *1. 获取学生整体学习进度（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Array<Object>>} 学生学习进度列表
      */
@@ -975,10 +975,10 @@ export const learningProgressAPI = {
     },
 };
 
-// 知识点api模块（教师端）
+// 知识点api模块（教师端）（8用的时候再添加，感觉用不到，15，21根据题目id获得题目详情，22，23，24根据题目类型获得题目列表）
 export const knowledgeAPI = {
     /**
-     * 更新知识点信息（需要token）
+     * 1.更新知识点信息（需要token）
      * @param {Object} updateKnowledgeData 更新的知识点数据
      * @param {string} updateKnowledgeData.knowledgeId 知识点ID
      * @param {string} updateKnowledgeData.name 知识点名称
@@ -1039,7 +1039,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 保存新的知识点（需要token）
+     * 2.保存新的知识点（需要token）
      * @param {Object} knowledgeData 知识点数据
      
      * @param {string} knowledgeData.name 知识点名称
@@ -1088,7 +1088,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据ID获取知识点详情（需要token）
+     * 3.根据ID获取知识点详情（需要token）（这个不太需要）
      * @param {string} id 知识点ID
      * @returns {Promise<Object>} 知识点详情
      * 返回字段同getKnowledgeByCourseId方法中的每项
@@ -1111,7 +1111,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据课程ID和知识点ID删除知识点（需要token）
+     * 4.根据课程ID和知识点ID删除知识点（需要token）
      * @param {string} courseId 课程ID
      * @param {string} id 知识点ID
      * @returns {Promise<Object>} 删除结果
@@ -1147,7 +1147,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 移除知识点持久化（需要token）
+     * 5.移除知识点持久化（需要token）
      * @param {string} knowledgeId 知识点ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -1172,7 +1172,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 从课程中移除一批知识点（需要token）
+     * 6.从课程中移除一批知识点（需要token）
      * @param {string} courseId 课程ID
      * @param {Array<string>} knowledgeIds 知识点ID数组
      * @returns {Promise<Object>} 删除结果
@@ -1204,7 +1204,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 批量移除知识点持久化（需要token）
+     * 7.批量移除知识点持久化（需要token）
      * @param {Array<string>} knowledgeIds 知识点ID数组
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -1232,7 +1232,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 查询与目标知识点相关联的所有课程（需要token）
+     * 8.查询与目标知识点相关联的所有课程（需要token）
      * @param {string} knowledgeId 知识点ID
      * @returns {Promise<Array<Object>>} 课程列表
      * 每项字段：
@@ -1272,7 +1272,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 根据教师ID获取知识点列表（需要token）
+     * 9.根据教师ID获取知识点列表（需要token）
      * @param {string} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 知识点列表
      * 每项字段：
@@ -1306,7 +1306,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据课程ID获取知识点列表（需要token）
+     * 10.根据课程ID获取知识点列表（需要token）
      * @param {string} courseId 课程ID
      * @returns {Promise<Array<Object>>} 知识点列表
      * 每项字段：
@@ -1339,7 +1339,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 获取教师在特定课程中的知识点列表（需要token）
+     * 11.获取教师在特定课程中的知识点列表（需要token）
      * @param {string} courseId 课程ID
      * @param {string} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 知识点列表
@@ -1366,7 +1366,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 复制知识点到课程（需要token）
+     * 12.复制知识点到课程（需要token）
      * @param {string} knowledgeId 知识点ID
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 复制后的知识点信息
@@ -1414,7 +1414,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 添加已有知识点到指定课程（需要token）
+     * 13.添加已有知识点到指定课程（需要token）
      * @param {string} knowledgeId 知识点ID
      * @param {string} courseId 目标课程ID
      * @returns {Promise<Object>} 操作结果
@@ -1438,7 +1438,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据知识点ID获取题目列表（需要token）
+     * 14.根据知识点ID获取题目列表（需要token）
      * @param {string} knowledgeId 知识点ID
      * @returns {Promise<Array<Object>>} 题目列表
      */
@@ -1477,7 +1477,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据条件搜索知识点下的题目（需要token）
+     * 15.根据条件搜索知识点下的题目（需要token）
      * @param {string} knowledgeId 知识点ID
      * @param {Object} questionQueryDTO 查询条件
      * @param {string} [questionQueryDTO.questionType] 题目类型（可选）
@@ -1513,7 +1513,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 根据关键词搜索知识点（需要token）
+     * 16.根据关键词搜索知识点（需要token）
      * @param {string} keyword 搜索关键词
      * @returns {Promise<Array<Object>>} 知识点列表
      * 每项字段同getKnowledgeByCourseId方法
@@ -1543,7 +1543,7 @@ export const knowledgeAPI = {
     },
 
     /**
-     * 调整知识点在课程中的位置（需要token）
+     * 17.调整知识点在课程中的位置（需要token）
      * @param {string} courseId 课程ID
      * @param {string} knowledgeId 知识点ID
      * @param {number} position 新位置（从0开始的索引）
@@ -1572,7 +1572,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 添加题目（需要token）
+     * 18.添加题目（需要token）
      * @param {Object} questionData 题目数据
      * @param {string} questionData.questionType 题目类型（选择题、填空题、判断题、简答题等）
      * @param {string} questionData.content 题目内容
@@ -1599,7 +1599,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 更新题目（需要token）
+     * 19.更新题目（需要token）
      * @param {Object} questionData 题目数据
      * @param {string} questionData.questionId 题目ID
      * @param {string} [questionData.questionType] 题目类型（选择题、填空题、判断题、简答题等）
@@ -1625,7 +1625,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 删除题目（需要token）
+     * 20.删除题目（需要token）
      * @param {string} questionId 题目ID
      * @returns {Promise<Object>} 操作结果
      */
@@ -1643,7 +1643,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 根据ID获取题目详情（需要token）
+     * 21.根据ID获取题目详情（需要token）
      * @param {string} questionId 题目ID
      * @returns {Promise<Object>} 题目详情
      * 返回字段：
@@ -1685,7 +1685,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 根据题目类型获取题目列表（需要token）
+     * 22.根据题目类型获取题目列表（需要token）
      * @param {string} questionType 题目类型
      * @returns {Promise<Array<Object>>} 题目列表
      * 每项字段同getQuestionById方法返回字段
@@ -1714,7 +1714,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 根据教师ID获取题目列表（需要token）
+     * 23.根据教师ID获取题目列表（需要token）
      * @param {string} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 题目列表
      * 每项字段同getQuestionById方法返回字段
@@ -1746,7 +1746,7 @@ export const knowledgeAPI = {
     },
     
     /**
-     * 根据难度级别获取题目列表（需要token）
+     * 24.根据难度级别获取题目列表（需要token）
      * @param {string} difficulty 难度级别
      * @returns {Promise<Array<Object>>} 题目列表
      * 每项字段同getQuestionById方法返回字段
@@ -1775,9 +1775,10 @@ export const knowledgeAPI = {
     },
 };
 
+// 考试api模块（8）
 export const examAPI = {
     /**
-     * 更新考试（需要token）
+     * 1.更新考试（需要token）
      * @param {Object} updateExamData 考试信息
      * @param {number} updateExamData.examId 考试ID
      * @param {string} updateExamData.title 考试标题
@@ -1883,7 +1884,7 @@ export const examAPI = {
     },
 
     /**
-     * 根据考试ID获取考试信息（需要token）
+     * 2.根据考试ID获取考试信息（需要token）
      * @param {number} examId 考试ID
      * @returns {Promise<Object>} 考试信息
      * 返回字段：同 updateExam 返回字段
@@ -1912,7 +1913,7 @@ export const examAPI = {
     },
 
     /**
-     * 根据教师ID获取考试列表（需要token）
+     * 3.根据教师ID获取考试列表（需要token）
      * @param {number} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 考试列表
      * 每项字段：同 updateExam 返回字段
@@ -1943,7 +1944,7 @@ export const examAPI = {
     },
 
     /**
-     * 根据课程ID获取考试列表（需要token）
+     * 4.根据课程ID获取考试列表（需要token）
      * @param {number} courseId 课程ID
      * @returns {Promise<Array<Object>>} 考试列表
      * 每项字段：同 updateExam 返回字段
@@ -1974,7 +1975,7 @@ export const examAPI = {
     },
 
     /**
-     * 根据课程ID和考试类型获取考试列表（需要token）
+     * 5.根据课程ID和考试类型获取考试列表（需要token）
      * @param {number} courseId 课程ID
      * @param {string} type 考试类型
      * @returns {Promise<Array<Object>>} 考试列表
@@ -2008,7 +2009,7 @@ export const examAPI = {
     },
 
     /**
-     * 根据课程ID和教师ID获取考试列表（需要token）
+     * 6.根据课程ID和教师ID获取考试列表（需要token）
      * @param {number} courseId 课程ID
      * @param {number} teacherId 教师ID
      * @returns {Promise<Array<Object>>} 考试列表
@@ -2041,7 +2042,7 @@ export const examAPI = {
     },
 
     /**
-     * 删除考试（需要token）
+     * 7.删除考试（需要token）
      * @param {number} id 考试ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -2063,7 +2064,7 @@ export const examAPI = {
     },
 
     /**
-     * 获取参加考试的学生列表（需要token）
+     * 8.获取参加考试的学生列表（需要token）
      * @param {number} examId 考试ID
      * @returns {Promise<Array<number>>} 学生ID列表
      */
@@ -2090,9 +2091,10 @@ export const examAPI = {
     }
 };
 
+// 学习计划api模块（待讨论）
 export const learningPlanAPI = {
     /**
-     * 更新学习计划进度（需要token）
+     * 1.更新学习计划进度（需要token）
      * @param {Object} params 查询参数
      * @param {string} params.planId 学习计划ID
      * @param {string} params.activityId 活动ID
@@ -2268,9 +2270,10 @@ export const learningPlanAPI = {
     }
 };
 
+// 考勤api模块（待完善bug）
 export const attendanceAPI = {
     /**
-     * 更新考勤状态（需要token）
+     * 1.更新考勤状态（需要token）
      * @param {number} attendanceId 考勤ID
      * @param {string} status 状态
      * @param {string} [remark] 备注（可选）
@@ -2286,7 +2289,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 按课程名称更新考勤（需要token）
+     * 2.按课程名称更新考勤（需要token）
      * @param {number} studentId 学生ID
      * @param {string} courseName 课程名称
      * @param {string} date 日期（YYYY-MM-DD）
@@ -2304,7 +2307,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 新增考勤（需要token）
+     * 3.新增考勤（需要token）
      * @param {Object} attendanceData 考勤信息
      * @param {number} attendanceData.courseId 课程ID
      * @param {number} attendanceData.studentId 学生ID
@@ -2336,7 +2339,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 批量新增考勤（需要token）
+     * 4.批量新增考勤（需要token）
      * @param {Array<Object>} attendanceList 考勤信息数组
      * @returns {Promise<Object>} 批量新增结果
      * 返回字段：由后端返回，通常包含批量操作结果
@@ -2348,7 +2351,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 获取学生考勤记录（需要token）
+     * 5.获取学生考勤记录（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Array<Object>>} 考勤记录列表
      * 每项字段：同 saveAttendance 返回字段
@@ -2360,7 +2363,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 根据状态获取学生考勤记录（需要token）
+     * 6.根据状态获取学生考勤记录（需要token）
      * @param {number} studentId 学生ID
      * @param {string} status 状态
      * @returns {Promise<Array<Object>>} 考勤记录列表
@@ -2373,7 +2376,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 获取学生考勤统计（需要token）
+     * 7.获取学生考勤统计（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Object>} 统计信息
      * 字段：由后端返回，通常包含统计相关信息
@@ -2385,7 +2388,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 搜索考勤记录（需要token）
+     * 8.搜索考勤记录（需要token）
      * @param {number} studentId 学生ID
      * @param {Object} params 查询参数
      * @param {string} [params.keywords] 关键词（可选）
@@ -2402,7 +2405,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 按日期范围获取学生考勤记录（需要token）
+     * 9.按日期范围获取学生考勤记录（需要token）
      * @param {number} studentId 学生ID
      * @param {string} startDate 起始日期（YYYY-MM-DD）
      * @param {string} endDate 结束日期（YYYY-MM-DD）
@@ -2416,7 +2419,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 获取学生某课程的考勤记录（需要token）
+     * 10.获取学生某课程的考勤记录（需要token）
      * @param {number} studentId 学生ID
      * @param {number} courseId 课程ID
      * @returns {Promise<Array<Object>>} 考勤记录列表
@@ -2429,7 +2432,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 获取学生某课程的考勤统计（需要token）
+     * 11.获取学生某课程的考勤统计（需要token）
      * @param {number} studentId 学生ID
      * @param {number} courseId 课程ID
      * @returns {Promise<Object>} 统计信息
@@ -2442,7 +2445,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 按课程名称获取考勤统计（需要token）
+     * 12.按课程名称获取考勤统计（需要token）
      * @param {number} studentId 学生ID
      * @param {string} courseName 课程名称
      * @returns {Promise<Object>} 统计信息
@@ -2455,7 +2458,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 按课程名称获取考勤记录（需要token）
+     * 13.按课程名称获取考勤记录（需要token）
      * @param {number} studentId 学生ID
      * @param {string} courseName 课程名称
      * @returns {Promise<Array<Object>>} 考勤记录列表
@@ -2483,7 +2486,7 @@ export const attendanceAPI = {
     },
     
     /**
-     * 获取课程的考勤记录（需要token）
+     * 14.获取课程的考勤记录（需要token）
      * @param {number} courseId 课程ID
      * @returns {Promise<Array<Object>>} 考勤记录列表
      * 返回字段：
@@ -2531,7 +2534,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 根据考勤ID删除考勤实体（需要token）
+     * 15.根据考勤ID删除考勤实体（需要token）
      * @param {number} attendanceId 考勤ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -2555,7 +2558,7 @@ export const attendanceAPI = {
     },
 
     /**
-     * 批量删除考勤实体（需要token）
+     * 16.批量删除考勤实体（需要token）
      * @param {Array<number>} attendanceIds 考勤ID数组
      * @returns {Promise<Object>} 删除结果
      * 返回字段：
@@ -2582,10 +2585,10 @@ export const attendanceAPI = {
     },
 };
 
-// 学生考试相关 API
+// 学生考试相关 API（代后端完善后写，可以先写模板）
 export const studentExamAPI = {
     /**
-     * 提交单份考试答卷（需要token）
+     * 1.提交单份考试答卷（需要token）
      * @param {Object} answerData 答卷信息
      * @param {number} answerData.answerId 答案ID（可选，提交新答卷时可不填）
      * @param {number} answerData.examId 考试ID
@@ -2613,7 +2616,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 批量提交考试答卷（需要token）
+     * 2.批量提交考试答卷（需要token）
      * @param {Array<Object>} answerList 答卷信息数组，每项结构如下：
      *   - answerId: number 答案ID（可选）
      *   - examId: number 考试ID
@@ -2641,7 +2644,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 搜索考试及试题（需要token）
+     * 3.搜索考试及试题（需要token）
      * @param {number} studentId 学生ID
      * @param {string} keywords 关键词
      * @returns {Promise<Object>} 搜索结果，由后端返回
@@ -2653,7 +2656,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生所有考试成绩（需要token）
+     * 4.获取学生所有考试成绩（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Array<Object>>} 成绩列表
      */
@@ -2664,7 +2667,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按关键词搜索学生考试成绩（需要token）
+     * 5.按关键词搜索学生考试成绩（需要token）
      * @param {number} studentId 学生ID
      * @param {string} keywords 关键词
      * @returns {Promise<Array<Object>>} 成绩列表
@@ -2676,7 +2679,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生某场考试的所有答卷（需要token）
+     * 6.获取学生某场考试的所有答卷（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @returns {Promise<Array<Object>>} 答卷列表
@@ -2688,7 +2691,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按题目内容搜索学生某场考试的答卷（需要token）
+     * 7.按题目内容搜索学生某场考试的答卷（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @param {string} content 题目内容关键词
@@ -2701,7 +2704,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生某场考试的总成绩（需要token）
+     * 8.获取学生某场考试的总成绩（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @returns {Promise<Object>} 成绩对象
@@ -2713,7 +2716,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生某场考试某题的答卷（需要token）
+     * 9.获取学生某场考试某题的答卷（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @param {number} questionId 题目ID
@@ -2726,7 +2729,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生某场考试详情（需要token）
+     * 10.获取学生某场考试详情（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @returns {Promise<Object>} 考试详情
@@ -2738,7 +2741,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生某场考试的智能分析（需要token）
+     * 11.获取学生某场考试的智能分析（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @returns {Promise<Object>} 分析结果
@@ -2750,7 +2753,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 获取学生某场考试的学习建议（需要token）
+     * 12.获取学生某场考试的学习建议（需要token）
      * @param {number} studentId 学生ID
      * @param {number} examId 考试ID
      * @returns {Promise<Array<string>>} 建议列表
@@ -2762,7 +2765,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按考试标题获取学生答卷（需要token）
+     * 13.按考试标题获取学生答卷（需要token）
      * @param {number} studentId 学生ID
      * @param {string} title 考试标题
      * @returns {Promise<Array<Object>>} 答卷列表
@@ -2774,7 +2777,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按考试标题获取学生成绩（需要token）
+     * 14.按考试标题获取学生成绩（需要token）
      * @param {number} studentId 学生ID
      * @param {string} title 考试标题
      * @returns {Promise<Object>} 成绩对象
@@ -2786,7 +2789,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按考试标题获取考试详情（需要token）
+     * 15.按考试标题获取考试详情（需要token）
      * @param {number} studentId 学生ID
      * @param {string} title 考试标题
      * @returns {Promise<Object>} 考试详情
@@ -2798,7 +2801,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按考试标题获取智能分析（需要token）
+     * 16.按考试标题获取智能分析（需要token）
      * @param {number} studentId 学生ID
      * @param {string} title 考试标题
      * @returns {Promise<Object>} 分析结果
@@ -2810,7 +2813,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 按考试标题获取学习建议（需要token）
+     * 17.按考试标题获取学习建议（需要token）
      * @param {number} studentId 学生ID
      * @param {string} title 考试标题
      * @returns {Promise<Array<string>>} 建议列表
@@ -2822,7 +2825,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 智能评测学生答卷（按内容，需token）
+     * 18.智能评测学生答卷（按内容，需token）
      * @param {number} studentId 学生ID
      * @param {string} title 考试标题
      * @param {string} content 答案内容
@@ -2835,7 +2838,7 @@ export const studentExamAPI = {
     },
 
     /**
-     * 智能评测学生答卷（按答卷ID，需token）
+     * 19.智能评测学生答卷（按答卷ID，需token）
      * @param {number} answerId 答卷ID
      * @returns {Promise<Object>} 评测结果
      */
@@ -2846,7 +2849,7 @@ export const studentExamAPI = {
     }
 };
 
-// 学生智能助理相关 API
+// 学生智能助理相关 API（代后端完善后写）
 export const studentAssistantAPI = {
     /**
      * 提交练习答案（需要token）
@@ -3025,10 +3028,10 @@ export const studentAssistantAPI = {
     }
 };
 
-// 课程选择相关API
+// 课程选择相关API（代完善具体页面）
 export const courseSelectionAPI = {
     /**
-     * 获取学生选择的课程（需要token）
+     * 1.获取学生选择的课程（需要token）
      * @param {string} studentId 学生ID
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 课程选择信息
@@ -3052,7 +3055,7 @@ export const courseSelectionAPI = {
     },
 
     /**
-     * 学生选课（需要token）
+     * 2.学生选课（需要token）
      * @param {string} studentId 学生ID
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 选课结果
@@ -3076,7 +3079,7 @@ export const courseSelectionAPI = {
     },
 
     /**
-     * 获取学生所有选课（需要token）
+     * 3.获取学生所有选课（需要token）
      * @param {string} studentId 学生ID
      * @returns {Promise<Array<Object>>} 学生选课列表
      * 每项字段：由后端返回，包含课程选择的详细信息
@@ -3098,7 +3101,7 @@ export const courseSelectionAPI = {
     },
 
     /**
-     * 获取选择了某课程的所有学生（需要token）
+     * 4.获取选择了某课程的所有学生（需要token）
      * @param {string} courseId 课程ID
      * @returns {Promise<Array<Object>>} 学生列表
      * 每项字段：由后端返回，包含学生信息
@@ -3120,7 +3123,7 @@ export const courseSelectionAPI = {
     },
 
     /**
-     * 删除单个学生选课（需要token）
+     * 5.删除单个学生选课（需要token）
      * @param {string} studentId 学生ID
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 删除结果
@@ -3144,7 +3147,7 @@ export const courseSelectionAPI = {
     },
 
     /**
-     * 删除指定课程的所有选课关系（需要token）
+     * 6.删除指定课程的所有选课关系（需要token）
      * @param {string} courseId 课程ID
      * @returns {Promise<Object>} 删除结果
      * 返回字段：由后端返回，通常包含删除成功状态和消息
