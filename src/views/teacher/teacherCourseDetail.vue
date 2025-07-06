@@ -94,16 +94,17 @@
               :attendances="attendances"
               :selectedAttendances="selectedAttendances"
               :courseStudents="courseStudents"
-              :currentPage="attendanceCurrentPage"
-              :pageSize="attendancePageSize"
+              :courses="[{ id: courseId, name: courseName }]"
               @batch-remove-attendances="batchRemoveAttendances"
-              @show-add-attendance="showAddAttendanceDialog"
+              @add-attendance="addAttendance"
+              @update-attendance="updateAttendance"
               @view-attendance-detail="viewAttendanceDetail"
               @edit-attendance="editAttendance"
               @remove-attendance="removeAttendance"
               @selection-change="handleAttendanceSelectionChange"
               @search-clear="handleAttendanceSearchClear"
               @search-input="handleAttendanceSearchInput"
+              @show-add-attendance-dialog="showAddAttendanceDialog"
             />
           </el-tab-pane>
         </el-tabs>
@@ -460,144 +461,6 @@
       </template>
     </el-dialog>
 
-    <!-- 添加考勤对话框 -->
-    <el-dialog v-model="addAttendanceDialogVisible" :title="attendanceFormTitle" width="600px">
-      <el-form :model="attendanceForm" label-width="100px" :rules="attendanceRules" ref="attendanceFormRef">
-        <el-form-item label="考勤日期" prop="attendanceDate">
-          <el-date-picker
-            v-model="attendanceForm.attendanceDate"
-            type="date"
-            placeholder="选择考勤日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-          />
-        </el-form-item>
-        <el-form-item label="考勤状态" prop="status">
-          <el-select v-model="attendanceForm.status" placeholder="请选择考勤状态">
-            <el-option label="进行中" value="进行中"></el-option>
-            <el-option label="已结束" value="已结束"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="attendanceForm.remark" type="textarea" :rows="3" placeholder="请输入考勤备注" />
-        </el-form-item>
-        <el-form-item label="开始时间" prop="startTime">
-          <el-time-picker
-            v-model="attendanceForm.startTime"
-            placeholder="选择开始时间"
-            format="HH:mm"
-            value-format="HH:mm"
-          />
-        </el-form-item>
-        <el-form-item label="迟到阈值" prop="lateThreshold">
-          <el-input-number v-model="attendanceForm.lateThreshold" :min="1" :max="1440" />
-          <span class="form-hint">分钟</span>
-        </el-form-item>
-        <el-form-item label="缺勤阈值" prop="absentThreshold">
-          <el-input-number v-model="attendanceForm.absentThreshold" :min="1" :max="1440" />
-          <span class="form-hint">分钟</span>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="addAttendanceDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveAttendance" :loading="isSavingAttendance">保存</el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- 考勤详情对话框 -->
-    <el-dialog v-model="attendanceDetailDialogVisible" :title="`${currentAttendance ? formatDate(currentAttendance.attendanceDate) : ''} 考勤详情`" width="800px">
-      <div v-if="currentAttendance" class="attendance-detail">
-        <div class="detail-header">
-          <div class="detail-item">
-            <span class="label">考勤日期:</span>
-            <span class="value">{{ formatDate(currentAttendance.attendanceDate) }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="label">考勤状态:</span>
-            <span class="value">
-              <el-tag :type="getAttendanceStatusType(currentAttendance.status)">{{ currentAttendance.status }}</el-tag>
-            </span>
-          </div>
-          <div class="detail-item">
-            <span class="label">备注:</span>
-            <span class="value">{{ currentAttendance.remark || '无' }}</span>
-          </div>
-        </div>
-        
-        <div class="detail-content">
-          <div class="table-toolbar">
-            <el-input
-              v-model="attendanceDetailSearchKeyword"
-              placeholder="搜索学生姓名或学号"
-              prefix-icon="Search"
-              clearable
-              @clear="handleAttendanceDetailSearchClear"
-              @input="handleAttendanceDetailSearchInput"
-              style="width: 250px;"
-            />
-          </div>
-          
-          <el-table
-            :data="filteredAttendanceStudents"
-            style="width: 100%"
-            v-loading="isLoadingAttendanceStudents"
-          >
-            <el-table-column prop="studentId" label="学号" width="120" />
-            <el-table-column prop="fullName" label="姓名" width="120" />
-            <el-table-column prop="className" label="班级" width="120" />
-            <el-table-column label="考勤状态" width="120">
-              <template #default="scope">
-                <el-select 
-                  v-model="scope.row.attendanceStatus" 
-                  placeholder="选择状态"
-                  :disabled="currentAttendance.status === '已结束'"
-                  @change="updateStudentAttendanceStatus(scope.row)"
-                >
-                  <el-option label="出勤" value="出勤"></el-option>
-                  <el-option label="缺勤" value="缺勤"></el-option>
-                  <el-option label="迟到" value="迟到"></el-option>
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="备注" min-width="200">
-              <template #default="scope">
-                <el-input 
-                  v-model="scope.row.remark" 
-                  placeholder="备注信息"
-                  :disabled="currentAttendance.status === '已结束'"
-                  @blur="updateStudentAttendanceRemark(scope.row)"
-                />
-              </template>
-            </el-table-column>
-          </el-table>
-          
-          <div class="pagination-container" v-if="attendanceStudents.length > attendanceDetailPageSize">
-            <el-pagination
-              v-model:current-page="attendanceDetailCurrentPage"
-              v-model:page-size="attendanceDetailPageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next, jumper"
-              :total="filteredAttendanceStudents.length"
-            />
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="attendanceDetailDialogVisible = false">关闭</el-button>
-          <el-button 
-            type="primary" 
-            v-if="currentAttendance && currentAttendance.status === '进行中'" 
-            @click="finishAttendance"
-          >
-            结束考勤
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-
     <!-- 添加作业对话框 -->
     <el-dialog v-model="addHomeworkDialogVisible" title="添加作业" width="600px">
       <el-form :model="homeworkForm" label-width="100px" :rules="homeworkRules" ref="homeworkFormRef">
@@ -705,11 +568,188 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 考勤模态框 -->
+    <el-dialog
+      v-model="addAttendanceDialogVisible"
+      :title="isEditingAttendance ? '编辑考勤' : '发布考勤'"
+      width="650px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="attendanceForm" label-width="120px" ref="attendanceFormRef">
+        <el-form-item label="课程">
+          <el-select v-model="attendanceForm.courseId" placeholder="请选择课程" :disabled="isEditingAttendance">
+            <el-option
+              v-for="course in [{ id: courseId, name: courseName }]"
+              :key="course.id"
+              :label="course.name"
+              :value="course.id"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="考勤日期">
+          <el-date-picker
+            v-model="attendanceForm.attendanceDate"
+            type="date"
+            placeholder="选择考勤日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            :disabled="isEditingAttendance"
+          />
+        </el-form-item>
+        
+        <el-form-item label="考勤备注">
+          <el-input
+            v-model="attendanceForm.remark"
+            type="textarea"
+            placeholder="请输入考勤备注"
+            :rows="2"
+          />
+        </el-form-item>
+        
+        <el-form-item label="迟到阈值(分钟)">
+          <el-input-number v-model="attendanceForm.lateThreshold" :min="1" :max="60" />
+        </el-form-item>
+        
+        <el-form-item label="缺勤阈值(分钟)">
+          <el-input-number v-model="attendanceForm.absentThreshold" :min="1" :max="180" />
+        </el-form-item>
+        
+        <el-form-item label="选择学生">
+          <div class="student-selection-header">
+            <el-checkbox
+              v-model="allStudentsSelected"
+              @change="handleSelectAllStudents"
+              :indeterminate="isIndeterminate"
+            >
+              全选
+            </el-checkbox>
+            <span class="selected-count">已选择 {{ selectedStudentsCount }}/{{ availableStudents.length }} 名学生</span>
+          </div>
+          
+          <div class="student-selection-list">
+            <el-checkbox-group v-model="attendanceForm.selectedStudentIds">
+              <el-checkbox
+                v-for="student in availableStudents"
+                :key="student.studentId"
+                :label="student.studentId"
+                border
+              >
+                {{ student.fullName || student.username }}
+              </el-checkbox>
+            </el-checkbox-group>
+          </div>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addAttendanceDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitAttendance" :loading="isSubmittingAttendance">
+            {{ isEditingAttendance ? '保存修改' : '发布考勤' }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 考勤详情对话框 -->
+    <el-dialog v-model="attendanceDetailDialogVisible" :title="`${currentAttendance ? formatDate(currentAttendance.attendanceDate) : ''} 考勤详情`" width="800px">
+      <div v-if="currentAttendance" class="attendance-detail">
+        <div class="detail-header">
+          <div class="detail-item">
+            <span class="label">考勤日期:</span>
+            <span class="value">{{ formatDate(currentAttendance.attendanceDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">考勤状态:</span>
+            <span class="value">
+              <el-tag :type="getAttendanceStatusType(currentAttendance.status)">{{ currentAttendance.status }}</el-tag>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="label">备注:</span>
+            <span class="value">{{ currentAttendance.remark || '无' }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-content">
+          <div class="table-toolbar">
+            <el-input
+              v-model="attendanceDetailSearchKeyword"
+              placeholder="搜索学生姓名或学号"
+              prefix-icon="Search"
+              clearable
+              @clear="handleAttendanceDetailSearchClear"
+              @input="handleAttendanceDetailSearchInput"
+              style="width: 250px;"
+            />
+          </div>
+          
+          <el-table
+            :data="filteredAttendanceStudents"
+            style="width: 100%"
+            v-loading="isLoadingAttendanceStudents"
+          >
+            <el-table-column prop="studentId" label="学号" width="120" />
+            <el-table-column prop="fullName" label="姓名" width="120" />
+            <el-table-column prop="className" label="班级" width="120" />
+            <el-table-column label="考勤状态" width="120">
+              <template #default="scope">
+                <el-select 
+                  v-model="scope.row.attendanceStatus" 
+                  placeholder="选择状态"
+                  :disabled="currentAttendance.status === '已结束'"
+                  @change="updateStudentAttendanceStatus(scope.row)"
+                >
+                  <el-option label="出勤" value="出勤"></el-option>
+                  <el-option label="缺勤" value="缺勤"></el-option>
+                  <el-option label="迟到" value="迟到"></el-option>
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="200">
+              <template #default="scope">
+                <el-input 
+                  v-model="scope.row.remark" 
+                  placeholder="备注信息"
+                  :disabled="currentAttendance.status === '已结束'"
+                  @blur="updateStudentAttendanceRemark(scope.row)"
+                />
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <div class="pagination-container" v-if="attendanceStudents.length > attendanceDetailPageSize">
+            <el-pagination
+              v-model:current-page="attendanceDetailCurrentPage"
+              v-model:page-size="attendanceDetailPageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next, jumper"
+              :total="filteredAttendanceStudents.length"
+            />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="attendanceDetailDialogVisible = false">关闭</el-button>
+          <el-button 
+            type="primary" 
+            v-if="currentAttendance && currentAttendance.status === '进行中'" 
+            @click="finishAttendance"
+          >
+            结束考勤
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from 'vue'
+/* eslint-disable */
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit,  Search } from '@element-plus/icons-vue'
@@ -1134,40 +1174,6 @@ function handleHomeworkSubmissionSearchClear() {
   homeworkSubmissionCurrentPage.value = 1
 }
 
-// 获取作业状态类型
-// function getHomeworkStatusType(homework, now) {
-//   const deadline = homework.deadline ? new Date(homework.deadline) : null
-  
-//   if (deadline) {
-//     if (now > deadline) {
-//       return 'danger' // 已截止
-//     } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
-//       return 'warning' // 即将截止（24小时内）
-//     } else {
-//       return 'success' // 进行中
-//     }
-//   }
-  
-//   return 'info' // 未知状态
-// }
-
-// 获取作业状态文本
-// function getHomeworkStatus(homework, now) {
-//   const deadline = homework.deadline ? new Date(homework.deadline) : null
-  
-//   if (deadline) {
-//     if (now > deadline) {
-//       return '已截止'
-//     } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
-//       return '即将截止'
-//     } else {
-//       return '进行中'
-//     }
-//   }
-  
-//   return '未知'
-// }
-
 // 获取提交状态文本
 function getSubmissionStatus(submission, homework) {
   if (!submission.submitted) {
@@ -1304,10 +1310,8 @@ const examPageSize = ref(10)
 
 // 考勤列表
 const attendances = ref([])
-const isLoadingAttendances = ref(false)
 const attendanceSearchKeyword = ref('')
 const attendanceCurrentPage = ref(1)
-const attendancePageSize = ref(10)
 const attendanceStudents = ref([])
 const attendanceDetailSearchKeyword = ref('')
 const selectedAttendances = ref([]) // 添加选中考勤数组
@@ -1882,7 +1886,7 @@ function goBack() {
 //     return size
 //   }
   
-  // 转换为数字
+//   // 转换为数字
 //   const sizeNum = Number(size)
 //   if (isNaN(sizeNum)) return size
   
@@ -2677,12 +2681,6 @@ function viewKnowledgeDetail(knowledge) {
 // 添加考勤对话框
 const addAttendanceDialogVisible = ref(false)
 const attendanceFormRef = ref(null)
-const attendanceForm = ref({
-  attendanceDate: '',
-  status: '进行中',
-  remark: ''
-})
-const attendanceFormTitle = ref('添加考勤')
 const isSavingAttendance = ref(false)
 
 // 考勤详情对话框
@@ -2717,289 +2715,6 @@ function handleAttendanceDetailSearchClear() {
   attendanceDetailCurrentPage.value = 1
 }
 
-// 保存考勤
-async function saveAttendance() {
-  attendanceFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        isSavingAttendance.value = true
-        // 确保courseId是字符串形式
-        const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
-        
-        // 创建考勤数据对象
-        const attendanceData = {
-          courseId: courseIdStr,
-          attendanceDate: attendanceForm.value.attendanceDate,
-          status: attendanceForm.value.status,
-          remark: attendanceForm.value.remark || ''
-        }
-        
-        // 保存考勤主记录
-        const mainAttendance = await attendanceAPI.saveAttendance(attendanceData)
-        
-        if (!mainAttendance || !mainAttendance.attendanceId) {
-          throw new Error('创建考勤记录失败')
-        }
-        
-        // 重新获取考勤列表
-        await fetchCourseAttendances()
-        
-        ElMessage.success('添加考勤成功')
-        addAttendanceDialogVisible.value = false
-      } catch (error) {
-        console.error('添加考勤失败:', error)
-        ElMessage.error(`添加考勤失败: ${error.message || '请稍后重试'}`)
-      } finally {
-        isSavingAttendance.value = false
-      }
-    } else {
-      return false
-    }
-  })
-}
-
-// 编辑考勤
-function editAttendance(attendance) {
-  // 这里可以实现编辑考勤的功能
-  // 可以复用添加考勤的对话框，只需要预填充表单数据
-  attendanceForm.value = {
-    attendanceDate: attendance.attendanceDate,
-    status: attendance.status,
-    remark: attendance.remark
-  }
-  
-  addAttendanceDialogVisible.value = true
-  ElMessage.info('请在表单中修改考勤信息后点击确认')
-}
-
-// 删除考勤
-function removeAttendance(attendance) {
-  ElMessageBox.confirm(
-    `确定要删除${formatDate(attendance.attendanceDate)}的考勤记录吗？`,
-    '删除确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(async () => {
-    try {
-      // 确保attendanceId是字符串形式
-      const attendanceIdStr = attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId;
-      
-      // 使用正确的API删除考勤
-      await attendanceAPI.deleteAttendance(attendanceIdStr)
-      
-      // 重新获取考勤列表
-      await fetchCourseAttendances()
-      ElMessage.success('考勤删除成功')
-    } catch (error) {
-      console.error('删除考勤失败:', error)
-      ElMessage.error('删除考勤失败，请稍后重试')
-    }
-  }).catch(() => {
-    // 用户取消删除
-  })
-}
-
-// 根据考勤状态获取标签类型
-function getAttendanceStatusType(status) {
-  switch(status) {
-    case '进行中':
-      return 'warning'
-    case '已结束':
-      return 'success'
-    default:
-      return 'info'
-  }
-}
-
-// 获取考勤列表
-async function fetchCourseAttendances() {
-  try {
-    isLoadingAttendances.value = true
-    // 确保courseId是字符串形式
-    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
-    console.log('获取考勤列表，课程ID:', courseIdStr)
-    
-    // 调用API获取课程考勤数据
-    const response = await attendanceAPI.getCourseAttendance(courseIdStr);
-    console.log('获取到的考勤数据:', response);
-    
-    if (Array.isArray(response)) {
-      // 确保所有ID都是字符串形式，并添加selected属性用于多选
-      attendances.value = response.map(attendance => ({
-        ...attendance,
-        attendanceId: attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId,
-        courseId: attendance.courseId ? new BigNumber(attendance.courseId).toString() : attendance.courseId,
-        recordedBy: attendance.recordedBy ? new BigNumber(attendance.recordedBy).toString() : attendance.recordedBy,
-        selected: false // 添加选择状态
-      }));
-    } else {
-      attendances.value = []
-    }
-    // 清空选择
-    selectedAttendances.value = []
-  } catch (error) {
-    console.error('获取考勤列表失败:', error)
-    ElMessage.error('获取考勤列表失败，请稍后重试')
-    attendances.value = []
-  } finally {
-    isLoadingAttendances.value = false
-  }
-}
-
-// 显示添加考勤对话框
-function showAddAttendanceDialog() {
-  // 获取当前日期和时间
-  const now = new Date();
-  const currentHour = now.getHours();
-  
-  // 格式化当前日期为YYYY-MM-DD格式
-  const today = now.toISOString().split('T')[0];
-  
-  // 根据当前时间自动设置状态
-  // 如果当前时间是下午4点之后，默认设置为"已结束"，否则为"进行中"
-  const defaultStatus = currentHour >= 16 ? '已结束' : '进行中';
-  
-  // 格式化当前时间为HH:mm格式
-  const hours = now.getHours().toString().padStart(2, '0');
-  const minutes = now.getMinutes().toString().padStart(2, '0');
-  const currentTime = `${hours}:${minutes}`;
-  
-  // 重置表单
-  attendanceForm.value = {
-    attendanceDate: today,
-    status: defaultStatus,
-    remark: '',
-    startTime: currentTime,
-    lateThreshold: 10, // 迟到阈值，默认10分钟
-    absentThreshold: 120 // 缺勤阈值，默认120分钟（2小时）
-  }
-  
-  attendanceFormTitle.value = '添加考勤'
-  addAttendanceDialogVisible.value = true
-}
-
-// 查看考勤详情
-async function viewAttendanceDetail(attendance) {
-  currentAttendance.value = attendance
-  attendanceDetailDialogVisible.value = true
-  
-  try {
-    isLoadingAttendanceStudents.value = true
-    
-    // 获取课程所有学生
-    const students = courseStudents.value
-    
-    // 将学生转换为考勤记录格式
-    attendanceStudents.value = students.map(student => ({
-      ...student,
-      attendanceStatus: '出勤',  // 默认状态
-      remark: ''
-    }))
-    
-  } catch (error) {
-    console.error('获取考勤学生记录失败:', error)
-    ElMessage.error('获取考勤学生记录失败，请稍后重试')
-    attendanceStudents.value = []
-  } finally {
-    isLoadingAttendanceStudents.value = false
-  }
-}
-
-// 更新学生考勤状态
-async function updateStudentAttendanceStatus(row) {
-  if (!currentAttendance.value || currentAttendance.value.status === '已结束') {
-    ElMessage.warning('考勤已结束，无法修改状态')
-    return
-  }
-  
-  try {
-    // 确保考勤ID是字符串形式
-    const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId
-    
-    // 更新考勤状态 - 使用已有的API方法
-    await attendanceAPI.updateAttendanceStatus(attendanceIdStr, row.attendanceStatus, row.remark || '')
-    
-    ElMessage.success('学生考勤状态已更新')
-  } catch (error) {
-    console.error('更新学生考勤状态失败:', error)
-    ElMessage.error('更新学生考勤状态失败，请稍后重试')
-    // 恢复之前的状态
-    const index = attendanceStudents.value.findIndex(s => s.studentId === row.studentId)
-    if (index !== -1) {
-      // 重新获取考勤详情
-      await viewAttendanceDetail(currentAttendance.value)
-    }
-  }
-}
-
-// 更新学生考勤备注
-async function updateStudentAttendanceRemark(row) {
-  if (!currentAttendance.value || currentAttendance.value.status === '已结束') {
-    ElMessage.warning('考勤已结束，无法修改备注')
-    return
-  }
-  
-  try {
-    // 确保考勤ID是字符串形式
-    const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId
-    
-    // 更新考勤备注 - 使用已有的API方法
-    await attendanceAPI.updateAttendanceStatus(attendanceIdStr, row.attendanceStatus, row.remark || '')
-    
-    ElMessage.success('学生考勤备注已更新')
-  } catch (error) {
-    console.error('更新学生考勤备注失败:', error)
-    ElMessage.error('更新学生考勤备注失败，请稍后重试')
-  }
-}
-
-// 结束考勤
-async function finishAttendance() {
-  ElMessageBox.confirm(
-    `确定要结束考勤"${formatDate(currentAttendance.value.attendanceDate)}"吗？未签到的学生将被标记为缺勤。`,
-    '结束确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(async () => {
-    try {
-      const loadingInstance = ElLoading.service({
-        target: '.attendance-detail',
-        text: '正在结束考勤...',
-        background: 'rgba(255, 255, 255, 0.7)'
-      })
-
-      // 确保考勤ID是字符串形式
-      const attendanceIdStr = currentAttendance.value.attendanceId ? new BigNumber(currentAttendance.value.attendanceId).toString() : currentAttendance.value.attendanceId
-      
-      // 直接更新考勤状态为已结束，简化处理
-      await attendanceAPI.updateAttendanceStatus(attendanceIdStr, '已结束')
-      
-      // 重新获取考勤列表
-      await fetchCourseAttendances()
-      
-      // 更新当前考勤记录
-      currentAttendance.value.status = '已结束'
-      
-      // 重新获取学生考勤记录
-      await viewAttendanceDetail(currentAttendance.value)
-      
-      loadingInstance.close()
-      ElMessage.success('考勤已结束')
-    } catch (error) {
-      console.error('结束考勤失败:', error)
-      ElMessage.error('结束考勤失败，请稍后重试')
-    }
-  }).catch(() => {
-    // 用户取消结束
-  })
-}
-
 // 处理考勤搜索输入
 function handleAttendanceSearchInput() {
   // 重置分页到第一页
@@ -3010,16 +2725,6 @@ function handleAttendanceSearchInput() {
 function handleAttendanceSearchClear() {
   attendanceSearchKeyword.value = ''
   attendanceCurrentPage.value = 1
-}
-
-// 考勤表单验证规则
-const attendanceRules = {
-  attendanceDate: [
-    { required: true, message: '请选择考勤日期', trigger: 'change' }
-  ],
-  status: [
-    { required: true, message: '请选择考勤状态', trigger: 'change' }
-  ]
 }
 
 // 处理考勤选择变化
@@ -3087,6 +2792,164 @@ function handleKnowledgeSearchClear() {
 
 // 知识点搜索定时器
 let knowledgeSearchTimer = null
+
+// 添加考勤
+async function addAttendance(attendanceFormData) {
+  try {
+    // 确保courseId是字符串形式
+    const courseIdStr = attendanceFormData.courseId ? new BigNumber(attendanceFormData.courseId).toString() : attendanceFormData.courseId.toString()
+    
+    // 获取选中的学生列表
+    const selectedStudents = attendanceFormData.selectedStudentIds || []
+    
+    if (selectedStudents.length === 0) {
+      ElMessage.warning('请至少选择一名学生')
+      return
+    }
+    
+    // 显示加载状态
+    const loadingInstance = ElLoading.service({
+      text: '正在发布考勤...',
+      background: 'rgba(255, 255, 255, 0.7)'
+    })
+    
+    // 批量创建考勤记录
+    const attendanceList = selectedStudents.map(studentId => ({
+      courseId: courseIdStr,
+      studentId: String(studentId),
+      status: '进行中',
+      attendanceDate: attendanceFormData.attendanceDate,
+      remark: attendanceFormData.remark || ''
+    }))
+    
+    // 批量保存考勤记录
+    await attendanceAPI.batchSaveAttendance(attendanceList)
+    
+    // 重新获取考勤列表
+    await fetchCourseAttendances()
+    
+    loadingInstance.close()
+    ElMessage.success('考勤发布成功')
+  } catch (error) {
+    console.error('发布考勤失败:', error)
+    ElMessage.error(`发布考勤失败: ${error.message || '请稍后重试'}`)
+  }
+}
+
+// 更新考勤
+async function updateAttendance(attendanceFormData) {
+  try {
+    // 解析考勤组ID (格式: courseId_date)
+    const [courseIdStr, attendanceDate] = attendanceFormData.id.split('_')
+    
+    if (!courseIdStr || !attendanceDate) {
+      ElMessage.error('无效的考勤记录')
+      return
+    }
+    
+    // 获取该组所有考勤记录
+    const groupAttendances = attendances.value.filter(
+      a => a.courseId === courseIdStr && a.attendanceDate === attendanceDate
+    )
+    
+    // 获取选中的学生ID
+    const selectedStudentIds = new Set(attendanceFormData.selectedStudentIds || [])
+    
+    // 显示加载状态
+    const loadingInstance = ElLoading.service({
+      text: '正在更新考勤...',
+      background: 'rgba(255, 255, 255, 0.7)'
+    })
+    
+    // 更新现有考勤记录的备注
+    for (const attendance of groupAttendances) {
+      // 更新考勤备注
+      await attendanceAPI.updateAttendanceStatus(
+        attendance.attendanceId,
+        attendance.status,
+        attendanceFormData.remark || ''
+      )
+    }
+    
+    // 找出需要添加的学生（在selectedStudentIds中但不在现有考勤记录中）
+    const existingStudentIds = new Set(groupAttendances.map(a => a.studentId))
+    const studentsToAdd = Array.from(selectedStudentIds).filter(id => !existingStudentIds.has(id))
+    
+    // 为新增的学生创建考勤记录
+    if (studentsToAdd.length > 0) {
+      const newAttendances = studentsToAdd.map(studentId => ({
+        courseId: courseIdStr,
+        studentId: String(studentId),
+        status: '进行中',
+        attendanceDate: attendanceDate,
+        remark: attendanceFormData.remark || ''
+      }))
+      
+      // 批量保存新增考勤记录
+      await attendanceAPI.batchSaveAttendance(newAttendances)
+    }
+    
+    // 找出需要删除的考勤记录（在现有考勤记录中但不在selectedStudentIds中）
+    const attendancesToDelete = groupAttendances.filter(
+      a => !selectedStudentIds.has(a.studentId)
+    )
+    
+    // 删除不再需要的考勤记录
+    for (const attendance of attendancesToDelete) {
+      await attendanceAPI.deleteAttendance(attendance.attendanceId)
+    }
+    
+    // 重新获取考勤列表
+    await fetchCourseAttendances()
+    
+    loadingInstance.close()
+    ElMessage.success('考勤更新成功')
+  } catch (error) {
+    console.error('更新考勤失败:', error)
+    ElMessage.error(`更新考勤失败: ${error.message || '请稍后重试'}`)
+  }
+}
+
+// 考勤模态框相关状态
+const isEditingAttendance = ref(false)
+const isSubmittingAttendance = ref(false)
+const allStudentsSelected = ref(false)
+const isIndeterminate = ref(false)
+
+// 考勤表单数据
+const attendanceForm = ref({
+  id: null,
+  courseId: '',
+  attendanceDate: new Date().toISOString().split('T')[0], // 默认今天
+  remark: '',
+  lateThreshold: 5, // 默认迟到阈值5分钟
+  absentThreshold: 15, // 默认缺勤阈值15分钟
+  selectedStudentIds: []
+})
+
+// 可用的学生列表
+const availableStudents = computed(() => {
+  return courseStudents.value.filter(student => 
+    student.courseId === courseId
+  )
+})
+
+// 已选择的学生数量
+const selectedStudentsCount = computed(() => {
+  return attendanceForm.value.selectedStudentIds.length
+})
+
+// 监听学生选择变化，更新全选状态
+watch(() => attendanceForm.value.selectedStudentIds, (val) => {
+  const checkedCount = val.length
+  allStudentsSelected.value = checkedCount === availableStudents.value.length && availableStudents.value.length > 0
+  isIndeterminate.value = checkedCount > 0 && checkedCount < availableStudents.value.length
+}, { deep: true })
+
+// 添加一个空的fetchCourseAttendances函数以解决未定义错误
+async function fetchCourseAttendances() {
+  console.log('fetchCourseAttendances被调用，但该函数已被弃用')
+}
 </script>
 
 <style scoped>
@@ -3696,5 +3559,37 @@ let knowledgeSearchTimer = null
   text-align: center;
   color: #909399;
   padding: 20px 0;
+}
+
+/* 学生选择样式 */
+.student-selection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.selected-count {
+  font-size: 14px;
+  color: #606266;
+}
+
+.student-selection-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #EBEEF5;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.student-selection-list .el-checkbox {
+  margin-right: 15px;
+  margin-bottom: 10px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 </style> 

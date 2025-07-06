@@ -3,18 +3,18 @@
     <div class="section-header">
       <h3>考勤列表</h3>
       <div class="header-actions">
-        <el-button type="danger" size="small" v-if="selectedAttendances.length > 0" @click="$emit('batch-remove-attendances')">
+        <el-button type="danger" size="small" v-if="selectedAttendances.length > 0" @click="handleBatchDelete">
           <el-icon><Delete /></el-icon>
           批量删除 ({{ selectedAttendances.length }})
         </el-button>
-        <el-button type="primary" size="small" @click="$emit('show-add-attendance')">
+        <el-button type="primary" size="small" @click="showAddAttendanceDialog">
           <el-icon><Plus /></el-icon>
-          添加考勤
+          发布考勤
         </el-button>
       </div>
     </div>
     <div class="section-body">
-      <div class="table-toolbar" v-if="attendances.length > 0">
+      <div class="table-toolbar" v-if="attendanceGroups.length > 0">
         <div class="filter-container">
           <el-select
             v-model="attendanceStatusFilter"
@@ -42,38 +42,37 @@
           />
         </div>
       </div>
-      <div v-if="attendances.length === 0" class="empty-tip">
-        暂无考勤记录，请点击"添加考勤"按钮添加
+      <div v-if="attendanceGroups.length === 0" class="empty-tip">
+        暂无考勤记录，请点击"发布考勤"按钮添加
       </div>
       <div v-else class="attendance-list">
-        <div v-for="attendance in filteredAttendances" :key="attendance.attendanceId" class="attendance-item">
-          <el-checkbox v-model="attendance.selected" @change="handleAttendanceSelectionChange"></el-checkbox>
-          <div class="attendance-content" @click="$emit('view-attendance-detail', attendance)">
+        <div v-for="group in filteredAttendanceGroups" :key="group.key" class="attendance-item">
+          <el-checkbox v-model="group.selected" @change="handleGroupSelectionChange(group)"></el-checkbox>
+          <div class="attendance-content" @click="viewGroupDetail(group)">
             <div class="attendance-header">
-              <h4>{{ formatDate(attendance.attendanceDate) }} 考勤</h4>
-              <el-tag :type="getAttendanceStatusType(attendance.status)">{{ attendance.status }}</el-tag>
+              <h4>{{ formatDate(group.attendanceDate) }} {{ group.courseName }} 考勤</h4>
+              <el-tag :type="getAttendanceStatusType(group.status)">{{ group.status }}</el-tag>
             </div>
             <div class="attendance-info">
-              <p>出勤人数: {{ getAttendanceStats(attendance).present }} / {{ courseStudents.length }}</p>
-              <p>缺勤人数: {{ getAttendanceStats(attendance).absent }}</p>
-              <p>迟到人数: {{ getAttendanceStats(attendance).late }}</p>
+              <p>出勤人数: {{ group.stats.present }} / {{ group.totalStudents }}</p>
+              <p>缺勤人数: {{ group.stats.absent }}</p>
+              <p>迟到人数: {{ group.stats.late }}</p>
+              <p v-if="group.remark"><el-icon><InfoFilled /></el-icon> 备注: {{ group.remark }}</p>
             </div>
             <div class="attendance-actions">
-              <el-button link type="primary" @click.stop="$emit('edit-attendance', attendance)">编辑</el-button>
-              <el-button link type="danger" @click.stop="$emit('remove-attendance', attendance)">删除</el-button>
+              <el-button link type="primary" @click.stop="editAttendanceGroup(group)">编辑</el-button>
+              <el-button link type="danger" @click.stop="removeAttendanceGroup(group)">删除</el-button>
             </div>
           </div>
         </div>
       </div>
-      <div class="pagination-container" v-if="attendances.length > pageSize">
+      <div class="pagination-container" v-if="attendanceGroups.length > pageSize">
         <el-pagination
-          :current-page="currentPage"
-          :page-size="pageSize"
-          @update:current-page="$emit('update:current-page', $event)"
-          @update:page-size="$emit('update:page-size', $event)"
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
           :page-sizes="[10, 20, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
-          :total="filteredAttendances.length"
+          :total="filteredAttendanceGroups.length"
         />
       </div>
     </div>
@@ -82,8 +81,9 @@
 
 <script setup>
 import { defineProps, defineEmits, ref, computed } from 'vue'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { formatDateTime } from '@/utils/examManager'
+import { ElMessageBox } from 'element-plus'
 
 const props = defineProps({
   attendances: {
@@ -98,45 +98,95 @@ const props = defineProps({
     type: Array,
     required: true
   },
-  currentPage: {
-    type: Number,
-    default: 1
-  },
-  pageSize: {
-    type: Number,
-    default: 10
+  courses: {
+    type: Array,
+    required: true
   }
 })
 
 const emit = defineEmits([
   'batch-remove-attendances',
-  'show-add-attendance',
+  'add-attendance',
+  'update-attendance',
   'view-attendance-detail',
   'edit-attendance',
   'remove-attendance',
   'selection-change',
   'search-clear',
   'search-input',
-  'update:current-page',
-  'update:page-size'
+  'show-add-attendance-dialog'
 ])
 
+const currentPage = ref(1)
+const pageSize = ref(10)
 const attendanceStatusFilter = ref('')
 const attendanceDateFilter = ref('')
 
-// 过滤考勤列表
-const filteredAttendances = computed(() => {
+// 将考勤记录按课程和日期分组
+const attendanceGroups = computed(() => {
+  const groups = {}
+  
+  props.attendances.forEach(attendance => {
+    // 生成分组键：courseId_date
+    const key = `${attendance.courseId}_${attendance.attendanceDate}`
+    
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        courseId: attendance.courseId,
+        courseName: attendance.courseName || '未知课程',
+        attendanceDate: attendance.attendanceDate,
+        status: attendance.status,
+        remark: attendance.remark,
+        attendances: [],
+        selected: false,
+        stats: {
+          present: 0,
+          absent: 0,
+          late: 0
+        },
+        totalStudents: 0
+      }
+    }
+    
+    // 添加到分组
+    groups[key].attendances.push(attendance)
+    
+    // 更新统计数据
+    if (attendance.status === '出勤') {
+      groups[key].stats.present++
+    } else if (attendance.status === '缺勤') {
+      groups[key].stats.absent++
+    } else if (attendance.status === '迟到') {
+      groups[key].stats.late++
+    }
+    
+    // 更新总学生数
+    groups[key].totalStudents = groups[key].attendances.length
+    
+    // 如果有任何一个考勤被选中，则分组也被选中
+    if (attendance.selected) {
+      groups[key].selected = true
+    }
+  })
+  
+  // 转换为数组
+  return Object.values(groups)
+})
+
+// 过滤考勤分组
+const filteredAttendanceGroups = computed(() => {
   if (!attendanceStatusFilter.value && !attendanceDateFilter.value) {
-    return props.attendances
+    return attendanceGroups.value
   }
   
-  return props.attendances.filter(attendance => {
+  return attendanceGroups.value.filter(group => {
     // 状态筛选
-    const statusMatch = !attendanceStatusFilter.value || attendance.status === attendanceStatusFilter.value
+    const statusMatch = !attendanceStatusFilter.value || group.status === attendanceStatusFilter.value
     
     // 日期筛选
     const dateMatch = !attendanceDateFilter.value || 
-      (attendance.attendanceDate && attendance.attendanceDate.includes(attendanceDateFilter.value))
+      (group.attendanceDate && group.attendanceDate.includes(attendanceDateFilter.value))
     
     // 同时满足状态和日期筛选条件
     return statusMatch && dateMatch
@@ -145,7 +195,7 @@ const filteredAttendances = computed(() => {
 
 // 格式化日期
 function formatDate(dateString) {
-  return formatDateTime(dateString);
+  return formatDateTime(dateString)
 }
 
 // 获取考勤状态类型
@@ -160,36 +210,57 @@ function getAttendanceStatusType(status) {
   }
 }
 
-// 获取考勤统计信息
-function getAttendanceStats(attendance) {
-  // 默认统计数据
-  const stats = {
-    present: 0,
-    absent: 0,
-    late: 0
-  }
+// 处理分组选择变化
+function handleGroupSelectionChange(group) {
+  // 更新组内所有考勤的选择状态
+  group.attendances.forEach(attendance => {
+    attendance.selected = group.selected
+  })
   
-  // 如果有学生考勤记录，则统计
-  if (attendance.attendanceRecords && Array.isArray(attendance.attendanceRecords)) {
-    attendance.attendanceRecords.forEach(record => {
-      if (record.attendanceStatus === '出勤') {
-        stats.present++
-      } else if (record.attendanceStatus === '缺勤') {
-        stats.absent++
-      } else if (record.attendanceStatus === '迟到') {
-        stats.late++
-      }
-    })
-  }
-  
-  return stats
-}
-
-// 处理考勤选择变化
-function handleAttendanceSelectionChange() {
-  // 筛选出被选中的考勤记录
+  // 更新选中的考勤列表
   const selected = props.attendances.filter(attendance => attendance.selected)
   emit('selection-change', selected)
+}
+
+// 批量删除
+function handleBatchDelete() {
+  ElMessageBox.confirm('确定要删除选中的考勤记录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    emit('batch-remove-attendances')
+  }).catch(() => {})
+}
+
+// 查看分组详情
+function viewGroupDetail(group) {
+  emit('view-attendance-detail', group)
+}
+
+// 编辑考勤分组
+function editAttendanceGroup(group) {
+  emit('edit-attendance', group)
+}
+
+// 删除考勤分组
+function removeAttendanceGroup(group) {
+  ElMessageBox.confirm('确定要删除此考勤记录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    // 删除组内所有考勤
+    group.attendances.forEach(attendance => {
+      emit('remove-attendance', attendance)
+    })
+  }).catch(() => {})
+}
+
+// 显示添加考勤对话框
+function showAddAttendanceDialog() {
+  // 发出事件通知父组件，由父组件显示模态框
+  emit('show-add-attendance-dialog')
 }
 
 // 处理状态过滤
