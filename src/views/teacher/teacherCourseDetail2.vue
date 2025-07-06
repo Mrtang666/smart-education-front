@@ -1,3 +1,4 @@
+<!-- 学生管理有bug，检查修复 -->
 <template>
     <div class="course-detail">
       <div class="course-header">
