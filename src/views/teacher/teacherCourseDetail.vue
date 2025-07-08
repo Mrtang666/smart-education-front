@@ -2103,7 +2103,7 @@ function removeStudent(student) {
       const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
       const studentIdStr = student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
       
-      // 修正API参数顺序：应该是从课程中移除学生，而不是从学生中移除课程
+      // 调用批量删除API，传入单个学生ID作为数组
       await courseSelectionAPI.batchDeleteCourseStudents(courseIdStr, [studentIdStr])
       
       // 重新获取课程学生列表

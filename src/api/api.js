@@ -3166,6 +3166,43 @@ export const courseSelectionAPI = {
             console.error('删除课程的所有选课关系失败:', error.response ? error.response.data : error.message);
             throw error;
         }
+    },
+
+    /**
+     * 7.批量删除课程中的学生（需要token）
+     * @param {string} courseId 课程ID
+     * @param {Array<string>} studentIds 学生ID数组
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：由后端返回，通常包含删除成功状态和消息
+     */
+    async batchDeleteCourseStudents(courseId, studentIds) {
+        try {
+            // 确保courseId是字符串类型
+            const courseIdStr = String(courseId);
+            
+            // 确保所有studentId都是字符串类型
+            const studentIdsStr = studentIds.map(id => String(id));
+            
+            console.log(`批量删除课程中的学生，课程ID: ${courseIdStr}, 学生数量: ${studentIdsStr.length}`);
+            
+            // 使用Promise.all并行处理多个删除请求
+            const promises = studentIdsStr.map(studentId => 
+                this.deleteCourseSelection(studentId, courseIdStr)
+            );
+            
+            const results = await Promise.all(promises);
+            console.log('批量删除学生响应:', results);
+            
+            // 返回成功信息
+            return {
+                success: true,
+                message: `成功删除 ${results.length} 名学生`,
+                count: results.length
+            };
+        } catch (error) {
+            console.error('批量删除课程学生失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     }
 };
 

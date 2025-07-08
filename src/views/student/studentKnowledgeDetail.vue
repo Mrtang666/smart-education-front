@@ -19,10 +19,32 @@
               <span>题量: {{ questions.length }}</span>
               <span>满分: {{ typeof totalScore === 'number' ? totalScore.toFixed(1) : '0.0' }}</span>
             </div>
+            
+            <div class="action-buttons">
+              <el-button 
+                type="primary" 
+                @click="submitAllAnswers" 
+                :disabled="!hasAnyAnswer || allQuestionsAnswered"
+              >
+                提交全部答案
+              </el-button>
+              <el-button 
+                type="warning" 
+                @click="resetAllAnswers" 
+                v-if="allQuestionsAnswered"
+              >
+                重新答题
+              </el-button>
+            </div>
           </div>
           
           <!-- 题目列表 -->
-          <div v-for="(question, index) in questions" :key="question.questionId" class="question-item">
+          <div 
+            v-for="(question, index) in questions" 
+            :key="question.questionId" 
+            class="question-item"
+            :id="`question-${question.questionId}`"
+          >
             <div class="question-header">
               {{ index + 1 }}. <span v-if="question.questionType === 'SINGLE_CHOICE'">[单选题]</span>
               <span v-else-if="question.questionType === 'MULTIPLE_CHOICE'">[多选题]</span>
@@ -41,13 +63,19 @@
                   v-for="(option, optIndex) in question.options"
                   :key="optIndex"
                   class="option-item"
-                  :class="{ selected: userAnswers[question.questionId] === String.fromCharCode(65 + optIndex) }"
-                  @click="userAnswers[question.questionId] = String.fromCharCode(65 + optIndex)"
+                  :class="{ 
+                    selected: userAnswers[question.questionId] === String.fromCharCode(65 + optIndex),
+                    'option-hover': true
+                  }"
+                  @click="selectSingleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
                 >
                   <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
                   <span class="option-separator">、</span>
-                      <span class="option-content">{{ option }}</span>
-                  </div>
+                  <span class="option-content">{{ option }}</span>
+                  <span class="option-check" v-if="userAnswers[question.questionId] === String.fromCharCode(65 + optIndex)">
+                    <i class="el-icon-check"></i>
+                  </span>
+                </div>
               </div>
               
               <!-- 多选题选项（自定义渲染） -->
@@ -56,13 +84,19 @@
                   v-for="(option, optIndex) in question.options"
                   :key="optIndex"
                   class="option-item"
-                  :class="{ selected: userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex)) }"
+                  :class="{ 
+                    selected: userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex)),
+                    'option-hover': true
+                  }"
                   @click="toggleMultipleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
                 >
                   <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
                   <span class="option-separator">、</span>
-                      <span class="option-content">{{ option }}</span>
-                  </div>
+                  <span class="option-content">{{ option }}</span>
+                  <span class="option-check" v-if="userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex))">
+                    <i class="el-icon-check"></i>
+                  </span>
+                </div>
               </div>
               
               <div v-else-if="question.questionType === 'FILL_BLANK'" class="question-options">
@@ -87,21 +121,33 @@
               <div v-else-if="question.questionType === 'TRUE_FALSE'" class="question-options">
                 <div
                   class="option-item"
-                  :class="{ selected: userAnswers[question.questionId] === 'true' }"
-                  @click="userAnswers[question.questionId] = 'true'"
+                  :class="{ 
+                    selected: userAnswers[question.questionId] === 'true',
+                    'option-hover': true
+                  }"
+                  @click="selectTrueFalse(question.questionId, 'true')"
                 >
                   <span class="option-label">A</span>
                   <span class="option-separator">、</span>
                   <span class="option-content">正确</span>
+                  <span class="option-check" v-if="userAnswers[question.questionId] === 'true'">
+                    <i class="el-icon-check"></i>
+                  </span>
                 </div>
                 <div
                   class="option-item"
-                  :class="{ selected: userAnswers[question.questionId] === 'false' }"
-                  @click="userAnswers[question.questionId] = 'false'"
+                  :class="{ 
+                    selected: userAnswers[question.questionId] === 'false',
+                    'option-hover': true
+                  }"
+                  @click="selectTrueFalse(question.questionId, 'false')"
                 >
                   <span class="option-label">B</span>
                   <span class="option-separator">、</span>
                   <span class="option-content">错误</span>
+                  <span class="option-check" v-if="userAnswers[question.questionId] === 'false'">
+                    <i class="el-icon-check"></i>
+                  </span>
                 </div>
               </div>
               
@@ -112,6 +158,8 @@
                   size="small" 
                   @click="submitAnswer(question)"
                   :disabled="!isAnswerValid(question)"
+                  class="submit-btn"
+                  :class="{'submit-btn-active': isAnswerValid(question)}"
                 >提交答案</el-button>
               </div>
             </div>
@@ -119,17 +167,47 @@
             <!-- 已回答时显示答案区域 -->
             <div v-else class="answer-section">
               <!-- 我的答案 -->
-              <div class="my-answer">
+              <div class="my-answer" :class="{ 'correct-answer': isCorrect(question), 'wrong-answer': !isCorrect(question), 'answer-animation': true }">
                 <span class="answer-label">我的答案: </span>
                 <span class="answer-content">{{ getDisplayAnswer(question) }}</span>
+                <span class="answer-status" v-if="isCorrect(question)">
+                  <i class="el-icon-check"></i> 正确
+                </span>
+                <span class="answer-status wrong" v-else>
+                  <i class="el-icon-close"></i> 错误
+                </span>
               </div>
               
               <!-- 正确答案 -->
-              <div class="correct-answer">
+              <div class="correct-answer answer-animation" :style="{ animationDelay: '0.2s' }">
                 <span class="answer-label">正确答案: </span>
                 <span class="answer-content">{{ question.referenceAnswer }}</span>
               </div>
+              
+              <!-- 解析 -->
+              <div class="answer-analysis answer-animation" v-if="question.analysis" :style="{ animationDelay: '0.4s' }">
+                <span class="answer-label">解析: </span>
+                <span class="answer-content">{{ question.analysis }}</span>
+              </div>
             </div>
+          </div>
+          
+          <!-- 底部提交按钮 -->
+          <div class="bottom-actions" v-if="questions.length > 0">
+            <el-button 
+              type="primary" 
+              @click="submitAllAnswers" 
+              :disabled="!hasAnyAnswer || allQuestionsAnswered"
+            >
+              提交全部答案
+            </el-button>
+            <el-button 
+              type="warning" 
+              @click="resetAllAnswers" 
+              v-if="allQuestionsAnswered"
+            >
+              重新答题
+            </el-button>
           </div>
         </div>
       </el-card>
@@ -182,6 +260,7 @@
 <script>
 import { knowledgeAPI } from '@/api/api';
 import { BigNumber } from 'bignumber.js';
+import { getUserInfo } from '@/utils/auth';
 
 export default {
   name: 'StudentKnowledgeDetail',
@@ -201,6 +280,10 @@ export default {
       // 用户答案
       userAnswers: {},
       answeredQuestions: {},
+      correctAnswers: {},
+      
+      // 学生信息
+      studentId: null,
       
       // 目录相关
       knowledgePoints: [],
@@ -244,6 +327,29 @@ export default {
     taskProgressPercent() {
       if (this.totalTaskCount === 0) return 0;
       return Math.round((this.completedTaskCount / this.totalTaskCount) * 100);
+    },
+    
+    // 是否有任何答案
+    hasAnyAnswer() {
+      for (const questionId in this.userAnswers) {
+        const answer = this.userAnswers[questionId];
+        if (Array.isArray(answer) ? answer.length > 0 : answer) {
+          return true;
+        }
+      }
+      return false;
+    },
+    
+    // 是否所有题目都已回答
+    allQuestionsAnswered() {
+      if (this.questions.length === 0) return false;
+      
+      for (const question of this.questions) {
+        if (!this.answeredQuestions[question.questionId]) {
+          return false;
+        }
+      }
+      return true;
     }
   },
   watch: {
@@ -288,9 +394,18 @@ export default {
     // 设置当前知识点ID
     this.currentKnowledgeId = this.knowledgeId;
     
+    // 获取学生ID
+    const userInfo = getUserInfo();
+    if (userInfo && userInfo.studentId) {
+      this.studentId = userInfo.studentId;
+    }
+    
     // 加载数据
     this.fetchQuestions();
     this.fetchKnowledgePoints();
+    
+    // 从本地存储加载已答题状态
+    this.loadAnsweredState();
   },
   methods: {
     // 获取知识点下的题目
@@ -345,6 +460,7 @@ export default {
     initUserAnswers() {
       const answers = {};
       const answered = {};
+      const correct = {};
       this.questions.forEach(question => {
         if (question.questionType === 'MULTIPLE_CHOICE') {
           answers[question.questionId] = [];
@@ -352,9 +468,11 @@ export default {
           answers[question.questionId] = '';
         }
         answered[question.questionId] = false;
+        correct[question.questionId] = false;
       });
       this.userAnswers = answers;
       this.answeredQuestions = answered;
+      this.correctAnswers = correct;
     },
     
     // 提交答案
@@ -362,15 +480,151 @@ export default {
       // 标记题目已回答
       this.$set(this.answeredQuestions, question.questionId, true);
       
+      // 检查答案是否正确
+      const isCorrect = this.checkAnswer(question);
+      this.$set(this.correctAnswers, question.questionId, isCorrect);
+      
+      // 保存答题状态到本地存储
+      this.saveAnsweredState();
+      
       // 这里可以添加向后端提交答案的逻辑
       console.log('提交答案:', question.questionId, this.userAnswers[question.questionId]);
       
       // 显示提交成功提示
       this.$message({
-        message: '答案已提交',
-        type: 'success',
+        message: isCorrect ? '回答正确！' : '回答错误，请查看正确答案',
+        type: isCorrect ? 'success' : 'warning',
         duration: 1500
       });
+      
+      // 滚动到答案区域
+      this.$nextTick(() => {
+        const answerSection = document.querySelector(`#question-${question.questionId} .answer-section`);
+        if (answerSection) {
+          answerSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    },
+    
+    // 提交全部答案
+    submitAllAnswers() {
+      // 检查是否有未作答的题目
+      const unansweredQuestions = this.questions.filter(q => 
+        !this.isAnswerValid({ questionId: q.questionId, questionType: q.questionType })
+      );
+      
+      if (unansweredQuestions.length > 0) {
+        this.$confirm(`还有 ${unansweredQuestions.length} 道题目未作答，确定要提交吗？`, '提交确认', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          this.processAllAnswers();
+        }).catch(() => {
+          // 用户取消提交
+        });
+      } else {
+        this.processAllAnswers();
+      }
+    },
+    
+    // 处理所有答案
+    processAllAnswers() {
+      // 标记所有题目为已回答
+      this.questions.forEach(question => {
+        this.$set(this.answeredQuestions, question.questionId, true);
+        
+        // 检查答案是否正确
+        const isCorrect = this.checkAnswer(question);
+        this.$set(this.correctAnswers, question.questionId, isCorrect);
+      });
+      
+      // 保存答题状态到本地存储
+      this.saveAnsweredState();
+      
+      // 计算得分
+      const totalQuestions = this.questions.length;
+      const correctCount = Object.values(this.correctAnswers).filter(Boolean).length;
+      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      
+      // 显示得分结果
+      this.$message({
+        message: `答案已提交！得分: ${score}分，正确率: ${correctCount}/${totalQuestions}`,
+        type: 'success',
+        duration: 3000
+      });
+      
+      // 添加动画效果，依次显示每个答案
+      this.$nextTick(() => {
+        this.questions.forEach((question, index) => {
+          setTimeout(() => {
+            const questionElement = document.querySelector(`#question-${question.questionId}`);
+            if (questionElement) {
+              questionElement.classList.add('question-answered');
+              // 如果是第一个问题，滚动到它的位置
+              if (index === 0) {
+                questionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          }, index * 300); // 每个问题间隔300毫秒
+        });
+      });
+    },
+    
+    // 重置所有答案
+    resetAllAnswers() {
+      this.$confirm('确定要重新答题吗？这将清除您的所有答案。', '重置确认', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        // 重置用户答案
+        this.initUserAnswers();
+        
+        // 清除本地存储的答题状态
+        this.clearAnsweredState();
+        
+        this.$message({
+          message: '已重置所有答案，可以重新作答',
+          type: 'success',
+          duration: 1500
+        });
+      }).catch(() => {
+        // 用户取消重置
+      });
+    },
+    
+    // 检查答案是否正确
+    checkAnswer(question) {
+      const userAnswer = this.userAnswers[question.questionId];
+      const referenceAnswer = question.referenceAnswer;
+      
+      if (!userAnswer || !referenceAnswer) return false;
+      
+      if (question.questionType === 'MULTIPLE_CHOICE') {
+        // 多选题比较
+        if (!Array.isArray(userAnswer)) return false;
+        
+        // 将参考答案转换为数组
+        const refAnswerArray = referenceAnswer.split(/[,，、\s]+/).filter(Boolean);
+        
+        // 检查长度是否相同
+        if (userAnswer.length !== refAnswerArray.length) return false;
+        
+        // 检查每个选项是否都存在
+        return refAnswerArray.every(option => userAnswer.includes(option));
+      } else if (question.questionType === 'TRUE_FALSE') {
+        // 判断题比较（忽略大小写）
+        return userAnswer.toLowerCase() === referenceAnswer.toLowerCase();
+      } else {
+        // 其他题型（简单比较）
+        return userAnswer.trim() === referenceAnswer.trim();
+      }
+    },
+    
+    // 判断答案是否正确
+    isCorrect(question) {
+      return this.correctAnswers[question.questionId] === true;
     },
     
     // 获取用户答案显示文本
@@ -452,9 +706,25 @@ export default {
         return answer && answer.trim() !== '';
       } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE') {
         return answer && answer.trim() !== '';
+      } else if (question.questionType === 'TRUE_FALSE') {
+        return answer === 'true' || answer === 'false';
       } else {
         return false;
       }
+    },
+    
+    // 单选题选择
+    selectSingleChoice(questionId, optionLabel) {
+      this.$set(this.userAnswers, questionId, optionLabel);
+      // 添加选择动画效果
+      this.animateSelection(questionId);
+    },
+    
+    // 判断题选择
+    selectTrueFalse(questionId, value) {
+      this.$set(this.userAnswers, questionId, value);
+      // 添加选择动画效果
+      this.animateSelection(questionId);
     },
     
     // 多选题选项切换
@@ -468,6 +738,70 @@ export default {
       }
       // 触发响应式
       this.$set(this.userAnswers, questionId, [...arr]);
+      // 添加选择动画效果
+      this.animateSelection(questionId);
+    },
+    
+    // 添加选择动画效果
+    animateSelection(questionId) {
+      // 可以在这里添加更复杂的动画逻辑
+      // 简单的实现是通过CSS transition实现
+      console.log('选择了问题ID:', questionId);
+    },
+    
+    // 保存答题状态到本地存储
+    saveAnsweredState() {
+      if (!this.knowledgeId || !this.studentId) return;
+      
+      const storageKey = `knowledge_${this.knowledgeId}_student_${this.studentId}`;
+      const storageData = {
+        userAnswers: this.userAnswers,
+        answeredQuestions: this.answeredQuestions,
+        correctAnswers: this.correctAnswers,
+        timestamp: new Date().getTime()
+      };
+      
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(storageData));
+      } catch (e) {
+        console.error('保存答题状态失败:', e);
+      }
+    },
+    
+    // 从本地存储加载答题状态
+    loadAnsweredState() {
+      if (!this.knowledgeId || !this.studentId) return;
+      
+      const storageKey = `knowledge_${this.knowledgeId}_student_${this.studentId}`;
+      
+      try {
+        const storageData = localStorage.getItem(storageKey);
+        if (storageData) {
+          const data = JSON.parse(storageData);
+          
+          // 检查数据是否有效
+          if (data && data.userAnswers && data.answeredQuestions) {
+            this.userAnswers = data.userAnswers;
+            this.answeredQuestions = data.answeredQuestions;
+            this.correctAnswers = data.correctAnswers || {};
+          }
+        }
+      } catch (e) {
+        console.error('加载答题状态失败:', e);
+      }
+    },
+    
+    // 清除本地存储的答题状态
+    clearAnsweredState() {
+      if (!this.knowledgeId || !this.studentId) return;
+      
+      const storageKey = `knowledge_${this.knowledgeId}_student_${this.studentId}`;
+      
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {
+        console.error('清除答题状态失败:', e);
+      }
     }
   }
 };
@@ -524,6 +858,15 @@ export default {
   padding-bottom: 20px;
   border-bottom: 1px dashed #ebeef5;
   text-align: left;
+  transition: all 0.5s ease;
+}
+
+.question-answered {
+  background-color: rgba(64, 158, 255, 0.05);
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  transform: translateZ(0);
 }
 
 .question-header {
@@ -546,14 +889,39 @@ export default {
   font-weight: normal;
   cursor: pointer;
   background: none;
-  border-radius: 0;
-  padding: 0;
-  transition: color 0.2s;
+  border-radius: 6px;
+  padding: 10px 15px;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.option-hover:hover {
+  background-color: rgba(64, 158, 255, 0.1);
+  color: #409EFF;
 }
 
 .option-item.selected {
-  color: #222;
+  color: #409EFF;
   font-weight: bold;
+  background-color: rgba(64, 158, 255, 0.1);
+  border: 1px solid #409EFF;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.2);
+}
+
+.option-check {
+  position: absolute;
+  right: 15px;
+  color: #409EFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .option-label {
@@ -588,7 +956,8 @@ export default {
 }
 
 .my-answer,
-.correct-answer {
+.correct-answer,
+.answer-analysis {
   margin-top: 10px;
   font-size: 16px;
   padding: 12px 20px;
@@ -598,6 +967,14 @@ export default {
   align-items: center;
   font-weight: bold;
   position: relative;
+}
+
+.my-answer {
+  background-color: #f0f9eb;
+}
+
+.my-answer.wrong-answer {
+  background-color: #fef0f0;
 }
 
 .my-answer::before {
@@ -610,6 +987,14 @@ export default {
   position: absolute;
   left: 8px;
   top: 10%;
+}
+
+.my-answer.correct-answer::before {
+  background: #67C23A;
+}
+
+.my-answer.wrong-answer::before {
+  background: #F56C6C;
 }
 
 .correct-answer {
@@ -628,6 +1013,23 @@ export default {
   top: 10%;
 }
 
+.answer-analysis {
+  color: #606266;
+  background-color: #f4f4f5;
+}
+
+.answer-analysis::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 80%;
+  background: #909399;
+  border-radius: 2px;
+  position: absolute;
+  left: 8px;
+  top: 10%;
+}
+
 .answer-label {
   font-weight: bold;
   margin-right: 5px;
@@ -636,10 +1038,26 @@ export default {
 
 .my-answer .answer-content {
   color: #222;
+  flex: 1;
 }
 
 .correct-answer .answer-content {
   color: #13c26b;
+}
+
+.answer-analysis .answer-content {
+  color: #606266;
+  font-weight: normal;
+}
+
+.answer-status {
+  margin-left: 10px;
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.answer-status.wrong {
+  color: #F56C6C;
 }
 
 /* 右侧目录区样式 */
@@ -716,5 +1134,44 @@ export default {
   background: #409eff;
   border-radius: 9px 0 0 9px;
   transition: width 0.3s;
+}
+
+.action-buttons {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+.bottom-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.submit-btn-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-btn {
+  transition: all 0.3s ease;
+}
+
+.submit-btn-active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 12px 0 rgba(64, 158, 255, 0.3);
+}
+
+.answer-animation {
+  animation: slideIn 0.5s ease forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>

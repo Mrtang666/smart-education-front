@@ -249,11 +249,15 @@ export default {
       try {
         if (currentPlan.value && currentPlan.value.planId) {
           const response = await learningPlanAPI.getPlanRecommendedResources(currentPlan.value.planId);
-          recommendedResources.value = response;
+          recommendedResources.value = response || [];
+        } else {
+          console.warn('无法获取推荐资源：当前计划不存在或没有planId');
+          recommendedResources.value = [];
         }
       } catch (error) {
         console.error('获取推荐学习资源失败:', error);
         ElMessage.error('获取推荐学习资源失败');
+        recommendedResources.value = [];
       }
     };
     
@@ -343,11 +347,18 @@ export default {
         return;
       }
       
+      if (!studentId.value) {
+        ElMessage.error('无法获取学生ID，请重新登录');
+        return;
+      }
+      
       loading.value = true;
       try {
+        let response;
+        
         if (newPlan.courseNames && newPlan.courseNames.length > 0) {
           // 通过课程名称生成计划
-          await learningPlanAPI.generateLearningPlanByCourseName(
+          response = await learningPlanAPI.generateLearningPlanByCourseName(
             studentId.value,
             newPlan.targetGoal,
             newPlan.timeFrame,
@@ -355,7 +366,7 @@ export default {
           );
         } else if (newPlan.knowledgeNames && newPlan.knowledgeNames.length > 0) {
           // 通过知识点名称生成计划
-          await learningPlanAPI.generateLearningPlanByKnowledgeName(
+          response = await learningPlanAPI.generateLearningPlanByKnowledgeName(
             studentId.value,
             newPlan.targetGoal,
             newPlan.timeFrame,
@@ -363,20 +374,27 @@ export default {
           );
         } else {
           // 直接生成计划
-          await learningPlanAPI.generateLearningPlan(
+          response = await learningPlanAPI.generateLearningPlan(
             studentId.value,
             newPlan.targetGoal,
             newPlan.timeFrame
           );
         }
         
-        ElMessage.success('学习计划生成成功');
-        resetForm();
-        activeTab.value = 'current';
-        fetchCurrentPlan();
+        if (response) {
+          ElMessage.success('学习计划生成成功');
+          resetForm();
+          activeTab.value = 'current';
+          await fetchCurrentPlan();
+        } else {
+          ElMessage.warning('学习计划生成成功，但服务器返回空数据');
+          resetForm();
+          activeTab.value = 'current';
+          await fetchCurrentPlan();
+        }
       } catch (error) {
         console.error('生成学习计划失败:', error);
-        ElMessage.error('生成学习计划失败');
+        ElMessage.error('生成学习计划失败: ' + (error.message || '未知错误'));
       } finally {
         loading.value = false;
       }
@@ -446,6 +464,16 @@ export default {
       } catch (error) {
         console.error('更新活动状态失败:', error);
         ElMessage.error('更新活动状态失败');
+        
+        // 尝试在本地更新活动状态，即使API调用失败
+        if (currentPlan.value && currentPlan.value.dailyActivities) {
+          currentPlan.value.dailyActivities.forEach(dayPlan => {
+            const activity = dayPlan.activities.find(act => act.activityId === activityId);
+            if (activity) {
+              activity.status = status;
+            }
+          });
+        }
       }
     };
     
@@ -458,14 +486,15 @@ export default {
       
       try {
         const response = await learningPlanAPI.searchPlanResources(studentId.value, searchKeyword.value);
-        searchResults.value = response;
+        searchResults.value = response || [];
         
-        if (searchResults.value.length === 0) {
+        if (!response || searchResults.value.length === 0) {
           ElMessage.info('没有找到相关资源');
         }
       } catch (error) {
         console.error('搜索资源失败:', error);
-        ElMessage.error('搜索资源失败');
+        ElMessage.error('搜索资源失败: ' + (error.message || '未知错误'));
+        searchResults.value = [];
       }
     };
     
