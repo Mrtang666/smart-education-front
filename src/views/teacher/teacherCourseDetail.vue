@@ -476,9 +476,9 @@
         <el-form-item label="总分" prop="totalScore">
           <el-input-number v-model="homeworkForm.totalScore" :min="1" :max="100" />
         </el-form-item>
-        <el-form-item label="截止日期" prop="deadline">
+        <el-form-item label="截止日期" prop="endTime">
           <el-date-picker
-            v-model="homeworkForm.deadline"
+            v-model="homeworkForm.endTime"
             type="datetime"
             placeholder="选择截止日期"
             format="YYYY-MM-DD HH:mm"
@@ -823,7 +823,7 @@ const homeworkForm = ref({
   title: '',
   description: '',
   totalScore: 100,
-  deadline: '',
+  endTime: '',
   homeworkId: null,
   type: 'homework' // 添加type字段，指定为作业类型
 })
@@ -862,7 +862,7 @@ const homeworkRules = {
     { required: true, message: '请输入总分', trigger: 'blur' },
     { type: 'number', min: 1, message: '总分必须大于0', trigger: 'blur' }
   ],
-  deadline: [
+  endTime: [
     { required: true, message: '请选择截止日期', trigger: 'change' }
   ]
 }
@@ -905,7 +905,7 @@ function showAddHomeworkDialog() {
     title: '',
     description: '',
     totalScore: 100,
-    deadline: '',
+    endTime: '',
     homeworkId: null,
     type: 'homework' // 添加type字段，指定为作业类型
   }
@@ -922,7 +922,7 @@ function editHomework(homework) {
     title: homework.title,
     description: homework.description || '',
     totalScore: homework.totalScore,
-    deadline: homework.deadline,
+    endTime: homework.endTime,
     homeworkId: homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId,
     type: 'homework' // 确保type字段设置为作业类型
   }
@@ -967,7 +967,7 @@ async function saveHomework() {
             title: homeworkForm.value.title,
             description: homeworkForm.value.description,
             totalScore: homeworkForm.value.totalScore,
-            deadline: homeworkForm.value.deadline,
+            endTime: homeworkForm.value.endTime,
             type: 'homework'
           }
           
@@ -981,7 +981,7 @@ async function saveHomework() {
             courseId: courseIdStr,
             teacherId: teacherId,
             totalScore: homeworkForm.value.totalScore,
-            deadline: homeworkForm.value.deadline,
+            endTime: homeworkForm.value.endTime,
             type: 'homework'
           }
           
@@ -1180,7 +1180,7 @@ function getSubmissionStatus(submission, homework) {
     return '未提交'
   }
   
-  const deadline = homework.deadline ? new Date(homework.deadline) : null
+  const deadline = homework.endTime ? new Date(homework.endTime) : null
   const submitTime = submission.submitTime ? new Date(submission.submitTime) : null
   
   if (deadline && submitTime) {
@@ -1192,6 +1192,58 @@ function getSubmissionStatus(submission, homework) {
   }
   
   return '已提交'
+}
+
+// 获取截止日期倒计时
+function getDeadlineCountdown(homework, now) {
+  if (!homework.endTime) return null;
+  
+  const endTime = new Date(homework.endTime);
+  
+  // 如果已经截止，不显示倒计时
+  if (now > endTime) return null;
+  
+  // 计算剩余时间（毫秒）
+  const timeRemaining = endTime.getTime() - now.getTime();
+  
+  // 转换为天、小时、分钟
+  const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+  
+  // 根据剩余时间返回不同格式的倒计时
+  if (days > 0) {
+    return `剩余 ${days} 天 ${hours} 小时`;
+  } else if (hours > 0) {
+    return `剩余 ${hours} 小时 ${minutes} 分钟`;
+  } else if (minutes > 0) {
+    return `剩余 ${minutes} 分钟`;
+  } else {
+    return `即将截止`;
+  }
+}
+
+// 获取标签效果
+function getTagEffect(homework, now) {
+  if (!homework.endTime) return 'plain';
+  
+  const endTime = new Date(homework.endTime);
+  
+  if (now > endTime) {
+    return 'dark'; // 已截止，深色效果
+  } else if (now > new Date(endTime.getTime() - 24 * 60 * 60 * 1000)) {
+    return 'light'; // 即将截止（24小时内），浅色效果
+  } else {
+    return 'plain'; // 进行中，普通效果
+  }
+}
+
+// 判断作业是否已过期
+function isHomeworkExpired(homework, now) {
+  if (!homework.endTime) return false;
+  
+  const endTime = new Date(homework.endTime);
+  return now > endTime;
 }
 
 // 课程知识点列表
@@ -3356,6 +3408,17 @@ function removeAttendance(attendance) {
 </script>
 
 <style scoped>
+.deadline-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.countdown-text {
+  font-size: 12px;
+  color: #F56C6C;
+  margin-top: 4px;
+}
+
 .course-detail {
   height: 100%;
   display: flex;

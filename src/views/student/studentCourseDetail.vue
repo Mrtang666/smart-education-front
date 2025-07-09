@@ -112,20 +112,32 @@
             </div>
             <div class="attendance-stats">
               <div class="stat-item">
-                <div class="stat-value">{{ attendanceStats.present }}</div>
-                <div class="stat-label">已到</div>
+                <div class="stat-value stat-present">{{ attendanceStats.present }}</div>
+                <div class="stat-label">
+                  <i class="el-icon-check"></i>
+                  已到
+                </div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ attendanceStats.late }}</div>
-                <div class="stat-label">迟到</div>
+                <div class="stat-value stat-late">{{ attendanceStats.late }}</div>
+                <div class="stat-label">
+                  <i class="el-icon-time"></i>
+                  迟到
+                </div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ attendanceStats.absent }}</div>
-                <div class="stat-label">缺勤</div>
+                <div class="stat-value stat-absent">{{ attendanceStats.absent }}</div>
+                <div class="stat-label">
+                  <i class="el-icon-close"></i>
+                  缺勤
+                </div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">{{ attendanceStats.leave }}</div>
-                <div class="stat-label">请假</div>
+                <div class="stat-value stat-leave">{{ attendanceStats.leave }}</div>
+                <div class="stat-label">
+                  <i class="el-icon-document"></i>
+                  请假
+                </div>
               </div>
             </div>
           </div>
@@ -133,15 +145,24 @@
           <div class="attendance-list">
             <div class="attendance-header">
               <h3>考勤记录</h3>
+              <div class="attendance-filter">
+                <el-select v-model="attendanceStatusFilter" placeholder="状态筛选" size="small" clearable>
+                  <el-option label="全部" value=""></el-option>
+                  <el-option label="已到" value="已到"></el-option>
+                  <el-option label="迟到" value="迟到"></el-option>
+                  <el-option label="缺勤" value="缺勤"></el-option>
+                  <el-option label="请假" value="请假"></el-option>
+                </el-select>
+              </div>
             </div>
             <el-skeleton :loading="attendanceLoading" animated :rows="3">
               <template #default>
                 <el-empty v-if="attendanceRecords.length === 0" description="暂无考勤记录"></el-empty>
-                <el-table v-else :data="attendanceRecords" style="width: 100%">
+                <el-table v-else :data="filteredAttendanceRecords" style="width: 100%" :row-class-name="getAttendanceRowClass">
                   <el-table-column prop="date" label="日期" width="180"></el-table-column>
                   <el-table-column prop="status" label="状态" width="120">
                     <template #default="scope">
-                      <el-tag :type="getAttendanceTagType(scope.row.status)">
+                      <el-tag :type="getAttendanceTagType(scope.row.status)" effect="dark">
                         {{ scope.row.status }}
                       </el-tag>
                     </template>
@@ -153,6 +174,7 @@
                         size="small" 
                         type="primary" 
                         @click="showAttendanceDetail(scope.row)"
+                        plain
                       >查看详情</el-button>
                       <el-button 
                         v-if="scope.row.canSignIn"
@@ -172,31 +194,42 @@
             title="考勤详情"
             v-model="attendanceDialogVisible"
             width="50%"
+            custom-class="attendance-detail-dialog"
           >
             <div v-if="selectedAttendance" class="attendance-detail">
-              <div class="detail-item">
-                <span class="detail-label">日期：</span>
-                <span class="detail-value">{{ selectedAttendance.date }}</span>
+              <div class="detail-header" :class="getAttendanceStatusClass(selectedAttendance.status)">
+                <div class="detail-status-icon">
+                  <i :class="getAttendanceStatusIcon(selectedAttendance.status)"></i>
+                </div>
+                <div class="detail-status-text">
+                  {{ selectedAttendance.status }}
+                </div>
               </div>
-              <div class="detail-item">
-                <span class="detail-label">状态：</span>
-                <span class="detail-value">
-                  <el-tag :type="getAttendanceTagType(selectedAttendance.status)">
-                    {{ selectedAttendance.status }}
-                  </el-tag>
-                </span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">时间：</span>
-                <span class="detail-value">{{ selectedAttendance.time }}</span>
-              </div>
-              <div class="detail-item" v-if="selectedAttendance.reason">
-                <span class="detail-label">原因：</span>
-                <span class="detail-value">{{ selectedAttendance.reason }}</span>
-              </div>
-              <div class="detail-item" v-if="selectedAttendance.note">
-                <span class="detail-label">备注：</span>
-                <span class="detail-value">{{ selectedAttendance.note }}</span>
+              <div class="detail-content">
+                <div class="detail-item">
+                  <span class="detail-label">日期：</span>
+                  <span class="detail-value">{{ selectedAttendance.date }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">状态：</span>
+                  <span class="detail-value">
+                    <el-tag :type="getAttendanceTagType(selectedAttendance.status)" effect="dark">
+                      {{ selectedAttendance.status }}
+                    </el-tag>
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">时间：</span>
+                  <span class="detail-value">{{ selectedAttendance.time }}</span>
+                </div>
+                <div class="detail-item" v-if="selectedAttendance.reason">
+                  <span class="detail-label">原因：</span>
+                  <span class="detail-value">{{ selectedAttendance.reason }}</span>
+                </div>
+                <div class="detail-item" v-if="selectedAttendance.note">
+                  <span class="detail-label">备注：</span>
+                  <span class="detail-value">{{ selectedAttendance.note }}</span>
+                </div>
               </div>
               <div class="detail-actions" v-if="selectedAttendance.canSignIn">
                 <el-button type="primary" @click="handleSignIn(selectedAttendance)">立即签到</el-button>
@@ -337,6 +370,7 @@ export default {
       // 考勤数据
       attendanceRecords: [],
       attendanceLoading: false,
+      attendanceStatusFilter: '', // 新增：考勤状态筛选
       
       // 作业数据
       assignments: [],
@@ -379,6 +413,14 @@ export default {
       }
     },
     
+    // 根据筛选条件过滤考勤记录
+    filteredAttendanceRecords() {
+      if (!this.attendanceStatusFilter) {
+        return this.attendanceRecords;
+      }
+      return this.attendanceRecords.filter(record => record.status === this.attendanceStatusFilter);
+    },
+    
     // 是否显示筛选栏
     showFilterBar() {
       return ['assignment', 'exam', 'knowledge'].includes(this.activeSection);
@@ -394,12 +436,11 @@ export default {
       };
       
       this.attendanceRecords.forEach(record => {
-        const originalData = record.originalData;
-        if (originalData.present) {
+        if (record.status === '已到' || record.status === '出勤') {
           stats.present++;
-        } else if (originalData.late) {
+        } else if (record.status === '迟到') {
           stats.late++;
-        } else if (originalData.absent) {
+        } else if (record.status === '缺勤') {
           stats.absent++;
         } else if (record.status === '请假') {
           stats.leave++;
@@ -1060,6 +1101,54 @@ export default {
       
       return `${fileSize.toFixed(2)} ${units[unitIndex]}`;
     },
+
+    // 考勤记录表格行样式
+    getAttendanceRowClass({ row }) {
+      if (row.status === '已到' || row.status === '出勤') {
+        return 'attendance-present-row';
+      } else if (row.status === '迟到') {
+        return 'attendance-late-row';
+      } else if (row.status === '缺勤') {
+        return 'attendance-absent-row';
+      } else if (row.status === '请假') {
+        return 'attendance-leave-row';
+      }
+      return '';
+    },
+
+    // 获取考勤状态对应的图标
+    getAttendanceStatusIcon(status) {
+      const icons = {
+        '已到': 'el-icon-check',
+        '迟到': 'el-icon-time',
+        '缺勤': 'el-icon-close',
+        '请假': 'el-icon-document',
+        '进行中': 'el-icon-loading',
+        '已提交': 'el-icon-document-checked',
+        '已逾期': 'el-icon-warning',
+        '未开始': 'el-icon-date',
+        '已完成': 'el-icon-check-circle',
+        '已结束': 'el-icon-check-circle'
+      };
+      return icons[status] || 'el-icon-info'; // 默认图标
+    },
+
+    // 获取考勤状态对应的对话框头部样式
+    getAttendanceStatusClass(status) {
+      const classes = {
+        '已到': 'attendance-present-header',
+        '迟到': 'attendance-late-header',
+        '缺勤': 'attendance-absent-header',
+        '请假': 'attendance-leave-header',
+        '进行中': 'attendance-present-header',
+        '已提交': 'attendance-present-header',
+        '已逾期': 'attendance-late-header',
+        '未开始': 'attendance-present-header',
+        '已完成': 'attendance-present-header',
+        '已结束': 'attendance-present-header'
+      };
+      return classes[status] || 'attendance-present-header'; // 默认样式
+    }
   }
 }
 </script>
@@ -1215,14 +1304,11 @@ export default {
 }
 
 .attendance-summary {
-  padding: 20px 0;
-}
-
-.attendance-summary {
   background-color: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   padding: 20px;
+  margin-bottom: 20px;
 }
 
 .attendance-header {
@@ -1230,13 +1316,13 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ebeef5;
 }
 
-.attendance-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 500;
-  color: #303133;
+.attendance-filter {
+  display: flex;
+  gap: 10px;
 }
 
 .attendance-stats {
@@ -1245,12 +1331,24 @@ export default {
   background-color: #f9fafc;
   border-radius: 8px;
   padding: 20px 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s;
+}
+
+.attendance-stats:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
 .stat-item {
   text-align: center;
   padding: 10px 20px;
   position: relative;
+  transition: all 0.3s;
+}
+
+.stat-item:hover {
+  transform: translateY(-3px);
 }
 
 .stat-item:not(:last-child)::after {
@@ -1267,11 +1365,19 @@ export default {
   font-size: 32px;
   font-weight: bold;
   margin-bottom: 8px;
+  transition: all 0.3s;
+}
+
+.stat-item:hover .stat-value {
+  transform: scale(1.1);
 }
 
 .stat-label {
   font-size: 14px;
   color: #606266;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 为不同状态设置不同颜色 */
@@ -1289,6 +1395,33 @@ export default {
 
 .stat-item:nth-child(4) .stat-value {
   color: #909399; /* 请假 - 灰色 */
+}
+
+/* 添加具体的状态类样式 */
+.stat-present {
+  color: #67C23A !important;
+}
+
+.stat-late {
+  color: #E6A23C !important;
+}
+
+.stat-absent {
+  color: #F56C6C !important;
+}
+
+.stat-leave {
+  color: #909399 !important;
+}
+
+.stat-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-label i {
+  margin-right: 5px;
 }
 
 /* 知识点样式 */
@@ -1395,16 +1528,80 @@ export default {
 }
 
 .attendance-detail {
-  padding: 10px;
+  padding: 0;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 6px;
+  background-color: #f0f7ff;
+  border: 1px solid #d9ecff;
+}
+
+.attendance-present-header {
+  background-color: #f0f9eb;
+  border-color: #e1f3d8;
+}
+
+.attendance-present-header .detail-status-icon {
+  color: #67C23A;
+}
+
+.attendance-late-header {
+  background-color: #fffbe6;
+  border-color: #ffe58f;
+}
+
+.attendance-late-header .detail-status-icon {
+  color: #E6A23C;
+}
+
+.attendance-absent-header {
+  background-color: #fef0f0;
+  border-color: #fde2e2;
+}
+
+.attendance-absent-header .detail-status-icon {
+  color: #F56C6C;
+}
+
+.attendance-leave-header {
+  background-color: #f9f0f0;
+  border-color: #fde2e2;
+}
+
+.attendance-leave-header .detail-status-icon {
+  color: #909399;
+}
+
+.detail-status-icon {
+  font-size: 28px;
+  margin-right: 15px;
+}
+
+.detail-status-text {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.detail-content {
+  padding: 10px 0;
+  border-top: 1px solid #ebeef5;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 20px;
 }
 
 .detail-item {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   display: flex;
+  align-items: center;
 }
 
 .detail-label {
-  width: 100px;
+  width: 80px;
   color: #606266;
   font-weight: 500;
 }
@@ -1415,13 +1612,8 @@ export default {
 }
 
 .detail-actions {
-  margin-top: 20px;
   text-align: center;
-}
-
-.attendance-present {
-  color: #67C23A;
-  font-weight: bold;
+  margin-top: 20px;
 }
 
 /* 资料区样式 */
@@ -1492,5 +1684,22 @@ export default {
 
 .material-actions {
   margin-left: 16px;
+}
+
+/* 考勤记录表格行样式 */
+.attendance-present-row {
+  background-color: #f0f9eb; /* 已到行背景 */
+}
+
+.attendance-late-row {
+  background-color: #fffbe6; /* 迟到行背景 */
+}
+
+.attendance-absent-row {
+  background-color: #fef0f0; /* 缺勤行背景 */
+}
+
+.attendance-leave-row {
+  background-color: #f9f0f0; /* 请假行背景 */
 }
 </style>

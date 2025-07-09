@@ -45,7 +45,7 @@
           <el-table-column prop="totalScore" label="总分" width="80" />
           <el-table-column label="截止日期" min-width="180">
             <template #default="scope">
-              {{ formatDateTimeLocal(scope.row.deadline) }}
+              {{ formatDateTimeLocal(scope.row.endTime) }}
             </template>
           </el-table-column>
           <el-table-column label="状态" width="120">
@@ -106,7 +106,7 @@
         <el-descriptions :column="1" border>
           <el-descriptions-item label="所属课程">{{ selectedHomework.courseName }}</el-descriptions-item>
           <el-descriptions-item label="截止日期">
-            {{ formatDateTimeLocal(selectedHomework.deadline) }}
+            {{ formatDateTimeLocal(selectedHomework.endTime) }}
           </el-descriptions-item>
           <el-descriptions-item label="总分">{{ selectedHomework.totalScore }}分</el-descriptions-item>
           <el-descriptions-item label="作业状态">
@@ -157,6 +157,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { Search, Timer, Calendar, Loading } from '@element-plus/icons-vue'
+import { examAPI, courseSelectionAPI } from '@/api/api'
 
 const router = useRouter()
 
@@ -199,17 +200,31 @@ onUnmounted(() => {
 // 获取课程列表
 async function fetchCourseList() {
   try {
-    // 实际项目中应该调用API获取课程列表
-    // 这里使用模拟数据
-    courseList.value = [
-      { id: '1', name: '高等数学' },
-      { id: '2', name: '数据结构与算法' },
-      { id: '3', name: '计算机网络' },
-      { id: '4', name: '操作系统' }
-    ]
+    // 从localStorage获取学生ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      ElMessage.warning('未找到用户信息，请重新登录')
+      return
+    }
+    
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.studentId) {
+      ElMessage.warning('用户信息不完整或不是学生账号')
+      return
+    }
+    
+    // 获取学生选课列表
+    const selections = await courseSelectionAPI.getStudentCourses(userInfo.studentId)
+    
+    // 从选课列表中提取课程信息
+    courseList.value = selections.map(selection => ({
+      id: selection.courseId,
+      name: selection.courseName || `课程 ${selection.courseId}`
+    }))
   } catch (error) {
     console.error('获取课程列表失败:', error)
     ElMessage.error('获取课程列表失败，请稍后重试')
+    courseList.value = []
   }
 }
 
@@ -217,132 +232,118 @@ async function fetchCourseList() {
 async function fetchHomeworkList() {
   loading.value = true
   try {
-    // 实际项目中应该调用API获取作业列表
-    // 这里使用模拟数据，在实际项目中应该替换为API调用
-    // 使用后端接口，通过type=homework参数来区分作业
-    
-    // 模拟API调用延迟
-    setTimeout(() => {
-      const mockHomeworks = [
-        {
-          examId: '1',
-          title: '高等数学第一章作业',
-          courseName: '高等数学',
-          courseId: '1',
-          totalScore: 100,
-          deadline: '2023-11-20 23:59:59',
-          status: '进行中',
-          score: null,
-          submitted: false,
-          description: '请完成教材第一章习题1-10，并提交电子版。',
-          type: 'homework'
-        },
-        {
-          examId: '2',
-          title: '数据结构编程作业',
-          courseName: '数据结构与算法',
-          courseId: '2',
-          totalScore: 100,
-          deadline: '2023-11-25 23:59:59',
-          status: '进行中',
-          score: null,
-          submitted: true,
-          submitTime: '2023-11-18 14:30:00',
-          description: '实现一个简单的链表数据结构，包括增删改查操作。',
-          type: 'homework'
-        },
-        {
-          examId: '3',
-          title: '计算机网络实验报告',
-          courseName: '计算机网络',
-          courseId: '3',
-          totalScore: 50,
-          deadline: '2023-10-15 23:59:59',
-          status: '已结束',
-          score: 45,
-          submitted: true,
-          submitTime: '2023-10-14 18:20:00',
-          description: '完成TCP/IP协议分析实验，并提交实验报告。',
-          type: 'homework'
-        },
-        {
-          examId: '4',
-          title: '操作系统原理思考题',
-          courseName: '操作系统',
-          courseId: '4',
-          totalScore: 100,
-          deadline: '2023-11-30 23:59:59',
-          status: '未开始',
-          score: null,
-          submitted: false,
-          description: '思考并回答教材第三章末尾的5个思考题。',
-          type: 'homework'
-        }
-      ]
-      
-      // 过滤作业列表
-      let filteredHomeworks = [...mockHomeworks]
-      
-      // 按课程过滤
-      if (selectedCourseId.value) {
-        filteredHomeworks = filteredHomeworks.filter(hw => hw.courseId === selectedCourseId.value)
-      }
-      
-      // 按状态过滤
-      if (selectedStatus.value) {
-        filteredHomeworks = filteredHomeworks.filter(hw => hw.status === selectedStatus.value)
-      }
-      
-      // 按关键词搜索
-      if (searchKeyword.value) {
-        const keyword = searchKeyword.value.toLowerCase()
-        filteredHomeworks = filteredHomeworks.filter(hw => 
-          hw.title.toLowerCase().includes(keyword) || 
-          hw.courseName.toLowerCase().includes(keyword) ||
-          hw.description.toLowerCase().includes(keyword)
-        )
-      }
-      
-      // 更新作业列表和总数
-      homeworkList.value = filteredHomeworks
-      total.value = filteredHomeworks.length
-      
+    // 从localStorage获取学生ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      ElMessage.warning('未找到用户信息，请重新登录')
       loading.value = false
-    }, 500)
+      return
+    }
     
-    // 实际API调用应该类似：
-    // const response = await api.getStudentHomeworks({
-    //   courseId: selectedCourseId.value || undefined,
-    //   status: selectedStatus.value || undefined,
-    //   keyword: searchKeyword.value || undefined,
-    //   page: currentPage.value,
-    //   pageSize: pageSize.value,
-    //   type: 'homework' // 指定类型为作业
-    // })
-    // homeworkList.value = response.data
-    // total.value = response.total
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.studentId) {
+      ElMessage.warning('用户信息不完整或不是学生账号')
+      loading.value = false
+      return
+    }
+    
+    let homeworks = []
+    
+    // 如果选择了特定课程，则获取该课程的作业
+    if (selectedCourseId.value) {
+      const response = await examAPI.getExamsInCourseByType(selectedCourseId.value, 'homework')
+      homeworks = response || []
+    } else {
+      // 否则获取所有课程的作业
+      // 先获取学生的所有课程
+      const selections = await courseSelectionAPI.getStudentCourses(userInfo.studentId)
+      
+      // 然后获取每个课程的作业
+      const promises = selections.map(selection => 
+        examAPI.getExamsInCourseByType(selection.courseId, 'homework')
+          .then(exams => exams.map(exam => ({
+            ...exam,
+            courseName: selection.courseName || `课程 ${selection.courseId}`
+          })))
+          .catch(err => {
+            console.error(`获取课程${selection.courseId}的作业失败:`, err)
+            return []
+          })
+      )
+      
+      // 等待所有请求完成
+      const results = await Promise.all(promises)
+      
+      // 合并所有课程的作业
+      homeworks = results.flat()
+    }
+    
+    // 获取学生的作业提交情况
+    const submissionPromises = homeworks.map(homework => 
+      examAPI.getStudentExamAnswer(homework.examId, userInfo.studentId)
+        .then(submission => ({
+          ...homework,
+          submitted: !!submission,
+          submitTime: submission?.submitTime,
+          score: submission?.score
+        }))
+        .catch(() => ({
+          ...homework,
+          submitted: false,
+          submitTime: null,
+          score: null
+        }))
+    )
+    
+    // 等待所有提交情况查询完成
+    let homeworksWithSubmissions = await Promise.all(submissionPromises)
+    
+    // 按状态过滤
+    if (selectedStatus.value) {
+      homeworksWithSubmissions = homeworksWithSubmissions.filter(hw => 
+        getHomeworkStatus(hw, new Date()) === selectedStatus.value
+      )
+    }
+    
+    // 按关键词搜索
+    if (searchKeyword.value) {
+      const keyword = searchKeyword.value.toLowerCase()
+      homeworksWithSubmissions = homeworksWithSubmissions.filter(hw => 
+        (hw.title && hw.title.toLowerCase().includes(keyword)) || 
+        (hw.description && hw.description.toLowerCase().includes(keyword)) ||
+        (hw.courseName && hw.courseName.toLowerCase().includes(keyword))
+      )
+    }
+    
+    // 更新作业状态
+    homeworksWithSubmissions.forEach(homework => {
+      homework.status = getHomeworkStatus(homework, new Date())
+    })
+    
+    // 更新作业列表和总数
+    homeworkList.value = homeworksWithSubmissions
+    total.value = homeworksWithSubmissions.length
   } catch (error) {
     console.error('获取作业列表失败:', error)
     ElMessage.error('获取作业列表失败，请稍后重试')
+    homeworkList.value = []
+    total.value = 0
+  } finally {
     loading.value = false
   }
 }
 
-// 更新作业状态
-function updateHomeworkStatus() {
-  const now = new Date()
+// 获取作业状态
+function getHomeworkStatus(homework, now) {
+  if (!homework.endTime) return '进行中'
   
-  // 更新每个作业的状态
-  homeworkList.value.forEach(homework => {
-    const deadline = new Date(homework.deadline)
-    
-    // 如果当前时间超过截止日期，则状态为已结束
-    if (now > deadline) {
-      homework.status = '已结束'
-    } else {
-      homework.status = '进行中'
-    }
-  })
+  const deadline = new Date(homework.endTime)
+  
+  if (now > deadline) {
+    return '已结束'
+  } else {
+    return '进行中'
+  }
 }
 
 // 格式化日期时间
@@ -380,7 +381,7 @@ function getSubmitStatusText(homework) {
   }
   
   const submitTime = new Date(homework.submitTime)
-  const deadline = new Date(homework.deadline)
+  const deadline = new Date(homework.endTime)
   
   if (submitTime > deadline) {
     return '逾期提交'
@@ -396,7 +397,7 @@ function getSubmitStatusType(homework) {
   }
   
   const submitTime = new Date(homework.submitTime)
-  const deadline = new Date(homework.deadline)
+  const deadline = new Date(homework.endTime)
   
   if (submitTime > deadline) {
     return 'warning'
@@ -470,6 +471,16 @@ function viewHomeworkResult(homework) {
     name: 'studentHomeworkDetail',
     params: { homeworkId: homework.examId },
     query: { mode: 'result' }
+  })
+}
+
+// 更新作业状态
+function updateHomeworkStatus() {
+  const now = new Date()
+  
+  // 更新每个作业的状态
+  homeworkList.value.forEach(homework => {
+    homework.status = getHomeworkStatus(homework, now)
   })
 }
 </script>

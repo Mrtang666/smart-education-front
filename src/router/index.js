@@ -130,6 +130,10 @@ const routes = [
         component: () => import("@/views/student/studentExam.vue"),
       },
       {
+        path: "settings",
+        component: () => import("@/views/student/studentSetting.vue"),
+      },
+      {
         path: "course",
         component: () => import("@/views/student/studentCourse.vue"),
       },

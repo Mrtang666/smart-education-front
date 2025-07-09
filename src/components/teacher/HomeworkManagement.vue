@@ -33,7 +33,12 @@
         <el-table-column prop="totalScore" label="总分" width="80" />
         <el-table-column label="截止日期" width="180">
           <template #default="scope">
-            {{ formatDate(scope.row.deadline) }}
+            <div class="deadline-container">
+              <div>{{ formatDate(scope.row.endTime) }}</div>
+              <div v-if="getDeadlineCountdown(scope.row, currentTime)" class="countdown-text">
+                {{ getDeadlineCountdown(scope.row, currentTime) }}
+              </div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="提交率" width="100">
@@ -43,13 +48,18 @@
         </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="scope">
-            <el-tag :type="getHomeworkStatusType(scope.row, currentTime)">{{ getHomeworkStatus(scope.row, currentTime) }}</el-tag>
+            <el-tag 
+              :type="getHomeworkStatusType(scope.row, currentTime)"
+              :effect="getTagEffect(scope.row, currentTime)"
+            >
+              {{ getHomeworkStatus(scope.row, currentTime) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="250" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="$emit('view-homework-submissions', scope.row)">查看提交</el-button>
-            <el-button link type="primary" @click="$emit('edit-homework', scope.row)">编辑</el-button>
+            <el-button link type="primary" @click="$emit('edit-homework', scope.row)" :disabled="isHomeworkExpired(scope.row, currentTime)">编辑</el-button>
             <el-button link type="danger" @click="$emit('remove-homework', scope.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -129,36 +139,86 @@ function formatDate(dateString) {
 
 // 获取作业状态类型
 function getHomeworkStatusType(homework, now) {
-  const deadline = homework.deadline ? new Date(homework.deadline) : null
+  if (!homework.endTime) return 'info'; // 未设置截止日期
   
-  if (deadline) {
-    if (now > deadline) {
-      return 'danger' // 已截止
-    } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
-      return 'warning' // 即将截止（24小时内）
-    } else {
-      return 'success' // 进行中
-    }
+  const deadline = new Date(homework.endTime);
+  
+  if (now > deadline) {
+    return 'danger'; // 已截止
+  } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+    return 'warning'; // 即将截止（24小时内）
+  } else if (now > new Date(deadline.getTime() - 3 * 24 * 60 * 60 * 1000)) {
+    return 'warning'; // 即将截止（3天内）
+  } else {
+    return 'success'; // 进行中
   }
+}
+
+// 获取标签效果
+function getTagEffect(homework, now) {
+  if (!homework.endTime) return 'plain';
   
-  return 'info' // 未知状态
+  const deadline = new Date(homework.endTime);
+  
+  if (now > deadline) {
+    return 'dark'; // 已截止，深色效果
+  } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+    return 'light'; // 即将截止（24小时内），浅色效果
+  } else {
+    return 'plain'; // 进行中，普通效果
+  }
 }
 
 // 获取作业状态文本
 function getHomeworkStatus(homework, now) {
-  const deadline = homework.deadline ? new Date(homework.deadline) : null
+  if (!homework.endTime) return '未设置截止日期';
   
-  if (deadline) {
-    if (now > deadline) {
-      return '已截止'
-    } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
-      return '即将截止'
-    } else {
-      return '进行中'
-    }
+  const deadline = new Date(homework.endTime);
+  
+  if (now > deadline) {
+    return '已截止';
+  } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+    return '即将截止';
+  } else {
+    return '进行中';
   }
+}
+
+// 获取截止日期倒计时
+function getDeadlineCountdown(homework, now) {
+  if (!homework.endTime) return null;
   
-  return '未知'
+  const deadline = new Date(homework.endTime);
+  
+  // 如果已经截止，不显示倒计时
+  if (now > deadline) return null;
+  
+  // 计算剩余时间（毫秒）
+  const timeRemaining = deadline.getTime() - now.getTime();
+  
+  // 转换为天、小时、分钟
+  const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+  
+  // 根据剩余时间返回不同格式的倒计时
+  if (days > 0) {
+    return `剩余 ${days} 天 ${hours} 小时`;
+  } else if (hours > 0) {
+    return `剩余 ${hours} 小时 ${minutes} 分钟`;
+  } else if (minutes > 0) {
+    return `剩余 ${minutes} 分钟`;
+  } else {
+    return `即将截止`;
+  }
+}
+
+// 判断作业是否已过期
+function isHomeworkExpired(homework, now) {
+  if (!homework.endTime) return false;
+  
+  const deadline = new Date(homework.endTime);
+  return now > deadline;
 }
 
 // 处理作业搜索输入
@@ -220,5 +280,16 @@ function handleSearchClear() {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.deadline-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.countdown-text {
+  font-size: 12px;
+  color: #F56C6C;
+  margin-top: 4px;
 }
 </style> 

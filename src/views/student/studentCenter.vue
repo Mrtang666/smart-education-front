@@ -90,7 +90,8 @@ import {
     Document,
     DataAnalysis,
     Notebook,
-    Calendar
+    Calendar,
+    Setting
 } from '@element-plus/icons-vue'
 import { getUserInfo, clearAuth } from '@/utils/auth'
 import { courseSelectionAPI } from '@/api/api'
@@ -174,6 +175,7 @@ const menuList = [
     { name: '考试', icon: Document },
     { name: '日程', icon: Calendar },
     { name: '计划', icon: DataAnalysis },
+    { name: '设置', icon: Setting }
 ]
 
 const activeMenu = ref('') // 默认不选中任何菜单
@@ -233,6 +235,9 @@ function handleMenuClick(menu) {
             break
         case '计划':
             router.push('/student/plan')
+            break
+        case '设置':
+            router.push('/student/settings')
             break
         default:
             break
