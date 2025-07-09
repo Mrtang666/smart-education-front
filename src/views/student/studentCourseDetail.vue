@@ -146,15 +146,20 @@
                       </el-tag>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="location" label="地点"></el-table-column>
                   <el-table-column prop="time" label="时间"></el-table-column>
-                  <el-table-column label="操作" width="120">
+                  <el-table-column label="操作" width="180">
                     <template #default="scope">
                       <el-button 
                         size="small" 
                         type="primary" 
                         @click="showAttendanceDetail(scope.row)"
                       >查看详情</el-button>
+                      <el-button 
+                        v-if="scope.row.canSignIn"
+                        size="small" 
+                        type="success" 
+                        @click="handleSignIn(scope.row)"
+                      >签到</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -182,10 +187,6 @@
                 </span>
               </div>
               <div class="detail-item">
-                <span class="detail-label">地点：</span>
-                <span class="detail-value">{{ selectedAttendance.location }}</span>
-              </div>
-              <div class="detail-item">
                 <span class="detail-label">时间：</span>
                 <span class="detail-value">{{ selectedAttendance.time }}</span>
               </div>
@@ -196,6 +197,9 @@
               <div class="detail-item" v-if="selectedAttendance.note">
                 <span class="detail-label">备注：</span>
                 <span class="detail-value">{{ selectedAttendance.note }}</span>
+              </div>
+              <div class="detail-actions" v-if="selectedAttendance.canSignIn">
+                <el-button type="primary" @click="handleSignIn(selectedAttendance)">立即签到</el-button>
               </div>
             </div>
           </el-dialog>
@@ -390,10 +394,16 @@ export default {
       };
       
       this.attendanceRecords.forEach(record => {
-        if (record.status === '已到') stats.present++;
-        else if (record.status === '迟到') stats.late++;
-        else if (record.status === '缺勤') stats.absent++;
-        else if (record.status === '请假') stats.leave++;
+        const originalData = record.originalData;
+        if (originalData.present) {
+          stats.present++;
+        } else if (originalData.late) {
+          stats.late++;
+        } else if (originalData.absent) {
+          stats.absent++;
+        } else if (record.status === '请假') {
+          stats.leave++;
+        }
       });
       
       return stats;
@@ -484,12 +494,16 @@ export default {
     // 获取考勤状态对应的标签类型
     getAttendanceTagType(status) {
       const map = {
+        '出勤': 'success',
         '已到': 'success',
         '迟到': 'warning',
+        '缺勤': 'danger',
         '请假': 'info',
-        '缺勤': 'danger'
+        '已结束': 'success',
+        '进行中': 'primary',
+        '': 'info'
       };
-      return map[status] || '';
+      return map[status] || 'info';
     },
     
     // 检查日期是否有考勤记录
@@ -515,7 +529,8 @@ export default {
         '已到': 'attendance-present',
         '迟到': 'attendance-late',
         '请假': 'attendance-leave',
-        '缺勤': 'attendance-absent'
+        '缺勤': 'attendance-absent',
+        '已结束': 'attendance-present'
       };
       
       return map[record.status] || '';
@@ -534,6 +549,20 @@ export default {
         });
       } catch (error) {
         return '日期格式错误';
+      }
+    },
+    
+    // 格式化时间
+    formatTime(timeString) {
+      if (!timeString) return '';
+      try {
+        const date = new Date(timeString);
+        return date.toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (error) {
+        return '时间格式错误';
       }
     },
     
@@ -616,32 +645,27 @@ export default {
         return;
       }
       
-      // 调用考勤API获取学生考勤数据
-      attendanceAPI.getStudentAttendance(userInfo.studentId)
+      // 调用考勤API获取学生特定课程的考勤数据
+      attendanceAPI.getStudentCourseAttendance(userInfo.studentId, this.courseId)
         .then(response => {
           if (Array.isArray(response)) {
-            // 过滤当前课程的考勤记录
-            const filteredRecords = response.filter(record => 
-              record.courseId === this.courseId
-            );
-            
             // 处理考勤数据
-            this.attendanceRecords = filteredRecords.map(item => {
+            this.attendanceRecords = response.map(item => {
               return {
                 id: item.attendanceId,
-                date: this.formatDate(item.date),
-                status: this.mapAttendanceStatus(item.status),
-                location: item.location || '未记录',
-                time: item.timeSlot || '未记录',
-                reason: item.reason,
-                note: item.note,
+                date: this.formatDate(item.attendanceDate), // 使用attendanceDate字段
+                status: this.mapAttendanceStatus(item),
+                time: this.formatTime(item.createdAt) || '未记录', // 使用创建时间作为考勤时间
+                reason: item.reason || '',
+                note: item.remark || '', // 使用remark字段
+                canSignIn: (item.status === '进行中' || !item.status || item.status.trim() === '') && !item.present, // 允许状态为空或进行中的考勤都可以签到
                 originalData: item // 保存原始数据，以备后用
               };
             });
             
             // 按日期排序，最新的在前面
             this.attendanceRecords.sort((a, b) => {
-              return new Date(b.originalData.date) - new Date(a.originalData.date);
+              return new Date(b.originalData.attendanceDate) - new Date(a.originalData.attendanceDate);
             });
           } else {
             this.attendanceRecords = [];
@@ -658,14 +682,28 @@ export default {
     },
     
     // 映射考勤状态
-    mapAttendanceStatus(status) {
-      const statusMap = {
-        'PRESENT': '已到',
-        'LATE': '迟到',
-        'ABSENT': '缺勤',
-        'LEAVE': '请假'
-      };
-      return statusMap[status] || status;
+    mapAttendanceStatus(item) {
+      // 如果有明确的status字段且不为空，优先使用
+      if (item.status && item.status.trim() !== '') {
+        return item.status;
+      }
+      
+      // 否则根据absent、late、present字段确定状态
+      if (item) {
+        if (item.present) {
+          return '已到';
+        } else if (item.late) {
+          return '迟到';
+        } else if (item.absent) {
+          return '缺勤';
+        } else {
+          // 如果没有明确状态，默认为进行中
+          return '进行中';
+        }
+      }
+      
+      // 默认返回进行中
+      return '进行中';
     },
     
     // 获取作业
@@ -854,6 +892,44 @@ export default {
     showAttendanceDetail(record) {
       this.selectedAttendance = record;
       this.attendanceDialogVisible = true;
+    },
+    
+    // 处理考勤签到
+    async handleSignIn(record) {
+      try {
+        // 获取学生ID
+        const userInfo = getUserInfo();
+        if (!userInfo || !userInfo.studentId) {
+          this.$message.error('获取学生信息失败，请重新登录');
+          return;
+        }
+        
+        // 显示加载状态
+        const loading = this.$loading({
+          lock: true,
+          text: '正在签到...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(255, 255, 255, 0.7)'
+        });
+        
+        // 调用签到API
+        const result = await attendanceAPI.studentAttendanceSignIn(record.id, userInfo.studentId);
+        
+        // 关闭加载状态
+        loading.close();
+        
+        // 处理结果
+        if (result && result.success) {
+          this.$message.success('签到成功');
+          // 重新获取考勤记录
+          this.fetchAttendanceRecords();
+        } else {
+          this.$message.error(result.message || '签到失败，请稍后再试');
+        }
+      } catch (error) {
+        console.error('考勤签到失败:', error);
+        this.$message.error('签到失败: ' + (error.message || '未知错误'));
+      }
     },
     
     // 查看考试详情
@@ -1336,6 +1412,16 @@ export default {
 .detail-value {
   flex: 1;
   color: #303133;
+}
+
+.detail-actions {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.attendance-present {
+  color: #67C23A;
+  font-weight: bold;
 }
 
 /* 资料区样式 */

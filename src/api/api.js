@@ -2281,7 +2281,7 @@ export const attendanceAPI = {
      * 返回字段：由后端返回，通常包含考勤相关信息
      */
     async updateAttendanceStatus(attendanceId, status, remark) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         const params = { status };
         if (remark) params.remark = remark;
         const response = await axios.put(`/api/attendance/${attendanceId}/status`, null, { params });
@@ -2333,7 +2333,7 @@ export const attendanceAPI = {
      *   - present: boolean 是否出勤
      */
     async saveAttendance(attendanceData) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         const response = await axios.post('/api/attendance/save', attendanceData);
         return response.data;
     },
@@ -2345,7 +2345,7 @@ export const attendanceAPI = {
      * 返回字段：由后端返回，通常包含批量操作结果
      */
     async batchSaveAttendance(attendanceList) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         const response = await axios.post('/api/attendance/batch-save', attendanceList);
         return response.data;
     },
@@ -2542,7 +2542,7 @@ export const attendanceAPI = {
      *   - message: string 提示信息
      */
     async deleteAttendance(attendanceId) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         try {
             // 确保ID是字符串类型
             const attendanceIdStr = String(attendanceId);
@@ -2567,7 +2567,7 @@ export const attendanceAPI = {
      *   - count: number 成功删除的记录数
      */
     async batchDeleteAttendance(attendanceIds) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         try {
             // 确保所有ID都是字符串类型
             const attendanceIdsStr = attendanceIds.map(id => String(id));
@@ -2581,6 +2581,48 @@ export const attendanceAPI = {
         } catch (error) {
             console.error('批量删除考勤记录失败:', error.response ? error.response.data : error.message);
             throw error;
+        }
+    },
+
+    /**
+     * 17.学生签到考勤（需要token）
+     * @param {number} attendanceId 考勤ID
+     * @param {number} studentId 学生ID
+     * @returns {Promise<Object>} 签到结果
+     * 返回字段：
+     *   - success: boolean 是否签到成功
+     *   - message: string 提示信息
+     *   - attendanceRecord: Object 更新后的考勤记录
+     */
+    async studentAttendanceSignIn(attendanceId, studentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const attendanceIdStr = String(attendanceId);
+            
+            console.log(`学生签到考勤，考勤ID: ${attendanceIdStr}, 学生ID: ${studentId}`);
+            
+            // 使用更新考勤状态接口，将状态更新为"已到"
+            const response = await axios.put(`/api/attendance/${attendanceIdStr}/status`, null, { 
+                params: { 
+                    status: '已到',
+                    remark: `学生${studentId}自主签到`
+                } 
+            });
+            
+            // 格式化返回结果以保持与原接口一致
+            return {
+                success: true,
+                message: '签到成功',
+                attendanceRecord: response.data
+            };
+        } catch (error) {
+            console.error('学生签到考勤失败:', error.response ? error.response.data : error.message);
+            return {
+                success: false,
+                message: error.response ? error.response.data.message || '签到失败' : '签到失败',
+                error: error.message
+            };
         }
     },
 };

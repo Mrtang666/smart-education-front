@@ -104,6 +104,10 @@ const props = defineProps({
   }
 })
 
+// 添加调试日志
+console.log('AttendanceManagement组件接收到的考勤数据:', props.attendances)
+console.log('AttendanceManagement组件接收到的学生数据:', props.courseStudents)
+
 const emit = defineEmits([
   'batch-remove-attendances',
   'add-attendance',
@@ -124,9 +128,21 @@ const attendanceDateFilter = ref('')
 
 // 将考勤记录按课程和日期分组
 const attendanceGroups = computed(() => {
+  if (!props.attendances || props.attendances.length === 0) {
+    console.log('没有考勤数据可分组')
+    return []
+  }
+  
+  console.log('开始分组考勤数据:', props.attendances.length, '条记录')
   const groups = {}
   
   props.attendances.forEach(attendance => {
+    // 确保考勤记录有必要的字段
+    if (!attendance.courseId || !attendance.attendanceDate) {
+      console.warn('发现无效考勤记录:', attendance)
+      return
+    }
+    
     // 生成分组键：courseId_date
     const key = `${attendance.courseId}_${attendance.attendanceDate}`
     
@@ -136,8 +152,8 @@ const attendanceGroups = computed(() => {
         courseId: attendance.courseId,
         courseName: attendance.courseName || '未知课程',
         attendanceDate: attendance.attendanceDate,
-        status: attendance.status,
-        remark: attendance.remark,
+        status: attendance.status || '', // 设置状态默认值为空字符串
+        remark: attendance.remark || '',
         attendances: [],
         selected: false,
         stats: {
@@ -152,13 +168,17 @@ const attendanceGroups = computed(() => {
     // 添加到分组
     groups[key].attendances.push(attendance)
     
-    // 更新统计数据
-    if (attendance.status === '出勤') {
+    // 更新统计数据 - 根据学生的考勤属性来计算，而不是根据状态
+    // 这里假设每个考勤记录有一个attendanceResult属性表示学生的出勤结果
+    if (attendance.attendanceResult === '出勤') {
       groups[key].stats.present++
-    } else if (attendance.status === '缺勤') {
+    } else if (attendance.attendanceResult === '缺勤') {
       groups[key].stats.absent++
-    } else if (attendance.status === '迟到') {
+    } else if (attendance.attendanceResult === '迟到') {
       groups[key].stats.late++
+    } else {
+      // 默认计入出勤
+      groups[key].stats.present++
     }
     
     // 更新总学生数
@@ -168,10 +188,16 @@ const attendanceGroups = computed(() => {
     if (attendance.selected) {
       groups[key].selected = true
     }
+    
+    // 更新组的状态 - 如果任何一个考勤记录是"已结束"状态，则整个组也是"已结束"
+    if (attendance.status === '已结束') {
+      groups[key].status = '已结束'
+    }
   })
   
-  // 转换为数组
-  return Object.values(groups)
+  const result = Object.values(groups)
+  console.log('考勤分组结果:', result.length, '个分组')
+  return result
 })
 
 // 过滤考勤分组
@@ -233,14 +259,36 @@ function handleBatchDelete() {
   }).catch(() => {})
 }
 
-// 查看分组详情
-function viewGroupDetail(group) {
-  emit('view-attendance-detail', group)
-}
-
 // 编辑考勤分组
 function editAttendanceGroup(group) {
+  // 在调用父组件的编辑方法之前，确保状态已更新
+  saveAttendanceGroupStatus(group)
   emit('edit-attendance', group)
+}
+
+// 添加新方法：保存考勤组状态
+async function saveAttendanceGroupStatus(group) {
+  try {
+    // 遍历组内所有考勤记录，更新状态
+    for (const attendance of group.attendances) {
+      // 发出更新事件，由父组件处理API调用
+      emit('update-attendance', {
+        attendanceId: attendance.attendanceId,
+        status: group.status || '', // 使用组的状态，默认为空字符串
+        remark: group.remark || ''
+      })
+    }
+    console.log('考勤组状态已保存:', group.key)
+  } catch (error) {
+    console.error('保存考勤组状态失败:', error)
+  }
+}
+
+// 查看分组详情
+function viewGroupDetail(group) {
+  // 在查看详情前，确保状态已更新
+  saveAttendanceGroupStatus(group)
+  emit('view-attendance-detail', group)
 }
 
 // 删除考勤分组

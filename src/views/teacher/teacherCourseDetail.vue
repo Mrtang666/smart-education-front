@@ -2813,23 +2813,31 @@ async function addAttendance(attendanceFormData) {
       background: 'rgba(255, 255, 255, 0.7)'
     })
     
-    // 批量创建考勤记录
-    const attendanceList = selectedStudents.map(studentId => ({
-      courseId: courseIdStr,
-      studentId: String(studentId),
-      status: '进行中',
-      attendanceDate: attendanceFormData.attendanceDate,
-      remark: attendanceFormData.remark || ''
-    }))
-    
-    // 批量保存考勤记录
-    await attendanceAPI.batchSaveAttendance(attendanceList)
-    
-    // 重新获取考勤列表
-    await fetchCourseAttendances()
-    
-    loadingInstance.close()
-    ElMessage.success('考勤发布成功')
+    try {
+      // 批量创建考勤记录
+      const attendanceList = selectedStudents.map(studentId => ({
+        courseId: courseIdStr,
+        studentId: String(studentId),
+        status: '', // 设置状态为空字符串
+        attendanceDate: attendanceFormData.attendanceDate,
+        remark: attendanceFormData.remark || '',
+        type: 'attendance'
+      }))
+      
+      console.log('创建考勤列表:', attendanceList)
+      
+      // 批量保存考勤记录
+      await attendanceAPI.batchSaveAttendance(attendanceList)
+      
+      loadingInstance.close()
+      ElMessage.success('考勤发布成功')
+      
+      // 重新获取考勤列表
+      await fetchCourseAttendances()
+    } catch (error) {
+      loadingInstance.close()
+      throw error
+    }
   } catch (error) {
     console.error('发布考勤失败:', error)
     ElMessage.error(`发布考勤失败: ${error.message || '请稍后重试'}`)
@@ -2839,6 +2847,22 @@ async function addAttendance(attendanceFormData) {
 // 更新考勤
 async function updateAttendance(attendanceFormData) {
   try {
+    // 检查是否是单个考勤记录的更新请求
+    if (attendanceFormData.attendanceId) {
+      // 单个考勤状态更新
+      await attendanceAPI.updateAttendanceStatus(
+        attendanceFormData.attendanceId,
+        attendanceFormData.status,
+        attendanceFormData.remark || ''
+      )
+      console.log('单个考勤状态已更新:', attendanceFormData.attendanceId)
+      
+      // 重新获取考勤列表
+      await fetchCourseAttendances()
+      return
+    }
+    
+    // 以下是整个考勤组的更新逻辑
     // 解析考勤组ID (格式: courseId_date)
     const [courseIdStr, attendanceDate] = attendanceFormData.id.split('_')
     
@@ -2880,7 +2904,7 @@ async function updateAttendance(attendanceFormData) {
       const newAttendances = studentsToAdd.map(studentId => ({
         courseId: courseIdStr,
         studentId: String(studentId),
-        status: '进行中',
+        status: '', // 设置状态为空字符串
         attendanceDate: attendanceDate,
         remark: attendanceFormData.remark || ''
       }))
@@ -2929,26 +2953,405 @@ const attendanceForm = ref({
 
 // 可用的学生列表
 const availableStudents = computed(() => {
-  return courseStudents.value.filter(student => 
-    student.courseId === courseId
-  )
+  // 确保返回的是有效的数组
+  return courseStudents.value && courseStudents.value.length > 0 
+    ? courseStudents.value.filter(student => student.studentId)
+    : []
 })
 
 // 已选择的学生数量
 const selectedStudentsCount = computed(() => {
-  return attendanceForm.value.selectedStudentIds.length
+  return attendanceForm.value && attendanceForm.value.selectedStudentIds 
+    ? attendanceForm.value.selectedStudentIds.length 
+    : 0
 })
 
 // 监听学生选择变化，更新全选状态
 watch(() => attendanceForm.value.selectedStudentIds, (val) => {
-  const checkedCount = val.length
-  allStudentsSelected.value = checkedCount === availableStudents.value.length && availableStudents.value.length > 0
-  isIndeterminate.value = checkedCount > 0 && checkedCount < availableStudents.value.length
+  updateStudentSelectionStatus()
 }, { deep: true })
 
 // 添加一个空的fetchCourseAttendances函数以解决未定义错误
 async function fetchCourseAttendances() {
-  console.log('fetchCourseAttendances被调用，但该函数已被弃用')
+  try {
+    // 确保courseId是字符串形式
+    const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
+    console.log('获取课程考勤，课程ID:', courseIdStr)
+    
+    const response = await attendanceAPI.getCourseAttendance(courseIdStr)
+    console.log('获取到的考勤数据:', response)
+    
+    if (Array.isArray(response)) {
+      // 确保所有ID都是字符串形式，并添加默认值防止undefined
+      attendances.value = response.map(attendance => ({
+        ...attendance,
+        attendanceId: attendance.attendanceId ? new BigNumber(attendance.attendanceId).toString() : attendance.attendanceId,
+        studentId: attendance.studentId ? new BigNumber(attendance.studentId).toString() : attendance.studentId,
+        courseId: attendance.courseId ? new BigNumber(attendance.courseId).toString() : attendance.courseId,
+        selected: false, // 添加选中状态
+        status: attendance.status || '', // 确保状态有默认值，设为空字符串
+        type: attendance.type || 'attendance', // 添加默认类型
+      }));
+    } else {
+      attendances.value = []
+    }
+  } catch (error) {
+    console.error('获取课程考勤失败:', error)
+    ElMessage.error('获取课程考勤失败，请稍后重试')
+    attendances.value = []
+  }
+}
+
+// 显示添加考勤对话框
+function showAddAttendanceDialog() {
+  // 重置表单
+  attendanceForm.value = {
+    courseId: courseId,
+    attendanceDate: new Date().toISOString().split('T')[0], // 默认今天
+    remark: '',
+    lateThreshold: 5, // 默认迟到阈值5分钟
+    absentThreshold: 15, // 默认缺勤阈值15分钟
+    selectedStudentIds: [],
+    type: 'attendance', // 添加默认类型
+  }
+  
+  // 确保课程学生数据已加载
+  if (courseStudents.value.length === 0) {
+    fetchCourseStudents().then(() => {
+      // 获取学生后再设置选中状态
+      if (courseStudents.value && courseStudents.value.length > 0) {
+        attendanceForm.value.selectedStudentIds = courseStudents.value.map(student => student.studentId)
+        updateStudentSelectionStatus()
+      }
+    })
+  } else {
+    // 默认选中所有学生
+    if (courseStudents.value && courseStudents.value.length > 0) {
+      attendanceForm.value.selectedStudentIds = courseStudents.value.map(student => student.studentId)
+    }
+    
+    // 更新全选状态
+    updateStudentSelectionStatus()
+  }
+  
+  // 设置为新建模式
+  isEditingAttendance.value = false
+  
+  // 显示对话框
+  addAttendanceDialogVisible.value = true
+}
+
+// 更新学生选择状态
+function updateStudentSelectionStatus() {
+  if (!availableStudents.value || availableStudents.value.length === 0) {
+    allStudentsSelected.value = false
+    isIndeterminate.value = false
+    return
+  }
+  
+  const checkedCount = attendanceForm.value.selectedStudentIds.length
+  allStudentsSelected.value = checkedCount === availableStudents.value.length && availableStudents.value.length > 0
+  isIndeterminate.value = checkedCount > 0 && checkedCount < availableStudents.value.length
+}
+
+// 处理全选学生
+function handleSelectAllStudents(val) {
+  if (val) {
+    // 全选
+    attendanceForm.value.selectedStudentIds = availableStudents.value.map(student => student.studentId)
+  } else {
+    // 全不选
+    attendanceForm.value.selectedStudentIds = []
+  }
+  isIndeterminate.value = false
+}
+
+// 提交考勤
+async function submitAttendance() {
+  try {
+    isSubmittingAttendance.value = true
+    
+    if (!attendanceForm.value || !attendanceForm.value.selectedStudentIds || attendanceForm.value.selectedStudentIds.length === 0) {
+      ElMessage.warning('请至少选择一名学生')
+      isSubmittingAttendance.value = false
+      return
+    }
+    
+    // 确保courseId是字符串形式
+    const courseIdStr = attendanceForm.value.courseId ? 
+      new BigNumber(attendanceForm.value.courseId).toString() : 
+      attendanceForm.value.courseId.toString()
+    
+    // 准备考勤数据
+    const attendanceData = {
+      courseId: courseIdStr,
+      attendanceDate: attendanceForm.value.attendanceDate,
+      remark: attendanceForm.value.remark || '',
+      selectedStudentIds: attendanceForm.value.selectedStudentIds,
+      lateThreshold: attendanceForm.value.lateThreshold || 5,
+      absentThreshold: attendanceForm.value.absentThreshold || 15,
+      type: 'attendance', // 添加默认类型
+    }
+    
+    console.log('提交考勤数据:', attendanceData)
+    
+    if (isEditingAttendance.value && attendanceForm.value.id) {
+      // 更新考勤
+      await updateAttendance(attendanceData)
+    } else {
+      // 添加考勤
+      await addAttendance(attendanceData)
+    }
+    
+    // 关闭对话框
+    addAttendanceDialogVisible.value = false
+    
+    // 重新获取考勤列表
+    await fetchCourseAttendances()
+    
+    ElMessage.success(isEditingAttendance.value ? '考勤更新成功' : '考勤发布成功')
+  } catch (error) {
+    console.error(isEditingAttendance.value ? '更新考勤失败:' : '发布考勤失败:', error)
+    ElMessage.error(`${isEditingAttendance.value ? '更新考勤失败' : '发布考勤失败'}: ${error.message || '请稍后重试'}`)
+  } finally {
+    isSubmittingAttendance.value = false
+  }
+}
+
+// 查看考勤详情
+async function viewAttendanceDetail(group) {
+  try {
+    isLoadingAttendanceStudents.value = true
+    
+    // 防止group为undefined
+    if (!group) {
+      ElMessage.error('考勤数据无效')
+      isLoadingAttendanceStudents.value = false
+      return
+    }
+    
+    // 设置当前考勤，添加默认值防止undefined
+    currentAttendance.value = {
+      ...group,
+      attendanceId: group.key || '', // 使用分组键作为考勤ID
+      status: group.status || '', // 设置状态默认值为空字符串
+      type: group.type || 'attendance', // 添加默认类型
+    }
+    
+    // 获取该考勤组的所有学生记录
+    if (Array.isArray(group.attendances)) {
+      attendanceStudents.value = group.attendances.map(attendance => {
+        // 查找对应的学生信息
+        const student = courseStudents.value.find(s => s.studentId === attendance.studentId) || {}
+        
+        return {
+          ...attendance,
+          ...student,
+          attendanceStatus: group.status || '', // 设置状态默认值为空字符串
+          type: attendance.type || 'attendance', // 添加默认类型
+        }
+      });
+    } else {
+      attendanceStudents.value = []
+      console.error('考勤学生数据格式错误:', group)
+    }
+    
+    // 重置搜索和分页
+    attendanceDetailSearchKeyword.value = ''
+    attendanceDetailCurrentPage.value = 1
+    
+    // 显示考勤详情对话框
+    attendanceDetailDialogVisible.value = true
+  } catch (error) {
+    console.error('获取考勤详情失败:', error)
+    ElMessage.error('获取考勤详情失败，请稍后重试')
+  } finally {
+    isLoadingAttendanceStudents.value = false
+  }
+}
+
+// 编辑考勤
+function editAttendance(group) {
+  // 设置为编辑模式
+  isEditingAttendance.value = true
+  
+  // 填充表单
+  attendanceForm.value = {
+    id: group.key, // 使用分组键作为ID
+    courseId: group.courseId,
+    attendanceDate: group.attendanceDate,
+    remark: group.remark || '',
+    lateThreshold: 5, // 默认值，实际应从后端获取
+    absentThreshold: 15, // 默认值，实际应从后端获取
+    selectedStudentIds: group.attendances.map(a => a.studentId)
+  }
+  
+  // 更新全选状态
+  allStudentsSelected.value = courseStudents.value.length > 0 && 
+    attendanceForm.value.selectedStudentIds.length === courseStudents.value.length
+  isIndeterminate.value = attendanceForm.value.selectedStudentIds.length > 0 && 
+    attendanceForm.value.selectedStudentIds.length < courseStudents.value.length
+  
+  // 显示对话框
+  addAttendanceDialogVisible.value = true
+}
+
+// 更新学生考勤状态
+async function updateStudentAttendanceStatus(student) {
+  try {
+    // 确保attendanceId是字符串形式
+    const attendanceIdStr = student.attendanceId ? 
+      new BigNumber(student.attendanceId).toString() : 
+      student.attendanceId
+    
+    // 获取当前考勤组的状态
+    const status = currentAttendance.value ? currentAttendance.value.status : ''
+    
+    console.log('更新考勤状态:', attendanceIdStr, status)
+    
+    // 调用API更新考勤状态
+    await attendanceAPI.updateAttendanceStatus(
+      attendanceIdStr,
+      status,
+      student.remark || ''
+    )
+    
+    // 更新本地数据
+    const index = attendances.value.findIndex(a => a.attendanceId === student.attendanceId)
+    if (index !== -1) {
+      attendances.value[index].status = status
+    }
+    
+    ElMessage.success('考勤状态更新成功')
+  } catch (error) {
+    console.error('更新考勤状态失败:', error)
+    ElMessage.error('更新考勤状态失败，请稍后重试')
+  }
+}
+
+// 更新学生考勤备注
+async function updateStudentAttendanceRemark(student) {
+  try {
+    // 确保attendanceId是字符串形式
+    const attendanceIdStr = student.attendanceId ? 
+      new BigNumber(student.attendanceId).toString() : 
+      student.attendanceId
+    
+    // 获取当前考勤组的状态
+    const status = currentAttendance.value ? currentAttendance.value.status : ''
+    
+    console.log('更新考勤备注:', attendanceIdStr, student.remark)
+    
+    // 调用API更新考勤备注
+    await attendanceAPI.updateAttendanceStatus(
+      attendanceIdStr,
+      status,
+      student.remark || ''
+    )
+    
+    // 更新本地数据
+    const index = attendances.value.findIndex(a => a.attendanceId === student.attendanceId)
+    if (index !== -1) {
+      attendances.value[index].remark = student.remark
+      attendances.value[index].status = status
+    }
+    
+    ElMessage.success('考勤备注更新成功')
+  } catch (error) {
+    console.error('更新考勤备注失败:', error)
+    ElMessage.error('更新考勤备注失败，请稍后重试')
+  }
+}
+
+// 结束考勤
+async function finishAttendance() {
+  try {
+    if (!currentAttendance.value) return
+    
+    // 显示加载状态
+    const loadingInstance = ElLoading.service({
+      text: '正在结束考勤...',
+      background: 'rgba(255, 255, 255, 0.7)'
+    })
+    
+    // 获取该考勤组的所有考勤记录
+    const attendanceIds = attendanceStudents.value.map(student => student.attendanceId)
+    
+    console.log('结束考勤，考勤ID列表:', attendanceIds)
+    
+    // 批量更新考勤状态为已结束
+    const updatePromises = attendanceIds.map(id => 
+      attendanceAPI.updateAttendanceStatus(id, '已结束')
+    )
+    
+    await Promise.all(updatePromises)
+    
+    // 更新当前考勤状态
+    currentAttendance.value.status = '已结束'
+    
+    // 重新获取考勤列表
+    await fetchCourseAttendances()
+    
+    // 关闭考勤详情对话框
+    attendanceDetailDialogVisible.value = false
+    
+    loadingInstance.close()
+    ElMessage.success('考勤已结束')
+  } catch (error) {
+    console.error('结束考勤失败:', error)
+    ElMessage.error('结束考勤失败，请稍后重试')
+  }
+}
+
+// 获取考勤状态类型
+function getAttendanceStatusType(status) {
+  switch(status) {
+    case '进行中':
+      return 'warning'
+    case '已结束':
+      return 'success'
+    case '出勤':
+      return 'success'
+    case '缺勤':
+      return 'danger'
+    case '迟到':
+      return 'warning'
+    default:
+      return 'info'
+  }
+}
+
+// 移除考勤
+function removeAttendance(attendance) {
+  ElMessageBox.confirm(
+    `确定要删除此考勤记录吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 确保attendanceId是字符串形式
+      const attendanceIdStr = attendance.attendanceId ? 
+        new BigNumber(attendance.attendanceId).toString() : 
+        attendance.attendanceId
+      
+      // 调用API删除考勤
+      await attendanceAPI.deleteAttendance(attendanceIdStr)
+      
+      // 重新获取考勤列表
+      await fetchCourseAttendances()
+      
+      ElMessage.success('考勤记录删除成功')
+    } catch (error) {
+      console.error('删除考勤失败:', error)
+      ElMessage.error('删除考勤失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
 }
 </script>
 
