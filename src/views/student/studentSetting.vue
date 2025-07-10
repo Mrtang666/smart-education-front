@@ -1,4 +1,4 @@
-<!-- 学生的信息更新接口待接入 -->
+<!-- 学生/教师的信息更新接口待接入 -->
 <template>
   <div class="settings-container">
     <!-- 左侧菜单栏 -->
@@ -25,24 +25,6 @@
       <!-- 账号管理 -->
       <div v-if="activeMenu === 'account'" class="account-management">
         <el-form label-position="top" :model="userForm" ref="userFormRef">
-          <div class="avatar-section">
-            <div class="avatar-container">
-              <el-avatar :size="100" :src="userForm.avatar || 'https://placehold.co/100x100?text=头像'"></el-avatar>
-              <div class="avatar-overlay">
-                <el-icon><Edit /></el-icon>
-              </div>
-            </div>
-            <el-upload
-              class="avatar-uploader"
-              action="#"
-              :auto-upload="false"
-              :show-file-list="false"
-              :on-change="handleAvatarChange"
-            >
-              <el-button type="primary" size="small">更换头像</el-button>
-            </el-upload>
-          </div>
-
           <el-form-item label="用户名">
             <el-input v-model="userForm.username" placeholder="请输入用户名"></el-input>
           </el-form-item>
@@ -234,7 +216,7 @@
 <script setup>
 import { ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Edit, ArrowRight } from '@element-plus/icons-vue';
+import { ArrowRight } from '@element-plus/icons-vue';
 
 // 菜单项
 const menuItems = [
@@ -249,7 +231,6 @@ const activeMenu = ref('account');
 
 // 用户表单数据
 const userForm = ref({
-  avatar: '',
   username: '',
   realName: '',
   phone: '',
@@ -267,19 +248,6 @@ const userAgreementDialogVisible = ref(false);
 function getCurrentMenuTitle() {
   const currentMenu = menuItems.find(item => item.id === activeMenu.value);
   return currentMenu ? currentMenu.name : '';
-}
-
-// 处理头像变更
-function handleAvatarChange(file) {
-  const isImage = file.raw.type.startsWith('image/');
-  if (!isImage) {
-    ElMessage.error('只能上传图片文件!');
-    return;
-  }
-  
-  // 这里应该上传头像到服务器，获取URL
-  // 暂时使用本地URL预览
-  userForm.value.avatar = URL.createObjectURL(file.raw);
 }
 
 // 保存用户信息
@@ -385,37 +353,11 @@ function showUserAgreement() {
 }
 
 /* 账号管理样式 */
-.avatar-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 30px;
-}
-
-.avatar-container {
-  position: relative;
-  margin-bottom: 15px;
-  cursor: pointer;
-}
-
-.avatar-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 0.3s;
-  color: #fff;
-}
-
-.avatar-container:hover .avatar-overlay {
-  opacity: 1;
+.account-management {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
 }
 
 .danger-zone {

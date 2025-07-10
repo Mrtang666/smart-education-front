@@ -73,7 +73,7 @@
                     </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="截止时间">
-                    {{ formatDateTimeLocal(selectedHomework.deadline) || '未设置截止时间' }}
+                    {{ formatDateTimeLocal(selectedHomework.endTime) || '未设置截止时间' }}
                 </el-descriptions-item>
                 <el-descriptions-item label="总分">
                     {{ selectedHomework.totalScore }}分
@@ -123,7 +123,7 @@
                     <el-table-column prop="totalScore" label="总分" width="80" />
                     <el-table-column label="截止日期" min-width="180">
                         <template #default="scope">
-                            {{ formatDateTimeLocal(scope.row.deadline) || '未设置截止时间' }}
+                            {{ formatDateTimeLocal(scope.row.endTime) || '未设置截止时间' }}
                         </template>
                     </el-table-column>
                     <el-table-column label="所属课程" min-width="150" v-if="!selectedCourseId">
@@ -195,9 +195,9 @@
                     <el-input-number v-model="homeworkForm.totalScore" :min="1" :max="100" />
                     <span class="unit-label">分</span>
                 </el-form-item>
-                <el-form-item label="截止日期" prop="deadline">
+                <el-form-item label="截止日期" prop="endTime">
                     <el-date-picker
-                        v-model="homeworkForm.deadline"
+                        v-model="homeworkForm.endTime"
                         type="datetime"
                         placeholder="选择截止日期"
                         format="YYYY-MM-DD HH:mm"
@@ -290,7 +290,7 @@ const homeworkForm = ref({
     courseId: '',
     teacherId: teacherId,
     totalScore: 100,
-    deadline: '',
+    endTime: '',
     status: '未开始',
     type: 'homework' // 指定类型为作业
 })
@@ -310,7 +310,7 @@ const rules = {
         { required: true, message: '请输入总分', trigger: 'blur' },
         { type: 'number', min: 1, max: 100, message: '总分应在1-100之间', trigger: 'blur' }
     ],
-    deadline: [
+    endTime: [
         { required: false, message: '请选择截止日期', trigger: 'change' },
         {
             validator: (rule, value, callback) => {
@@ -376,12 +376,12 @@ onMounted(async () => {
         
         // 更新作业状态
         homeworkList.value.forEach(homework => {
-            if (!homework.deadline) {
+            if (!homework.endTime) {
                 homework.status = '未设置截止日期'
                 return
             }
             
-            const deadline = new Date(homework.deadline)
+            const deadline = new Date(homework.endTime)
             const now = currentTime.value
             
             if (now > deadline && homework.status !== '已截止') {
@@ -469,12 +469,12 @@ const loadHomeworks = async () => {
         // 更新状态 - 根据截止时间判断作业状态
         const now = new Date()
         res.forEach(homework => {
-            if (!homework.deadline) {
+            if (!homework.endTime) {
                 homework.status = '未设置截止日期'
                 return
             }
             
-            const deadline = new Date(homework.deadline)
+            const deadline = new Date(homework.endTime)
             
             if (now > deadline) {
                 homework.status = '已截止'
@@ -742,12 +742,12 @@ const handlePageChange = (page) => {
 
 // 获取作业状态描述，添加剩余时间显示
 const getHomeworkStatusDescription = (homework) => {
-    if (!homework.deadline) {
+    if (!homework.endTime) {
         return '未设置截止日期';
     }
     
     const now = new Date();
-    const deadline = new Date(homework.deadline);
+    const deadline = new Date(homework.endTime);
     
     if (now > deadline) {
         // 已截止，显示已过去多长时间
@@ -796,7 +796,7 @@ const showCreateDialog = () => {
         courseId: selectedCourseId.value || '', // 如果已选择课程，默认使用该课程
         teacherId: teacherId,
         totalScore: 100,
-        deadline: formattedDeadline, // 设置默认截止时间为一周后
+        endTime: formattedDeadline, // 设置默认截止时间为一周后
         status: '进行中',
         type: 'homework' // 指定类型为作业
     }
@@ -811,7 +811,7 @@ const editHomework = (homework) => {
     isEdit.value = true
     
     // 处理截止日期格式
-    let formattedDeadline = homework.deadline;
+    let formattedDeadline = homework.endTime;
     if (formattedDeadline && formattedDeadline.includes('T')) {
         // 将ISO格式转换为YYYY-MM-DD HH:mm:ss格式
         formattedDeadline = formattedDeadline.replace('T', ' ').substring(0, 19);
@@ -824,7 +824,7 @@ const editHomework = (homework) => {
         courseId: homework.courseId,
         teacherId: homework.teacherId,
         totalScore: homework.totalScore,
-        deadline: formattedDeadline,
+        endTime: formattedDeadline,
         status: homework.status || '未开始',
         type: 'homework' // 确保type字段设置为作业类型
     }
@@ -854,17 +854,17 @@ const submitHomework = async () => {
                 }
                 
                 // 处理截止日期 - 确保数据格式正确
-                if (submitData.deadline) {
+                if (submitData.endTime) {
                     // 如果截止日期不是ISO格式字符串，则转换为ISO格式
-                    if (!(typeof submitData.deadline === 'string' && submitData.deadline.includes('T'))) {
-                        const deadlineDate = new Date(submitData.deadline);
-                        submitData.deadline = deadlineDate.toISOString();
+                    if (!(typeof submitData.endTime === 'string' && submitData.endTime.includes('T'))) {
+                        const deadlineDate = new Date(submitData.endTime);
+                        submitData.endTime = deadlineDate.toISOString();
                     }
                 }
                 
                 // 根据截止日期自动判断状态
                 const now = new Date();
-                const deadline = submitData.deadline ? new Date(submitData.deadline) : null;
+                const deadline = submitData.endTime ? new Date(submitData.endTime) : null;
                 
                 if (!deadline) {
                     // 如果没有设置截止日期
@@ -1068,12 +1068,12 @@ const handleCourseSelect = async () => {
             // 更新作业状态
             const now = new Date()
             courseHomeworks.value.forEach(homework => {
-                if (!homework.deadline) {
+                if (!homework.endTime) {
                     homework.status = '未设置截止日期'
                     return
                 }
                 
-                const deadline = new Date(homework.deadline)
+                const deadline = new Date(homework.endTime)
                 
                 if (now > deadline) {
                     homework.status = '已截止'

@@ -93,7 +93,8 @@ import {
   Position, 
   Reading, 
   Document, 
-  DataAnalysis 
+  DataAnalysis,
+  Setting
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -191,6 +192,7 @@ const menuList = [
   { name: '作业', icon: Document },
   { name: '考试', icon: Document },
   { name: '分析', icon: DataAnalysis },
+  { name: '设置', icon: Setting },
 ]
 
 const activeMenu = ref('') // 默认选中第一个菜单
@@ -230,10 +232,9 @@ function handleMenuClick(menu) {
     case '分析':
       router.push('/teacher/analysis')
       break
-    
-    // case '分析':
-    //   router.push('/teacher/analysis')
-    //   break
+    case '设置':
+      router.push('/teacher/setting')
+      break
     default:
       break
   }
