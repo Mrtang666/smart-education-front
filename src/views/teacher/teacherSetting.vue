@@ -1,4 +1,4 @@
-<!-- 学生/教师的信息更新接口待接入 -->
+<!-- 教师的信息更新接口已成功接入 -->
 <template>
     <div class="settings-container">
       <!-- 左侧菜单栏 -->
@@ -24,25 +24,31 @@
   
         <!-- 账号管理 -->
         <div v-if="activeMenu === 'account'" class="account-management">
-          <el-form label-position="top" :model="userForm" ref="userFormRef">
-            <el-form-item label="用户名">
-              <el-input v-model="userForm.username" placeholder="请输入用户名"></el-input>
+          <el-form 
+            label-position="top" 
+            :model="userForm" 
+            ref="userFormRef"
+            :rules="rules"
+            v-loading="loading"
+          >
+            <el-form-item label="用户名" prop="username">
+              <el-input v-model="userForm.username" placeholder="请输入用户名" :disabled="true"></el-input>
             </el-form-item>
   
-            <el-form-item label="真实姓名">
-              <el-input v-model="userForm.realName" placeholder="请输入真实姓名"></el-input>
+            <el-form-item label="真实姓名" prop="fullName">
+              <el-input v-model="userForm.fullName" placeholder="请输入真实姓名"></el-input>
             </el-form-item>
   
-            <el-form-item label="手机号">
+            <el-form-item label="手机号" prop="phone">
               <el-input v-model="userForm.phone" placeholder="请输入手机号"></el-input>
             </el-form-item>
   
-            <el-form-item label="邮箱">
+            <el-form-item label="邮箱" prop="email">
               <el-input v-model="userForm.email" placeholder="请输入邮箱"></el-input>
             </el-form-item>
   
             <el-form-item>
-              <el-button type="primary" @click="saveUserInfo">保存修改</el-button>
+              <el-button type="primary" @click="saveUserInfo" :loading="saving">保存修改</el-button>
             </el-form-item>
   
             <div class="danger-zone">
@@ -214,9 +220,10 @@
   </template>
   
   <script setup>
-  import { ref } from 'vue';
+  import { ref, reactive, onMounted } from 'vue';
   import { ElMessage, ElMessageBox } from 'element-plus';
   import { ArrowRight } from '@element-plus/icons-vue';
+  import { teacherAPI } from '@/api/api';  // 导入teacherAPI
   
   // 菜单项
   const menuItems = [
@@ -232,13 +239,31 @@
   // 用户表单数据
   const userForm = ref({
     username: '',
-    realName: '',
+    fullName: '',
     phone: '',
     email: ''
   });
   
+  // 加载状态
+  const loading = ref(false);
+  const saving = ref(false);
+  
   // 表单引用
   const userFormRef = ref(null);
+  
+  // 表单验证规则
+  const rules = reactive({
+    fullName: [
+      { required: true, message: '请输入真实姓名', trigger: 'blur' },
+      { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
+    ],
+    phone: [
+      { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+    ],
+    email: [
+      { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+    ]
+  });
   
   // 隐私协议对话框
   const privacyDialogVisible = ref(false);
@@ -250,10 +275,79 @@
     return currentMenu ? currentMenu.name : '';
   }
   
+  // 组件挂载时获取用户信息
+  onMounted(async () => {
+    await getUserInfo();
+  });
+  
+  // 获取教师信息
+  async function getUserInfo() {
+    loading.value = true;
+    try {
+      // 获取教师信息
+      const userInfo = await teacherAPI.getSelfTeacherInfo();
+      
+      if (userInfo) {
+        userForm.value = {
+          username: userInfo.username || '',
+          fullName: userInfo.fullName || '',
+          phone: userInfo.phone || '',
+          email: userInfo.email || ''
+        };
+        
+        // 保存teacherId到localStorage，以便后续使用
+        if (userInfo.teacherId) {
+          localStorage.setItem('teacherId', userInfo.teacherId);
+        }
+        
+        ElMessage.success('用户信息获取成功');
+      }
+    } catch (error) {
+      console.error('获取教师信息失败:', error);
+      ElMessage.error('获取教师信息失败，请稍后重试');
+    } finally {
+      loading.value = false;
+    }
+  }
+  
   // 保存用户信息
   function saveUserInfo() {
-    // 这里应该调用API保存用户信息
-    ElMessage.success('用户信息保存成功');
+    if (!userFormRef.value) return;
+    
+    userFormRef.value.validate(async (valid) => {
+      if (!valid) {
+        ElMessage.warning('请正确填写表单信息');
+        return;
+      }
+      
+      saving.value = true;
+      try {
+        const userData = {
+          teacherId: localStorage.getItem('teacherId'), // 添加teacherId字段
+          username: userForm.value.username,
+          fullName: userForm.value.fullName,
+          phone: userForm.value.phone,
+          email: userForm.value.email
+        };
+        
+        // 更新教师信息
+        const result = await teacherAPI.updateTeacher(userData);
+        
+        // 处理返回结果
+        if (result) {
+          ElMessage.success('教师信息保存成功');
+          // 重新获取用户信息
+          await getUserInfo();
+        } else {
+          ElMessage.error('教师信息保存失败');
+        }
+      } catch (error) {
+        console.error('保存教师信息失败:', error);
+        ElMessage.error('保存教师信息失败，请稍后重试');
+      } finally {
+        saving.value = false;
+      }
+    });
   }
   
   // 显示注销账号确认对话框

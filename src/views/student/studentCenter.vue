@@ -91,7 +91,8 @@ import {
     DataAnalysis,
     Notebook,
     Calendar,
-    Setting
+    Setting,
+    HomeFilled
 } from '@element-plus/icons-vue'
 import { getUserInfo, clearAuth } from '@/utils/auth'
 import { courseSelectionAPI } from '@/api/api'
@@ -170,6 +171,7 @@ const chatSuggestions = ref([
 
 // 左侧菜单栏
 const menuList = [
+    { name: '首页', icon: HomeFilled },
     { name: '课程', icon: Reading },
     { name: '作业', icon: Notebook },
     { name: '考试', icon: Document },
@@ -221,6 +223,9 @@ function handleMenuClick(menu) {
 
     // 根据菜单项跳转到不同的路由
     switch (menu.name) {
+        case '首页':
+            router.push('/student/center')
+            break
         case '课程':
             router.push('/student/course')
             break

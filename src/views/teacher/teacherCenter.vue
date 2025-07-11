@@ -94,7 +94,8 @@ import {
   Reading, 
   Document, 
   DataAnalysis,
-  Setting
+  Setting,
+  HomeFilled
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -187,6 +188,7 @@ const chatSuggestions = ref([
 
 // 左侧菜单栏
 const menuList = [
+  { name: '首页', icon: HomeFilled },
   { name: '课程', icon: Reading },
   { name: '知识', icon: Document },
   { name: '作业', icon: Document },
@@ -217,6 +219,9 @@ function handleMenuClick(menu) {
   
   // 根据菜单项跳转到不同的路由
   switch (menu.name) {
+    case '首页':
+      router.push('/teacher/center')
+      break
     case '课程':
       router.push('/teacher/course')
       break

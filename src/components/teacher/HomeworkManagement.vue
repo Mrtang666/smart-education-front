@@ -143,17 +143,17 @@ function getHomeworkStatusType(homework, now) {
   
   const deadline = new Date(homework.endTime);
   
-  if (now > deadline) {
+    if (now > deadline) {
     return 'danger'; // 已截止
-  } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+    } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
     return 'warning'; // 即将截止（24小时内）
   } else if (now > new Date(deadline.getTime() - 3 * 24 * 60 * 60 * 1000)) {
     return 'warning'; // 即将截止（3天内）
-  } else {
+    } else {
     return 'success'; // 进行中
+    }
   }
-}
-
+  
 // 获取标签效果
 function getTagEffect(homework, now) {
   if (!homework.endTime) return 'plain';
@@ -175,15 +175,15 @@ function getHomeworkStatus(homework, now) {
   
   const deadline = new Date(homework.endTime);
   
-  if (now > deadline) {
+    if (now > deadline) {
     return '已截止';
-  } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
+    } else if (now > new Date(deadline.getTime() - 24 * 60 * 60 * 1000)) {
     return '即将截止';
-  } else {
+    } else {
     return '进行中';
+    }
   }
-}
-
+  
 // 获取截止日期倒计时
 function getDeadlineCountdown(homework, now) {
   if (!homework.endTime) return null;

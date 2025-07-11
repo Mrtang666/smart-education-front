@@ -297,24 +297,24 @@ async function fetchHomeworkList() {
     
     // 等待所有提交情况查询完成
     let homeworksWithSubmissions = await Promise.all(submissionPromises)
-    
-    // 按状态过滤
-    if (selectedStatus.value) {
+      
+      // 按状态过滤
+      if (selectedStatus.value) {
       homeworksWithSubmissions = homeworksWithSubmissions.filter(hw => 
         getHomeworkStatus(hw, new Date()) === selectedStatus.value
       )
-    }
-    
-    // 按关键词搜索
-    if (searchKeyword.value) {
-      const keyword = searchKeyword.value.toLowerCase()
+      }
+      
+      // 按关键词搜索
+      if (searchKeyword.value) {
+        const keyword = searchKeyword.value.toLowerCase()
       homeworksWithSubmissions = homeworksWithSubmissions.filter(hw => 
         (hw.title && hw.title.toLowerCase().includes(keyword)) || 
         (hw.description && hw.description.toLowerCase().includes(keyword)) ||
         (hw.courseName && hw.courseName.toLowerCase().includes(keyword))
-      )
-    }
-    
+        )
+      }
+      
     // 更新作业状态
     homeworksWithSubmissions.forEach(homework => {
       homework.status = getHomeworkStatus(homework, new Date())
@@ -338,12 +338,12 @@ function getHomeworkStatus(homework, now) {
   if (!homework.endTime) return '进行中'
   
   const deadline = new Date(homework.endTime)
-  
-  if (now > deadline) {
+    
+    if (now > deadline) {
     return '已结束'
-  } else {
+    } else {
     return '进行中'
-  }
+    }
 }
 
 // 格式化日期时间

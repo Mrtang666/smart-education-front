@@ -206,29 +206,29 @@
                 </div>
               </div>
               <div class="detail-content">
-                <div class="detail-item">
-                  <span class="detail-label">日期：</span>
-                  <span class="detail-value">{{ selectedAttendance.date }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">状态：</span>
-                  <span class="detail-value">
+              <div class="detail-item">
+                <span class="detail-label">日期：</span>
+                <span class="detail-value">{{ selectedAttendance.date }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">状态：</span>
+                <span class="detail-value">
                     <el-tag :type="getAttendanceTagType(selectedAttendance.status)" effect="dark">
-                      {{ selectedAttendance.status }}
-                    </el-tag>
-                  </span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">时间：</span>
-                  <span class="detail-value">{{ selectedAttendance.time }}</span>
-                </div>
-                <div class="detail-item" v-if="selectedAttendance.reason">
-                  <span class="detail-label">原因：</span>
-                  <span class="detail-value">{{ selectedAttendance.reason }}</span>
-                </div>
-                <div class="detail-item" v-if="selectedAttendance.note">
-                  <span class="detail-label">备注：</span>
-                  <span class="detail-value">{{ selectedAttendance.note }}</span>
+                    {{ selectedAttendance.status }}
+                  </el-tag>
+                </span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">时间：</span>
+                <span class="detail-value">{{ selectedAttendance.time }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedAttendance.reason">
+                <span class="detail-label">原因：</span>
+                <span class="detail-value">{{ selectedAttendance.reason }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedAttendance.note">
+                <span class="detail-label">备注：</span>
+                <span class="detail-value">{{ selectedAttendance.note }}</span>
                 </div>
               </div>
               <div class="detail-actions" v-if="selectedAttendance.canSignIn">
