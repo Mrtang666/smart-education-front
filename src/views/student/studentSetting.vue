@@ -1,4 +1,4 @@
-<!-- 学生的信息更新接口待完善，没有成功接入 -->
+<!-- 学生信息设置页面 -->
 <template>
   <div class="settings-container">
     <!-- 左侧菜单栏 -->
@@ -241,7 +241,8 @@ const userForm = ref({
   username: '',
   fullName: '',
   phone: '',
-  email: ''
+  email: '',
+  studentId: '' // 添加studentId字段
 });
 
 // 加载状态
@@ -292,7 +293,8 @@ async function getUserInfo() {
         username: userInfo.username || '',
         fullName: userInfo.fullName || '',
         phone: userInfo.phone || '',
-        email: userInfo.email || ''
+        email: userInfo.email || '',
+        studentId: userInfo.studentId || '' // 保存studentId
       };
       ElMessage.success('用户信息获取成功');
     }
@@ -320,29 +322,30 @@ function saveUserInfo() {
         username: userForm.value.username,
         fullName: userForm.value.fullName,
         phone: userForm.value.phone,
-        email: userForm.value.email
+        email: userForm.value.email,
+        studentId: userForm.value.studentId // 确保包含studentId
       };
       
       // 更新学生信息
-      const result = await studentAPI.saveOrUpdateStudent(userData);
+      const result = await studentAPI.updateStudent(userData);
       
       // 处理返回结果
       if (result) {
         const studentId = result.studentId || result.id;
         
         if (studentId) {
-          ElMessage.success('学生信息保存成功');
+          ElMessage.success('学生信息更新成功');
           // 重新获取用户信息
           await getUserInfo();
         } else {
-          ElMessage.error('学生信息保存失败');
+          ElMessage.error('学生信息更新失败');
         }
       } else {
-        ElMessage.error('学生信息保存失败');
+        ElMessage.error('学生信息更新失败');
       }
     } catch (error) {
-      console.error('保存学生信息失败:', error);
-      ElMessage.error('保存学生信息失败，请稍后重试');
+      console.error('更新学生信息失败:', error);
+      ElMessage.error('更新学生信息失败，请稍后重试');
     } finally {
       saving.value = false;
     }

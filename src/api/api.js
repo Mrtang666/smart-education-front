@@ -397,6 +397,22 @@ export const studentAPI = {
         const axios = createStudentAuthorizedAxios();
         const response = await axios.get('/api/student/check/email', { params: { email } });
         return response.data;
+    },
+
+    /**
+     * 9.更新学生信息（需要token）
+     * @param {Object} updateStudentData 学生信息对象
+     * @param {string} updateStudentData.username 用户名
+     * @param {string} updateStudentData.email 邮箱
+     * @param {string} updateStudentData.fullName 姓名
+     * @param {string} updateStudentData.phone 电话
+     * @param {string} [updateStudentData.studentId] 学生ID（可选，如果已知）
+     * @returns {Promise<Object>} 更新后的学生信息
+     */
+    async updateStudent(updateStudentData) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.put('/api/student/update', updateStudentData);
+        return response.data;
     }
 };
 

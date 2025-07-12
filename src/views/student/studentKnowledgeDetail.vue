@@ -3,24 +3,215 @@
   <div class="knowledge-detail-container">
     <!-- 左侧内容区 -->
     <div class="content-area">
-      <el-card class="question-card">
+      <el-card class="knowledge-content-card">
         <div v-if="loading" class="loading-container">
           <el-skeleton :rows="10" animated />
         </div>
         
-        <div v-else-if="questions.length === 0" class="empty-container">
-          <el-empty description="暂无题目" />
-        </div>
-        
-        <div v-else class="questions-container">
+        <div v-else class="knowledge-content">
           <div class="knowledge-header">
             <h2>{{ knowledgeName }}</h2>
-            <div class="knowledge-info">
-              <span>题量: {{ questions.length }}</span>
-              <span>满分: {{ typeof totalScore === 'number' ? totalScore.toFixed(1) : '0.0' }}</span>
+            <div class="knowledge-meta">
+              <span class="course-name">{{ courseName }}</span>
+            </div>
+          </div>
+          
+          <!-- 知识点内容 -->
+          <div class="knowledge-description-container">
+            <div v-if="knowledgeDescription" class="knowledge-description">
+              <p v-html="formattedDescription"></p>            </div>
+            <div v-else class="empty-description">
+              <el-empty description="暂无知识点内容" />
+            </div>
+          </div>
+          
+          <!-- 学习完成按钮 -->
+          <div class="learning-actions">
+            <el-button type="primary" @click="markAsCompleted" :disabled="isCompleted">
+              {{ isCompleted ? '已完成学习' : '标记为已学习' }}
+            </el-button>
+            <el-button v-if="isCompleted" type="warning" @click="resetLearningStatus">
+              重置学习状态
+            </el-button>
+          </div>
+          
+          <!-- 题目部分暂时注释掉 -->
+          <!--
+          <div v-if="questions.length === 0" class="empty-container">
+            <el-empty description="暂无题目" />
+          </div>
+          
+          <div v-else class="questions-container">
+            <div class="question-section-header">
+              <h3>相关习题 ({{ questions.length }})</h3>
+              <div class="knowledge-info">
+                <span>题量: {{ questions.length }}</span>
+                <span>满分: {{ typeof totalScore === 'number' ? totalScore.toFixed(1) : '0.0' }}</span>
+              </div>
+              
+              <div class="action-buttons">
+                <el-button 
+                  type="primary" 
+                  @click="submitAllAnswers" 
+                  :disabled="!hasAnyAnswer || allQuestionsAnswered"
+                >
+                  提交全部答案
+                </el-button>
+                <el-button 
+                  type="warning" 
+                  @click="resetAllAnswers" 
+                  v-if="allQuestionsAnswered"
+                >
+                  重新答题
+                </el-button>
+              </div>
             </div>
             
-            <div class="action-buttons">
+            <div 
+              v-for="(question, index) in questions" 
+              :key="question.questionId" 
+              class="question-item"
+              :id="`question-${question.questionId}`"
+            >
+              <div class="question-header">
+                {{ index + 1 }}. <span v-if="question.questionType === 'SINGLE_CHOICE'">[单选题]</span>
+                <span v-else-if="question.questionType === 'MULTIPLE_CHOICE'">[多选题]</span>
+                <span v-else-if="question.questionType === 'FILL_BLANK'">[填空题]</span>
+                <span v-else-if="question.questionType === 'SUBJECTIVE'">[主观题]</span>
+                <span v-else-if="question.questionType === 'TRUE_FALSE'">[判断题]</span>
+                <span v-else>[{{ question.questionType }}]</span>
+                {{ question.content }}
+              </div>
+              
+              <div v-if="!answeredQuestions[question.questionId]">
+                <div v-if="question.questionType === 'SINGLE_CHOICE'" class="question-options">
+                  <div
+                    v-for="(option, optIndex) in question.options"
+                    :key="optIndex"
+                    class="option-item"
+                    :class="{ 
+                      selected: userAnswers[question.questionId] === String.fromCharCode(65 + optIndex),
+                      'option-hover': true
+                    }"
+                    @click="selectSingleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
+                  >
+                    <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
+                    <span class="option-separator">、</span>
+                    <span class="option-content">{{ option }}</span>
+                    <span class="option-check" v-if="userAnswers[question.questionId] === String.fromCharCode(65 + optIndex)">
+                      <i class="el-icon-check"></i>
+                    </span>
+                  </div>
+                </div>
+                
+                <div v-else-if="question.questionType === 'MULTIPLE_CHOICE'" class="question-options">
+                  <div
+                    v-for="(option, optIndex) in question.options"
+                    :key="optIndex"
+                    class="option-item"
+                    :class="{ 
+                      selected: userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex)),
+                      'option-hover': true
+                    }"
+                    @click="toggleMultipleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
+                  >
+                    <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
+                    <span class="option-separator">、</span>
+                    <span class="option-content">{{ option }}</span>
+                    <span class="option-check" v-if="userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex))">
+                      <i class="el-icon-check"></i>
+                    </span>
+                  </div>
+                </div>
+                
+                <div v-else-if="question.questionType === 'FILL_BLANK'" class="question-options">
+                  <el-input 
+                    v-model="userAnswers[question.questionId]" 
+                    type="textarea" 
+                    :rows="2" 
+                    placeholder="请输入您的答案"
+                  ></el-input>
+                </div>
+                
+                <div v-else-if="question.questionType === 'SUBJECTIVE'" class="question-options">
+                  <el-input 
+                    v-model="userAnswers[question.questionId]" 
+                    type="textarea" 
+                    :rows="4" 
+                    placeholder="请输入您的答案"
+                  ></el-input>
+                </div>
+                
+                <div v-else-if="question.questionType === 'TRUE_FALSE'" class="question-options">
+                  <div
+                    class="option-item"
+                    :class="{ 
+                      selected: userAnswers[question.questionId] === 'true',
+                      'option-hover': true
+                    }"
+                    @click="selectTrueFalse(question.questionId, 'true')"
+                  >
+                    <span class="option-label">A</span>
+                    <span class="option-separator">、</span>
+                    <span class="option-content">正确</span>
+                    <span class="option-check" v-if="userAnswers[question.questionId] === 'true'">
+                      <i class="el-icon-check"></i>
+                    </span>
+                  </div>
+                  <div
+                    class="option-item"
+                    :class="{ 
+                      selected: userAnswers[question.questionId] === 'false',
+                      'option-hover': true
+                    }"
+                    @click="selectTrueFalse(question.questionId, 'false')"
+                  >
+                    <span class="option-label">B</span>
+                    <span class="option-separator">、</span>
+                    <span class="option-content">错误</span>
+                    <span class="option-check" v-if="userAnswers[question.questionId] === 'false'">
+                      <i class="el-icon-check"></i>
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="submit-btn-container">
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    @click="submitAnswer(question)"
+                    :disabled="!isAnswerValid(question)"
+                    class="submit-btn"
+                    :class="{'submit-btn-active': isAnswerValid(question)}"
+                  >提交答案</el-button>
+                </div>
+              </div>
+              
+              <div v-else class="answer-section">
+                <div class="my-answer" :class="{ 'correct-answer': isCorrect(question), 'wrong-answer': !isCorrect(question), 'answer-animation': true }">
+                  <span class="answer-label">我的答案: </span>
+                  <span class="answer-content">{{ getDisplayAnswer(question) }}</span>
+                  <span class="answer-status" v-if="isCorrect(question)">
+                    <i class="el-icon-check"></i> 正确
+                  </span>
+                  <span class="answer-status wrong" v-else>
+                    <i class="el-icon-close"></i> 错误
+                  </span>
+                </div>
+                
+                <div class="correct-answer answer-animation" :style="{ animationDelay: '0.2s' }">
+                  <span class="answer-label">正确答案: </span>
+                  <span class="answer-content">{{ question.referenceAnswer }}</span>
+                </div>
+                
+                <div class="answer-analysis answer-animation" v-if="question.analysis" :style="{ animationDelay: '0.4s' }">
+                  <span class="answer-label">解析: </span>
+                  <span class="answer-content">{{ question.analysis }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bottom-actions" v-if="questions.length > 0">
               <el-button 
                 type="primary" 
                 @click="submitAllAnswers" 
@@ -37,178 +228,7 @@
               </el-button>
             </div>
           </div>
-          
-          <!-- 题目列表 -->
-          <div 
-            v-for="(question, index) in questions" 
-            :key="question.questionId" 
-            class="question-item"
-            :id="`question-${question.questionId}`"
-          >
-            <div class="question-header">
-              {{ index + 1 }}. <span v-if="question.questionType === 'SINGLE_CHOICE'">[单选题]</span>
-              <span v-else-if="question.questionType === 'MULTIPLE_CHOICE'">[多选题]</span>
-              <span v-else-if="question.questionType === 'FILL_BLANK'">[填空题]</span>
-              <span v-else-if="question.questionType === 'SUBJECTIVE'">[主观题]</span>
-              <span v-else-if="question.questionType === 'TRUE_FALSE'">[判断题]</span>
-              <span v-else>[{{ question.questionType }}]</span>
-              {{ question.content }}
-            </div>
-            
-            <!-- 未回答时显示作答区域 -->
-            <div v-if="!answeredQuestions[question.questionId]">
-              <!-- 选择题选项（自定义渲染） -->
-              <div v-if="question.questionType === 'SINGLE_CHOICE'" class="question-options">
-                <div
-                  v-for="(option, optIndex) in question.options"
-                  :key="optIndex"
-                  class="option-item"
-                  :class="{ 
-                    selected: userAnswers[question.questionId] === String.fromCharCode(65 + optIndex),
-                    'option-hover': true
-                  }"
-                  @click="selectSingleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
-                >
-                  <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
-                  <span class="option-separator">、</span>
-                  <span class="option-content">{{ option }}</span>
-                  <span class="option-check" v-if="userAnswers[question.questionId] === String.fromCharCode(65 + optIndex)">
-                    <i class="el-icon-check"></i>
-                  </span>
-                </div>
-              </div>
-              
-              <!-- 多选题选项（自定义渲染） -->
-              <div v-else-if="question.questionType === 'MULTIPLE_CHOICE'" class="question-options">
-                <div
-                  v-for="(option, optIndex) in question.options"
-                  :key="optIndex"
-                  class="option-item"
-                  :class="{ 
-                    selected: userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex)),
-                    'option-hover': true
-                  }"
-                  @click="toggleMultipleChoice(question.questionId, String.fromCharCode(65 + optIndex))"
-                >
-                  <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}</span>
-                  <span class="option-separator">、</span>
-                  <span class="option-content">{{ option }}</span>
-                  <span class="option-check" v-if="userAnswers[question.questionId] && userAnswers[question.questionId].includes(String.fromCharCode(65 + optIndex))">
-                    <i class="el-icon-check"></i>
-                  </span>
-                </div>
-              </div>
-              
-              <div v-else-if="question.questionType === 'FILL_BLANK'" class="question-options">
-                <el-input 
-                  v-model="userAnswers[question.questionId]" 
-                  type="textarea" 
-                  :rows="2" 
-                  placeholder="请输入您的答案"
-                ></el-input>
-              </div>
-              
-              <div v-else-if="question.questionType === 'SUBJECTIVE'" class="question-options">
-                <el-input 
-                  v-model="userAnswers[question.questionId]" 
-                  type="textarea" 
-                  :rows="4" 
-                  placeholder="请输入您的答案"
-                ></el-input>
-              </div>
-              
-              <!-- 判断题选项（自定义渲染） -->
-              <div v-else-if="question.questionType === 'TRUE_FALSE'" class="question-options">
-                <div
-                  class="option-item"
-                  :class="{ 
-                    selected: userAnswers[question.questionId] === 'true',
-                    'option-hover': true
-                  }"
-                  @click="selectTrueFalse(question.questionId, 'true')"
-                >
-                  <span class="option-label">A</span>
-                  <span class="option-separator">、</span>
-                  <span class="option-content">正确</span>
-                  <span class="option-check" v-if="userAnswers[question.questionId] === 'true'">
-                    <i class="el-icon-check"></i>
-                  </span>
-                </div>
-                <div
-                  class="option-item"
-                  :class="{ 
-                    selected: userAnswers[question.questionId] === 'false',
-                    'option-hover': true
-                  }"
-                  @click="selectTrueFalse(question.questionId, 'false')"
-                >
-                  <span class="option-label">B</span>
-                  <span class="option-separator">、</span>
-                  <span class="option-content">错误</span>
-                  <span class="option-check" v-if="userAnswers[question.questionId] === 'false'">
-                    <i class="el-icon-check"></i>
-                  </span>
-                </div>
-              </div>
-              
-              <!-- 提交按钮 -->
-              <div class="submit-btn-container">
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  @click="submitAnswer(question)"
-                  :disabled="!isAnswerValid(question)"
-                  class="submit-btn"
-                  :class="{'submit-btn-active': isAnswerValid(question)}"
-                >提交答案</el-button>
-              </div>
-            </div>
-            
-            <!-- 已回答时显示答案区域 -->
-            <div v-else class="answer-section">
-              <!-- 我的答案 -->
-              <div class="my-answer" :class="{ 'correct-answer': isCorrect(question), 'wrong-answer': !isCorrect(question), 'answer-animation': true }">
-                <span class="answer-label">我的答案: </span>
-                <span class="answer-content">{{ getDisplayAnswer(question) }}</span>
-                <span class="answer-status" v-if="isCorrect(question)">
-                  <i class="el-icon-check"></i> 正确
-                </span>
-                <span class="answer-status wrong" v-else>
-                  <i class="el-icon-close"></i> 错误
-                </span>
-              </div>
-              
-              <!-- 正确答案 -->
-              <div class="correct-answer answer-animation" :style="{ animationDelay: '0.2s' }">
-                <span class="answer-label">正确答案: </span>
-                <span class="answer-content">{{ question.referenceAnswer }}</span>
-              </div>
-              
-              <!-- 解析 -->
-              <div class="answer-analysis answer-animation" v-if="question.analysis" :style="{ animationDelay: '0.4s' }">
-                <span class="answer-label">解析: </span>
-                <span class="answer-content">{{ question.analysis }}</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 底部提交按钮 -->
-          <div class="bottom-actions" v-if="questions.length > 0">
-            <el-button 
-              type="primary" 
-              @click="submitAllAnswers" 
-              :disabled="!hasAnyAnswer || allQuestionsAnswered"
-            >
-              提交全部答案
-            </el-button>
-            <el-button 
-              type="warning" 
-              @click="resetAllAnswers" 
-              v-if="allQuestionsAnswered"
-            >
-              重新答题
-            </el-button>
-          </div>
+          -->
         </div>
       </el-card>
     </div>
@@ -228,6 +248,12 @@
           <div class="catalog-search">
             <el-input v-model="searchKeyword" placeholder="搜索" prefix-icon="el-icon-search" clearable />
           </div>
+          <!-- 清除所有学习状态按钮 -->
+          <div class="catalog-actions" v-if="completedTaskCount > 0">
+            <el-button type="danger" size="small" @click="clearAllLearningStatus">
+              清除所有学习状态
+            </el-button>
+          </div>
         </div>
         
         <div class="catalog-content">
@@ -245,6 +271,7 @@
               <div class="catalog-node">
                 <span>{{ node.label }}</span>
                 <el-tag v-if="data.knowledgeId === currentKnowledgeId" size="mini" type="primary">当前</el-tag>
+                <el-tag v-else-if="data.completed" size="mini" type="success">已学</el-tag>
               </div>
             </template>
           </el-tree>
@@ -273,14 +300,12 @@ export default {
       courseId: null,
       courseName: '',
       
-      // 题目列表
+      // 题目列表（暂时保留但不使用）
       questions: [],
       loading: true,
       
-      // 用户答案
-      userAnswers: {},
-      answeredQuestions: {},
-      correctAnswers: {},
+      // 学习状态
+      isCompleted: false,
       
       // 学生信息
       studentId: null,
@@ -299,7 +324,18 @@ export default {
     };
   },
   computed: {
-    // 计算总分
+    // 格式化知识点描述，将换行符转换为HTML换行标签
+    formattedDescription() {
+      if (!this.knowledgeDescription) return '';
+      
+      // 将换行符转换为<br>标签
+      return this.knowledgeDescription
+        .replace(/\n/g, '<br>')
+        .replace(/\r/g, '')
+        .replace(/\s{2,}/g, ' &nbsp;'); // 保留连续空格
+    },
+    
+    // 计算总分（暂时保留但不使用）
     totalScore() {
       return this.questions.reduce((sum, question) => sum + (question.scorePoints || 0), 0);
     },
@@ -327,29 +363,6 @@ export default {
     taskProgressPercent() {
       if (this.totalTaskCount === 0) return 0;
       return Math.round((this.completedTaskCount / this.totalTaskCount) * 100);
-    },
-    
-    // 是否有任何答案
-    hasAnyAnswer() {
-      for (const questionId in this.userAnswers) {
-        const answer = this.userAnswers[questionId];
-        if (Array.isArray(answer) ? answer.length > 0 : answer) {
-          return true;
-        }
-      }
-      return false;
-    },
-    
-    // 是否所有题目都已回答
-    allQuestionsAnswered() {
-      if (this.questions.length === 0) return false;
-      
-      for (const question of this.questions) {
-        if (!this.answeredQuestions[question.questionId]) {
-          return false;
-        }
-      }
-      return true;
     }
   },
   watch: {
@@ -364,10 +377,16 @@ export default {
         if (newKnowledgeId) {
           this.knowledgeId = newKnowledgeId;
           this.currentKnowledgeId = newKnowledgeId;
-          this.fetchQuestions();
+          this.fetchKnowledgeDetail();
+          
+          // 重新加载学习状态
+          this.updateCurrentKnowledgeStatus();
+          
+          // 更新所有知识点的完成状态
+          this.refreshAllKnowledgePointsStatus();
         }
       },
-      immediate: false
+      immediate: true
     }
   },
   created() {
@@ -401,15 +420,15 @@ export default {
     }
     
     // 加载数据
-    this.fetchQuestions();
+    this.fetchKnowledgeDetail();
     this.fetchKnowledgePoints();
     
-    // 从本地存储加载已答题状态
-    this.loadAnsweredState();
+    // 加载学习状态
+    this.loadLearningStatus();
   },
   methods: {
-    // 获取知识点下的题目
-    async fetchQuestions() {
+    // 获取知识点详情
+    async fetchKnowledgeDetail() {
       this.loading = true;
       
       try {
@@ -426,216 +445,21 @@ export default {
           console.error('无法将知识点ID转换为BigNumber:', error);
         }
         
-        const response = await knowledgeAPI.getQuestionsByKnowledgeId(knowledgeIdParam);
+        // 获取知识点详情
+        const response = await knowledgeAPI.getKnowledgeById(knowledgeIdParam);
         
-        // 确保返回的所有ID字段都是字符串类型
-        if (Array.isArray(response)) {
-          this.questions = response.map(item => {
-            // 处理选项，如果是字符串，转换为数组
-            if (typeof item.options === 'string') {
-              try {
-                item.options = JSON.parse(item.options);
-              } catch (e) {
-                item.options = [];
-              }
-            }
-            return item;
-          });
-          
-          // 初始化用户答案
-          this.initUserAnswers();
+        if (response) {
+          this.knowledgeName = response.name || '未命名知识点';
+          this.knowledgeDescription = response.description || '';
         } else {
-          this.questions = [];
+          this.$message.error('获取知识点详情失败');
         }
       } catch (error) {
-        console.error('获取知识点题目列表失败:', error);
-        this.$message.error('获取题目失败，请稍后再试');
-        this.questions = [];
+        console.error('获取知识点详情失败:', error);
+        this.$message.error('获取知识点详情失败，请稍后再试');
       } finally {
         this.loading = false;
       }
-    },
-    
-    // 初始化用户答案
-    initUserAnswers() {
-      const answers = {};
-      const answered = {};
-      const correct = {};
-      this.questions.forEach(question => {
-        if (question.questionType === 'MULTIPLE_CHOICE') {
-          answers[question.questionId] = [];
-        } else {
-          answers[question.questionId] = '';
-        }
-        answered[question.questionId] = false;
-        correct[question.questionId] = false;
-      });
-      this.userAnswers = answers;
-      this.answeredQuestions = answered;
-      this.correctAnswers = correct;
-    },
-    
-    // 提交答案
-    submitAnswer(question) {
-      // 标记题目已回答
-      this.$set(this.answeredQuestions, question.questionId, true);
-      
-      // 检查答案是否正确
-      const isCorrect = this.checkAnswer(question);
-      this.$set(this.correctAnswers, question.questionId, isCorrect);
-      
-      // 保存答题状态到本地存储
-      this.saveAnsweredState();
-      
-      // 这里可以添加向后端提交答案的逻辑
-      console.log('提交答案:', question.questionId, this.userAnswers[question.questionId]);
-      
-      // 显示提交成功提示
-      this.$message({
-        message: isCorrect ? '回答正确！' : '回答错误，请查看正确答案',
-        type: isCorrect ? 'success' : 'warning',
-        duration: 1500
-      });
-      
-      // 滚动到答案区域
-      this.$nextTick(() => {
-        const answerSection = document.querySelector(`#question-${question.questionId} .answer-section`);
-        if (answerSection) {
-          answerSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      });
-    },
-    
-    // 提交全部答案
-    submitAllAnswers() {
-      // 检查是否有未作答的题目
-      const unansweredQuestions = this.questions.filter(q => 
-        !this.isAnswerValid({ questionId: q.questionId, questionType: q.questionType })
-      );
-      
-      if (unansweredQuestions.length > 0) {
-        this.$confirm(`还有 ${unansweredQuestions.length} 道题目未作答，确定要提交吗？`, '提交确认', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          this.processAllAnswers();
-        }).catch(() => {
-          // 用户取消提交
-        });
-      } else {
-        this.processAllAnswers();
-      }
-    },
-    
-    // 处理所有答案
-    processAllAnswers() {
-      // 标记所有题目为已回答
-      this.questions.forEach(question => {
-        this.$set(this.answeredQuestions, question.questionId, true);
-        
-        // 检查答案是否正确
-        const isCorrect = this.checkAnswer(question);
-        this.$set(this.correctAnswers, question.questionId, isCorrect);
-      });
-      
-      // 保存答题状态到本地存储
-      this.saveAnsweredState();
-      
-      // 计算得分
-      const totalQuestions = this.questions.length;
-      const correctCount = Object.values(this.correctAnswers).filter(Boolean).length;
-      const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-      
-      // 显示得分结果
-      this.$message({
-        message: `答案已提交！得分: ${score}分，正确率: ${correctCount}/${totalQuestions}`,
-        type: 'success',
-        duration: 3000
-      });
-      
-      // 添加动画效果，依次显示每个答案
-      this.$nextTick(() => {
-        this.questions.forEach((question, index) => {
-          setTimeout(() => {
-            const questionElement = document.querySelector(`#question-${question.questionId}`);
-            if (questionElement) {
-              questionElement.classList.add('question-answered');
-              // 如果是第一个问题，滚动到它的位置
-              if (index === 0) {
-                questionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }
-          }, index * 300); // 每个问题间隔300毫秒
-        });
-      });
-    },
-    
-    // 重置所有答案
-    resetAllAnswers() {
-      this.$confirm('确定要重新答题吗？这将清除您的所有答案。', '重置确认', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        // 重置用户答案
-        this.initUserAnswers();
-        
-        // 清除本地存储的答题状态
-        this.clearAnsweredState();
-        
-        this.$message({
-          message: '已重置所有答案，可以重新作答',
-          type: 'success',
-          duration: 1500
-        });
-      }).catch(() => {
-        // 用户取消重置
-      });
-    },
-    
-    // 检查答案是否正确
-    checkAnswer(question) {
-      const userAnswer = this.userAnswers[question.questionId];
-      const referenceAnswer = question.referenceAnswer;
-      
-      if (!userAnswer || !referenceAnswer) return false;
-      
-      if (question.questionType === 'MULTIPLE_CHOICE') {
-        // 多选题比较
-        if (!Array.isArray(userAnswer)) return false;
-        
-        // 将参考答案转换为数组
-        const refAnswerArray = referenceAnswer.split(/[,，、\s]+/).filter(Boolean);
-        
-        // 检查长度是否相同
-        if (userAnswer.length !== refAnswerArray.length) return false;
-        
-        // 检查每个选项是否都存在
-        return refAnswerArray.every(option => userAnswer.includes(option));
-      } else if (question.questionType === 'TRUE_FALSE') {
-        // 判断题比较（忽略大小写）
-        return userAnswer.toLowerCase() === referenceAnswer.toLowerCase();
-      } else {
-        // 其他题型（简单比较）
-        return userAnswer.trim() === referenceAnswer.trim();
-      }
-    },
-    
-    // 判断答案是否正确
-    isCorrect(question) {
-      return this.correctAnswers[question.questionId] === true;
-    },
-    
-    // 获取用户答案显示文本
-    getDisplayAnswer(question) {
-      const answer = this.userAnswers[question.questionId];
-      if (!answer) return '未作答';
-      
-      if (question.questionType === 'MULTIPLE_CHOICE') {
-        return answer.join(', ');
-      }
-      return answer;
     },
     
     // 获取课程知识点列表
@@ -648,7 +472,14 @@ export default {
         const response = await knowledgeAPI.getKnowledgeByCourseId(this.courseId);
         
         if (Array.isArray(response)) {
-          this.knowledgePoints = response;
+          // 添加completed属性
+          this.knowledgePoints = response.map(point => ({
+            ...point,
+            completed: this.checkKnowledgeCompleted(point.knowledgeId)
+          }));
+          
+          // 更新当前知识点的完成状态
+          this.updateCurrentKnowledgeStatus();
         } else {
           this.knowledgePoints = [];
         }
@@ -684,124 +515,193 @@ export default {
       return data.name.toLowerCase().includes(value.toLowerCase());
     },
     
-    // 获取用户答案（示例方法，实际应从用户数据获取）
-    getUserAnswer(question) {
-      // 这里应该从用户的答题记录中获取答案
-      // 示例返回
-      if (question.questionType === 'SINGLE_CHOICE') {
-        return 'C';
-      } else if (question.questionType === 'MULTIPLE_CHOICE') {
-        return 'A, B, C';
-      } else {
-        return '用户暂未作答';
+    // 标记知识点为已学习
+    markAsCompleted() {
+      if (!this.knowledgeId || !this.studentId) {
+        this.$message.warning('无法标记学习状态，请确认您已登录');
+        return;
       }
-    },
-    
-    // 检查答案是否有效
-    isAnswerValid(question) {
-      const answer = this.userAnswers[question.questionId];
-      if (question.questionType === 'MULTIPLE_CHOICE') {
-        return answer && answer.length > 0;
-      } else if (question.questionType === 'SINGLE_CHOICE') {
-        return answer && answer.trim() !== '';
-      } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE') {
-        return answer && answer.trim() !== '';
-      } else if (question.questionType === 'TRUE_FALSE') {
-        return answer === 'true' || answer === 'false';
-      } else {
-        return false;
-      }
-    },
-    
-    // 单选题选择
-    selectSingleChoice(questionId, optionLabel) {
-      this.$set(this.userAnswers, questionId, optionLabel);
-      // 添加选择动画效果
-      this.animateSelection(questionId);
-    },
-    
-    // 判断题选择
-    selectTrueFalse(questionId, value) {
-      this.$set(this.userAnswers, questionId, value);
-      // 添加选择动画效果
-      this.animateSelection(questionId);
-    },
-    
-    // 多选题选项切换
-    toggleMultipleChoice(questionId, optionLabel) {
-      const arr = this.userAnswers[questionId] || [];
-      const idx = arr.indexOf(optionLabel);
-      if (idx > -1) {
-        arr.splice(idx, 1);
-      } else {
-        arr.push(optionLabel);
-      }
-      // 触发响应式
-      this.$set(this.userAnswers, questionId, [...arr]);
-      // 添加选择动画效果
-      this.animateSelection(questionId);
-    },
-    
-    // 添加选择动画效果
-    animateSelection(questionId) {
-      // 可以在这里添加更复杂的动画逻辑
-      // 简单的实现是通过CSS transition实现
-      console.log('选择了问题ID:', questionId);
-    },
-    
-    // 保存答题状态到本地存储
-    saveAnsweredState() {
-      if (!this.knowledgeId || !this.studentId) return;
       
-      const storageKey = `knowledge_${this.knowledgeId}_student_${this.studentId}`;
-      const storageData = {
-        userAnswers: this.userAnswers,
-        answeredQuestions: this.answeredQuestions,
-        correctAnswers: this.correctAnswers,
-        timestamp: new Date().getTime()
-      };
+      this.isCompleted = true;
       
+      // 保存学习状态到本地存储
+      this.saveLearningStatus();
+      
+      // 刷新所有知识点的状态
+      this.refreshAllKnowledgePointsStatus();
+      
+      this.$message.success('已标记为学习完成！');
+      
+      // 更新进度条
+      this.$nextTick(() => {
+        this.updateProgressBar();
+      });
+    },
+    
+    // 重置学习状态
+    resetLearningStatus() {
+      if (!this.studentId || !this.knowledgeId) {
+        this.$message.warning('无法重置学习状态，请确认您已登录');
+        return;
+      }
+
+      this.$confirm('确定要重置此知识点的学习状态吗？这将清除您已完成的标记。', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.isCompleted = false;
+        this.removeFromCompletedList(); // 从已完成列表中移除
+        
+        // 刷新所有知识点的状态
+        this.refreshAllKnowledgePointsStatus();
+        
+        this.$message.success('学习状态已重置！');
+        this.$nextTick(() => {
+          this.updateProgressBar();
+        });
+      }).catch(() => {
+        // 取消操作
+      });
+    },
+    
+    // 从已完成列表中移除知识点
+    removeFromCompletedList() {
+      if (!this.studentId || !this.knowledgeId) return;
+      
+      const storageKey = `knowledge_completed_${this.studentId}`;
       try {
-        localStorage.setItem(storageKey, JSON.stringify(storageData));
-      } catch (e) {
-        console.error('保存答题状态失败:', e);
-      }
-    },
-    
-    // 从本地存储加载答题状态
-    loadAnsweredState() {
-      if (!this.knowledgeId || !this.studentId) return;
-      
-      const storageKey = `knowledge_${this.knowledgeId}_student_${this.studentId}`;
-      
-      try {
-        const storageData = localStorage.getItem(storageKey);
-        if (storageData) {
-          const data = JSON.parse(storageData);
+        const completedData = localStorage.getItem(storageKey);
+        if (completedData) {
+          let completedList = JSON.parse(completedData);
+          const knowledgeIdStr = String(this.knowledgeId);
           
-          // 检查数据是否有效
-          if (data && data.userAnswers && data.answeredQuestions) {
-            this.userAnswers = data.userAnswers;
-            this.answeredQuestions = data.answeredQuestions;
-            this.correctAnswers = data.correctAnswers || {};
-          }
+          // 过滤掉当前知识点
+          completedList = completedList.filter(id => String(id) !== knowledgeIdStr);
+          
+          // 更新本地存储
+          localStorage.setItem(storageKey, JSON.stringify(completedList));
         }
       } catch (e) {
-        console.error('加载答题状态失败:', e);
+        console.error('移除学习状态失败:', e);
       }
     },
     
-    // 清除本地存储的答题状态
-    clearAnsweredState() {
-      if (!this.knowledgeId || !this.studentId) return;
+    // 更新知识点列表中的状态
+    updateKnowledgePointStatus(knowledgeId, completed) {
+      // 确保使用字符串进行比较
+      const knowledgeIdStr = String(knowledgeId);
       
-      const storageKey = `knowledge_${this.knowledgeId}_student_${this.studentId}`;
+      // 查找对应的知识点
+      const index = this.knowledgePoints.findIndex(kp => String(kp.knowledgeId) === knowledgeIdStr);
       
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (e) {
-        console.error('清除答题状态失败:', e);
+      if (index !== -1) {
+        // 使用数组替换方式更新，而不是使用this.$set
+        const updatedPoint = { ...this.knowledgePoints[index], completed };
+        this.knowledgePoints.splice(index, 1, updatedPoint);
       }
+    },
+    
+    // 更新当前知识点的完成状态
+    updateCurrentKnowledgeStatus() {
+      this.isCompleted = this.checkKnowledgeCompleted(this.knowledgeId);
+    },
+    
+    // 检查知识点是否已完成
+    checkKnowledgeCompleted(knowledgeId) {
+      if (!this.studentId || !knowledgeId) return false;
+      
+      const storageKey = `knowledge_completed_${this.studentId}`;
+      try {
+        const completedData = localStorage.getItem(storageKey);
+        if (completedData) {
+          const completedList = JSON.parse(completedData);
+          // 确保比较时使用字符串格式
+          const knowledgeIdStr = String(knowledgeId);
+          return completedList.some(id => String(id) === knowledgeIdStr);
+        }
+      } catch (e) {
+        console.error('读取学习状态失败:', e);
+      }
+      return false;
+    },
+    
+    // 保存学习状态到本地存储
+    saveLearningStatus() {
+      if (!this.studentId || !this.knowledgeId) return;
+      
+      const storageKey = `knowledge_completed_${this.studentId}`;
+      try {
+        let completedList = [];
+        const completedData = localStorage.getItem(storageKey);
+        
+        if (completedData) {
+          completedList = JSON.parse(completedData);
+        }
+        
+        // 转换为字符串进行比较
+        const knowledgeIdStr = String(this.knowledgeId);
+        
+        // 如果不存在则添加
+        if (!completedList.some(id => String(id) === knowledgeIdStr)) {
+          completedList.push(knowledgeIdStr); // 存储为字符串格式
+          localStorage.setItem(storageKey, JSON.stringify(completedList));
+        }
+      } catch (e) {
+        console.error('保存学习状态失败:', e);
+      }
+    },
+    
+    // 加载学习状态
+    loadLearningStatus() {
+      this.updateCurrentKnowledgeStatus();
+    },
+    
+    // 刷新所有知识点的完成状态
+    refreshAllKnowledgePointsStatus() {
+      if (!this.knowledgePoints || this.knowledgePoints.length === 0) return;
+      
+      // 更新每个知识点的完成状态
+      this.knowledgePoints = this.knowledgePoints.map(point => ({
+        ...point,
+        completed: this.checkKnowledgeCompleted(point.knowledgeId)
+      }));
+    },
+    
+    // 更新进度条
+    updateProgressBar() {
+      // 重新计算已完成任务点数
+      // 这里可以添加更新后端进度的逻辑
+    },
+
+    // 清除所有学习状态
+    clearAllLearningStatus() {
+      if (!this.studentId) {
+        this.$message.warning('无法清除学习状态，请确认您已登录');
+        return;
+      }
+
+      this.$confirm('确定要清除所有学习状态吗？这将删除您已完成的所有知识点标记。', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        // 清除本地存储
+        localStorage.removeItem(`knowledge_completed_${this.studentId}`);
+        
+        // 更新当前知识点状态
+        this.isCompleted = false;
+        
+        // 刷新所有知识点的状态
+        this.refreshAllKnowledgePointsStatus();
+        
+        this.$message.success('所有学习状态已清除！');
+        this.$nextTick(() => {
+          this.updateProgressBar();
+        });
+      }).catch(() => {
+        // 取消操作
+      });
     }
   }
 };
@@ -822,7 +722,7 @@ export default {
   overflow-y: auto;
 }
 
-.question-card {
+.knowledge-content-card {
   height: calc(100vh - 40px);
   overflow-y: auto;
 }
@@ -844,13 +744,51 @@ export default {
 .knowledge-header h2 {
   margin: 0 0 10px 0;
   color: #303133;
+  font-size: 24px;
 }
 
-.knowledge-info {
+.knowledge-meta {
   display: flex;
   gap: 20px;
   color: #606266;
   font-size: 14px;
+}
+
+.course-name {
+  color: #409EFF;
+  font-weight: 500;
+}
+
+/* 知识点内容样式 */
+.knowledge-description-container {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.knowledge-description {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #333;
+  text-align: justify;
+}
+
+.knowledge-description p {
+  margin-bottom: 16px;
+}
+
+.empty-description {
+  padding: 40px 0;
+  text-align: center;
+}
+
+.learning-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+  gap: 15px; /* 按钮之间的间距 */
 }
 
 .question-item {
@@ -1085,6 +1023,12 @@ export default {
 
 .catalog-search {
   margin-bottom: 15px;
+}
+
+.catalog-actions {
+  margin-top: 15px;
+  display: flex;
+  justify-content: center;
 }
 
 .catalog-content {

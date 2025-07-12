@@ -17,6 +17,34 @@
     </div>
 
     <div class="knowledge-content">
+      <!-- 知识点内容卡片 -->
+      <div class="detail-card content-card">
+        <div class="card-header">
+          <h3>知识点内容</h3>
+          <div class="header-actions">
+            <el-button type="primary" size="small" @click="editKnowledgeContent">
+              <el-icon><Edit /></el-icon>编辑内容
+            </el-button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div v-if="loading" class="loading-container">
+            <el-skeleton :rows="3" animated />
+          </div>
+          <div v-else-if="!knowledgeData?.description" class="empty-content">
+            <el-empty description="暂无知识点内容" :image-size="100">
+              <template #image>
+                <el-icon style="font-size: 50px; color: #909399;"><Document /></el-icon>
+              </template>
+              <el-button type="primary" @click="editKnowledgeContent">添加知识点内容</el-button>
+            </el-empty>
+          </div>
+          <div v-else class="knowledge-description">
+            <p class="description-text">{{ knowledgeData.description }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- 题型统计图表 -->
       <div class="detail-card chart-card" v-if="questions.length > 0">
         <div class="card-header">
@@ -145,6 +173,21 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑知识点内容对话框 -->
+    <el-dialog v-model="contentDialogVisible" title="编辑知识点内容" width="700px">
+      <el-form :model="contentForm" label-width="0">
+        <el-form-item>
+          <el-input v-model="contentForm.description" type="textarea" :rows="15" placeholder="请输入知识点内容..." />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="contentDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveKnowledgeContent">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 添加/编辑习题对话框 -->
     <el-dialog v-model="questionDialogVisible" :title="isEditingQuestion ? '编辑习题' : '添加习题'" width="700px">
       <el-form :model="questionForm" label-width="100px" :rules="questionRules" ref="questionFormRef">
@@ -225,7 +268,7 @@
 import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Edit, Plus, DocumentRemove, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Plus, DocumentRemove, Delete, Document } from '@element-plus/icons-vue'
 import { knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import * as echarts from 'echarts'
@@ -250,6 +293,12 @@ const editForm = ref({
   difficultyLevel: '中等',
   description: '',
   teachPlan: ''
+})
+
+// 知识点内容编辑对话框
+const contentDialogVisible = ref(false)
+const contentForm = ref({
+  description: ''
 })
 
 // 表单验证规则
@@ -665,6 +714,14 @@ function editKnowledge() {
   editDialogVisible.value = true
 }
 
+// 编辑知识点内容
+function editKnowledgeContent() {
+  contentForm.value = {
+    description: knowledgeData.value.description || ''
+  }
+  contentDialogVisible.value = true
+}
+
 // 保存知识点
 async function saveKnowledge() {
   formRef.value.validate(async (valid) => {
@@ -708,6 +765,44 @@ async function saveKnowledge() {
       }
     }
   })
+}
+
+// 保存知识点内容
+async function saveKnowledgeContent() {
+  // 从localstorage中获取教师ID
+  const userInfoStr = localStorage.getItem('user_info')
+  if (!userInfoStr) {
+    ElMessage.error('未找到用户信息，请重新登录')
+    return
+  }
+  
+  const userInfo = JSON.parse(userInfoStr)
+  if (!userInfo || !userInfo.teacherId) {
+    ElMessage.error('用户信息不完整或不是教师账号')
+    return
+  }
+  
+  // 确保教师ID是字符串形式
+  const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+  
+  // 确保知识点ID是字符串形式
+  const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
+  
+  const updateData = {
+    knowledgeId: knowledgeIdStr,
+    description: contentForm.value.description || '',
+    teacherId: teacherId
+  }
+  
+  try {
+    await knowledgeAPI.updateKnowledge(updateData)
+    ElMessage.success('知识点内容更新成功')
+    contentDialogVisible.value = false
+    await fetchKnowledgeDetail() // 重新获取知识点详情以更新描述
+  } catch (error) {
+    console.error('更新知识点内容失败:', error)
+    ElMessage.error('更新知识点内容失败: ' + (error.message || '请稍后重试'))
+  }
 }
 
 // 添加习题
@@ -1679,6 +1774,28 @@ const handleResize = () => {
 
 .detail-card:hover {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.content-card {
+  margin-bottom: 16px;
+}
+
+.knowledge-description {
+  padding: 10px 0;
+}
+
+.description-text {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #303133;
+  white-space: pre-wrap;
+  text-align: justify;
+  margin: 0;
+}
+
+.empty-content {
+  padding: 30px 0;
+  text-align: center;
 }
 
 .charts-container {
