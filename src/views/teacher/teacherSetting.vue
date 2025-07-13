@@ -80,26 +80,26 @@
         <!-- 关于 -->
         <div v-if="activeMenu === 'about'" class="about-section">
           <div class="app-info">
-            <img src="https://placehold.co/120x120?text=Logo" alt="应用Logo" class="app-logo">
-            <h3 class="app-name">智能教育平台</h3>
+            <img src="@/assets/projectlogo.png" alt="应用Logo" class="app-logo">
+            <h3 class="app-name">慧课</h3>
             <p class="app-version">版本: 1.3.3</p>
             <p class="app-description">
-              智能教育平台是一款专为学生和教师设计的教育管理系统，提供课程管理、作业提交、考试安排等功能。
+              慧课是一款专为学生和教师设计的教育管理系统，提供课程管理、作业提交、考试安排等功能。
             </p>
           </div>
           
           <div class="about-details">
             <div class="detail-item">
               <span class="detail-label">开发团队:</span>
-              <span class="detail-value">智能教育研发团队</span>
+              <span class="detail-value">慧课研发团队</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">技术支持:</span>
-              <span class="detail-value">support@smart-edu.com</span>
+              <span class="detail-value">support@huike.com</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">版权所有:</span>
-              <span class="detail-value">© 2025 智能教育平台</span>
+              <span class="detail-value">© 2025 慧课</span>
             </div>
           </div>
         </div>
@@ -118,7 +118,7 @@
         <p>最后更新日期：2025年1月1日</p>
         
         <h4>1. 引言</h4>
-        <p>欢迎使用智能教育平台（以下简称"我们"或"平台"）。我们非常重视您的个人信息和隐私保护。本隐私政策旨在向您说明我们如何收集、使用、存储和共享您的个人信息，以及您享有的相关权利。请您在使用我们的服务前，仔细阅读并了解本隐私政策的全部内容。</p>
+        <p>欢迎使用慧课（以下简称"我们"或"平台"）。我们非常重视您的个人信息和隐私保护。本隐私政策旨在向您说明我们如何收集、使用、存储和共享您的个人信息，以及您享有的相关权利。请您在使用我们的服务前，仔细阅读并了解本隐私政策的全部内容。</p>
         
         <h4>2. 我们收集的信息</h4>
         <p>我们可能收集以下类型的信息：</p>
@@ -177,7 +177,7 @@
         <p>最后更新日期：2025年1月1日</p>
         
         <h4>1. 协议的接受</h4>
-        <p>欢迎使用智能教育平台（以下简称"平台"）。本协议是您与平台之间关于使用平台服务所订立的协议。请您在使用平台服务前，仔细阅读并充分理解本协议的全部内容。一旦您开始使用平台服务，即表示您已充分理解并接受本协议的所有条款。</p>
+        <p>欢迎使用慧课（以下简称"平台"）。本协议是您与平台之间关于使用平台服务所订立的协议。请您在使用平台服务前，仔细阅读并充分理解本协议的全部内容。一旦您开始使用平台服务，即表示您已充分理解并接受本协议的所有条款。</p>
         
         <h4>2. 服务内容</h4>
         <p>平台提供的服务包括但不限于：课程学习、作业提交、考试管理、学习资料获取等。平台有权根据实际情况变更、中断或终止部分或全部的服务。</p>

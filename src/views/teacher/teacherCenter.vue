@@ -3,7 +3,7 @@
     <!-- 顶部导航栏 -->
     <AppHeader 
       :logo-url="logoUrl" 
-      :app-name="'智能教育平台'" 
+      :app-name="'慧课'" 
       :avatar-url="avatarUrl" 
       :user-name="userName"
       :default-search-value="searchValue"
@@ -99,7 +99,7 @@ import {
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const logoUrl = ref('https://placehold.co/48x48?text=Logo') // 可替换为实际logo图片
+const logoUrl = ref('@/assets/projectlogo.png') // 项目logo
 const avatarUrl = ref('https://placehold.co/40x40?text=头像') // 默认头像
 const userName = getUserName() // 默认用户名
 const showAIChat = ref(false)

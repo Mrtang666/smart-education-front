@@ -3,7 +3,7 @@
     <header class="header">
         <div class="logo-area">
             <!-- logo图片支持插入 -->
-            <img class="logo-img" src="@/assets/logo.png" alt="logo" />
+            <img class="logo-img" src="@/assets/projectlogo.png" alt="logo" />
             <span class="app-name">{{ props.appName }}</span>
         </div>
         <div class="header-right">
