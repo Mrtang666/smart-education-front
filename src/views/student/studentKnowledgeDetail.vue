@@ -19,7 +19,8 @@
           <!-- 知识点内容 -->
           <div class="knowledge-description-container">
             <div v-if="knowledgeDescription" class="knowledge-description">
-              <p v-html="formattedDescription"></p>            </div>
+              <p class="truncated-description" v-html="formattedDescription"></p>
+            </div>
             <div v-else class="empty-description">
               <el-empty description="暂无知识点内容" />
             </div>
@@ -775,8 +776,12 @@ export default {
   text-align: justify;
 }
 
-.knowledge-description p {
+.truncated-description {
   margin-bottom: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .empty-description {

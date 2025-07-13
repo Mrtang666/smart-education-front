@@ -40,7 +40,7 @@
             </el-empty>
           </div>
           <div v-else class="knowledge-description">
-            <p class="description-text">{{ knowledgeData.description }}</p>
+            <p class="description-text truncated-description">{{ knowledgeData.description }}</p>
           </div>
         </div>
       </div>
@@ -1323,6 +1323,13 @@ const handleResize = () => {
   line-height: 1.6;
   color: #303133;
   white-space: pre-wrap;
+}
+
+.truncated-description {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .empty-tip {

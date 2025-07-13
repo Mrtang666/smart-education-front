@@ -19,7 +19,7 @@
               <el-tag :type="getDifficultyTagType(knowledge.difficultyLevel)">{{ knowledge.difficultyLevel }}</el-tag>
             </div>
             <div class="knowledge-description">
-              <p>{{ knowledge.description || '暂无描述' }}</p>
+              <p class="truncated-description">{{ knowledge.description || '暂无描述' }}</p>
             </div>
             <div class="knowledge-footer">
               <span class="teach-plan-label">教学计划:</span>
@@ -287,6 +287,13 @@ function formatFileSize(size) {
 
 .knowledge-description p {
   margin: 0;
+}
+
+.truncated-description {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .knowledge-footer {

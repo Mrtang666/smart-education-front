@@ -100,12 +100,12 @@
                 </el-table-column>
                 <el-table-column prop="description" label="描述" min-width="200">
                     <template #default="scope">
-                        {{ scope.row.description || '暂无描述' }}
+                        <div class="truncated-description">{{ scope.row.description || '暂无描述' }}</div>
                     </template>
                 </el-table-column>
                 <el-table-column prop="teachPlan" label="教学计划" min-width="220">
                     <template #default="scope">
-                        {{ scope.row.teachPlan || '暂无教学计划' }}
+                        <div class="truncated-description">{{ scope.row.teachPlan || '暂无教学计划' }}</div>
                     </template>
                 </el-table-column>
                 <el-table-column label="操作" width="120" fixed="right">
@@ -1426,6 +1426,13 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.truncated-description {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .pagination-container {
