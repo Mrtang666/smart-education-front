@@ -26,6 +26,7 @@
               :courseKnowledges="courseKnowledges"
               :courseDescription="courseDescription"
               :materials="materials"
+              :documents="documents"
               @show-add-knowledge="showAddKnowledgeDialog"
               @view-knowledge="viewKnowledgeDetail"
               @edit-knowledge="editKnowledge"
@@ -33,6 +34,9 @@
               @show-upload="showUploadDialog"
               @download-material="downloadMaterial"
               @remove-material="removeMaterial"
+              @show-upload-doc="showUploadDocDialog"
+              @download-doc="downloadDoc"
+              @remove-doc="removeDoc"
             />
           </el-tab-pane>
 
@@ -744,6 +748,38 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 上传文档对话框 -->
+    <el-dialog v-model="uploadDocDialogVisible" title="上传文档" width="500px">
+      <el-form :model="uploadDocForm" label-width="80px" :rules="uploadDocRules" ref="uploadDocFormRef">
+        <el-form-item label="文件" prop="file">
+          <el-upload
+            ref="uploadDocRef"
+            :auto-upload="false"
+            :on-change="handleDocChange"
+            :on-remove="handleDocRemove"
+            :before-upload="beforeDocUpload"
+            :file-list="docFileList"
+            :limit="1"
+            accept=".pdf,.pptx,.docx,.txt"
+          >
+            <el-button type="primary">选择文件</el-button>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="名称">
+          <el-input v-model="uploadDocForm.name" placeholder="请输入文档名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="uploadDocForm.description" type="textarea" :rows="3" placeholder="请输入文档描述" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="uploadDocDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="uploadDoc" :loading="isUploadingDoc">上传</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -753,7 +789,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit,  Search } from '@element-plus/icons-vue'
-import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI } from '@/api/api'
+import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI, docAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import { getExamStatus, updateExamsStatus, formatDateTime } from '@/utils/examManager'
 
@@ -2682,6 +2718,9 @@ onMounted(async () => {
 
       // 加载课程考勤
       await fetchCourseAttendances()
+
+      // 加载文档列表
+      await fetchDocuments()
     } else {
       ElMessage.error('获取课程信息失败')
       goBack()
@@ -3403,6 +3442,177 @@ function removeAttendance(attendance) {
     }
   }).catch(() => {
     // 用户取消删除
+  })
+}
+
+// 下载文档
+async function downloadDoc(filename) {
+  try {
+    ElMessage.info('文档下载中，请稍候...')
+    
+    // 使用API下载文档
+    const blob = await docAPI.downloadDoc(filename)
+    
+    // 创建下载链接
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    
+    // 清理
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+      document.body.removeChild(link)
+    }, 100)
+    
+    ElMessage.success('文档下载成功')
+  } catch (error) {
+    console.error('下载文档失败:', error)
+    ElMessage.error('下载文档失败，请稍后重试')
+  }
+}
+
+// 文档列表
+const documents = ref([])
+const uploadDocDialogVisible = ref(false)
+const uploadDocForm = ref({
+  file: null
+})
+const uploadDocFormRef = ref(null)
+const docFileList = ref([])
+const isUploadingDoc = ref(false)
+
+// 文档上传表单验证规则
+const uploadDocRules = {
+  file: [
+    { required: true, message: '请选择要上传的文件', trigger: 'change' }
+  ]
+}
+
+// 获取文档列表
+async function fetchDocuments() {
+  try {
+    console.log('开始获取文档列表');
+    
+    // 调用API获取文档列表，API层已经处理好数据格式
+    const fileList = await docAPI.listDocs();
+    console.log('获取到的文档列表:', fileList);
+    
+    // 直接使用API返回的文件列表
+    documents.value = Array.isArray(fileList) ? fileList : [];
+    
+    console.log('设置的文档列表:', documents.value);
+  } catch (error) {
+    console.error('获取文档列表失败:', error);
+    ElMessage.error('获取文档列表失败，请稍后重试');
+    documents.value = [];
+  }
+}
+
+// 显示上传文档对话框
+function showUploadDocDialog() {
+  uploadDocForm.value = {
+    file: null
+  }
+  docFileList.value = []
+  uploadDocDialogVisible.value = true
+}
+
+// 文档上传前的验证
+function beforeDocUpload(file) {
+  // 限制文件大小为50MB
+  const maxSize = 50 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.error('文件大小不能超过50MB')
+    return false
+  }
+  
+  // 保存文件到表单
+  uploadDocForm.value.file = file
+  
+  return false // 阻止自动上传
+}
+
+// 文档选择变化处理
+function handleDocChange(file) {
+  // 更新文件列表
+  docFileList.value = [file]
+  
+  // 保存文件到表单
+  uploadDocForm.value.file = file.raw
+}
+
+// 文档移除处理
+function handleDocRemove() {
+  // 清空文件列表
+  docFileList.value = []
+  
+  // 清空表单中的文件
+  uploadDocForm.value.file = null
+}
+
+// 上传文档
+async function uploadDoc() {
+  // 表单验证
+  if (!uploadDocFormRef.value) return
+  
+  uploadDocFormRef.value.validate(async (valid) => {
+    if (!valid) {
+      ElMessage.warning('请选择要上传的文件')
+      return
+    }
+    
+    if (!uploadDocForm.value.file) {
+      ElMessage.warning('请选择要上传的文件')
+      return
+    }
+    
+    try {
+      isUploadingDoc.value = true
+      
+      // 上传文件
+      await docAPI.uploadDoc(uploadDocForm.value.file)
+      
+      ElMessage.success('文档上传成功')
+      uploadDocDialogVisible.value = false
+      
+      // 重新获取文档列表
+      await fetchDocuments()
+    } catch (error) {
+      console.error('上传文档失败:', error)
+      ElMessage.error('上传文档失败，请稍后重试')
+    } finally {
+      isUploadingDoc.value = false
+    }
+  })
+}
+
+// 删除文档
+function removeDoc(filename) {
+  ElMessageBox.confirm(
+    `确定要删除文件"${filename}"吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await docAPI.deleteDoc(filename)
+      
+      // 重新获取文档列表
+      await fetchDocuments()
+      
+      ElMessage.success('文档已删除')
+    } catch (error) {
+      console.error('删除文档失败:', error)
+      ElMessage.error('删除文档失败，请稍后重试')
+    }
+  }).catch(() => {
+    // 用户取消删除操作
   })
 }
 </script>

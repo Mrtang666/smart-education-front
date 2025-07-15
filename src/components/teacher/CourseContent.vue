@@ -87,14 +87,44 @@
         </div>
       </div>
     </div>
+
+    <!-- 课程文档部分 -->
+    <div class="content-section">
+      <div class="section-header">
+        <h3>课程文档</h3>
+        <el-button type="primary" size="small" @click="$emit('show-upload-doc')">
+          <el-icon><Upload /></el-icon>
+          上传文档
+        </el-button>
+      </div>
+      <div class="section-body">
+        <div v-if="!processedDocuments || processedDocuments.length === 0" class="empty-tip">
+          暂无课程文档
+        </div>
+        <div v-else class="materials-list">
+          <div v-for="(doc, index) in processedDocuments" :key="index" class="material-item">
+            <el-icon><Document /></el-icon>
+            <span class="material-name">{{ typeof doc === 'string' ? doc : JSON.stringify(doc) }}</span>
+            <div class="material-actions">
+              <el-button link type="primary" @click="$emit('download-doc', doc)">
+                <el-icon><Download /></el-icon> 下载
+              </el-button>
+              <el-button link type="danger" @click="$emit('remove-doc', doc)">
+                <el-icon><Delete /></el-icon> 删除
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, computed } from 'vue'
 import { Plus, Document, Upload, Download, Delete } from '@element-plus/icons-vue'
 
-defineProps({
+const props = defineProps({
   courseKnowledges: {
     type: Array,
     required: true
@@ -106,8 +136,25 @@ defineProps({
   materials: {
     type: Array,
     required: true
+  },
+  documents: {
+    type: Array,
+    default: () => []
   }
 })
+
+// 处理文档列表，将可能连在一起的文档名称分开
+const processedDocuments = computed(() => {
+  console.log('CourseContent组件接收到的documents:', props.documents);
+  
+  if (!props.documents || props.documents.length === 0) {
+    console.log('文档列表为空');
+    return [];
+  }
+  
+  // 直接返回文档列表，因为已经在API层处理过了
+  return props.documents;
+});
 
 defineEmits([
   'show-add-knowledge', 
@@ -116,7 +163,10 @@ defineEmits([
   'remove-knowledge', 
   'show-upload',
   'download-material',
-  'remove-material'
+  'remove-material',
+  'show-upload-doc',
+  'download-doc',
+  'remove-doc'
 ])
 
 // 根据难度等级获取标签类型

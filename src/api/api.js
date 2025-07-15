@@ -3391,3 +3391,687 @@ export const courseFileAPI = {
     }
 };
 
+// 文档管理相关API
+export const docAPI = {
+    /**
+     * 上传文档（使用表单提交方式）
+     * @param {File} file 文件对象
+     * @returns {Promise<Object>} 上传成功后返回的响应对象
+     */
+    async uploadDoc(file) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 创建FormData对象
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await axios.post('http://118.89.136.119:8000/docs/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            
+            return response.data;
+        } catch (error) {
+            console.error('上传文档失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取文档列表
+     * @returns {Promise<Array<string>>} 文档列表
+     */
+    async listDocs() {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.get('http://118.89.136.119:8000/docs/list');
+            console.log('原始文档列表响应:', response.data);
+            
+            // 处理响应数据，确保返回格式化的文件列表
+            let fileList = [];
+            
+            if (response.data) {
+                // 如果是字符串，可能是JSON字符串或单个文件名
+                if (typeof response.data === 'string') {
+                    if (response.data.trim().startsWith('[') && response.data.trim().endsWith(']')) {
+                        // 尝试解析JSON字符串
+                        try {
+                            const parsed = JSON.parse(response.data.replace(/'/g, '"'));
+                            if (Array.isArray(parsed)) {
+                                fileList = parsed;
+                            } else {
+                                fileList = [response.data];
+                            }
+                        } catch (e) {
+                            console.error('解析文档列表JSON失败:', e);
+                            // 如果解析失败，将整个字符串作为一个文件名
+                            fileList = [response.data];
+                        }
+                    } else {
+                        // 单个文件名
+                        fileList = [response.data];
+                    }
+                } 
+                // 如果已经是数组
+                else if (Array.isArray(response.data)) {
+                    // 处理数组中的每个元素
+                    fileList = response.data.flatMap(item => {
+                        // 如果元素是字符串且看起来像是数组
+                        if (typeof item === 'string') {
+                            if (item.includes('[') && item.includes(']')) {
+                                try {
+                                    const parsed = JSON.parse(item.replace(/'/g, '"'));
+                                    return Array.isArray(parsed) ? parsed : [item];
+                                } catch (e) {
+                                    return [item];
+                                }
+                            }
+                            // 检查是否包含多个文件名（以逗号分隔）
+                            else if (item.includes(',')) {
+                                // 尝试拆分逗号分隔的文件名
+                                const parts = item.split(',').map(part => part.trim())
+                                    .filter(part => part.length > 0);
+                                if (parts.length > 1) {
+                                    return parts;
+                                }
+                            }
+                            return [item];
+                        }
+                        return [String(item)];
+                    });
+                    
+                    // 清理文件名（去除引号和括号）
+                    fileList = fileList.map(filename => {
+                        if (typeof filename === 'string') {
+                            // 使用字符串方法替代正则表达式
+                            let cleaned = filename.trim();
+                            // 去除开头的引号和括号
+                            while (cleaned.length > 0 && (cleaned[0] === '"' || cleaned[0] === "'" || cleaned[0] === '[')) {
+                                cleaned = cleaned.substring(1);
+                            }
+                            // 去除结尾的引号和括号
+                            while (cleaned.length > 0 && (cleaned[cleaned.length - 1] === '"' || cleaned[cleaned.length - 1] === "'" || cleaned[cleaned.length - 1] === ']')) {
+                                cleaned = cleaned.substring(0, cleaned.length - 1);
+                            }
+                            return cleaned;
+                        }
+                        return String(filename);
+                    });
+                }
+                // 如果是对象，尝试提取值
+                else if (typeof response.data === 'object') {
+                    fileList = Object.values(response.data).map(item => String(item));
+                }
+                // 其他情况
+                else {
+                    fileList = [String(response.data)];
+                }
+            }
+            
+            console.log('处理后的文档列表:', fileList);
+            return fileList;
+        } catch (error) {
+            console.error('获取文档列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 删除文档
+     * @param {string} filename 文件名
+     * @returns {Promise<Object>} 删除结果
+     */
+    async deleteDoc(filename) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.delete(`http://118.89.136.119:8000/docs/delete/${encodeURIComponent(filename)}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除文档失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+    
+    /**
+     * 下载文档
+     * @param {string} filename 文件名
+     * @returns {Promise<Blob>} 文件Blob对象
+     */
+    async downloadDoc(filename) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.get(`http://118.89.136.119:8000/docs/download/${encodeURIComponent(filename)}`, {
+                responseType: 'blob'
+            });
+            return response.data;
+        } catch (error) {
+            console.error('下载文档失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
+
+// 问题相关API
+export const problemAPI = {
+    /**
+     * 更新问题（需要token）
+     * @param {Object} problemData 问题信息
+     * @param {number} problemData.problemId 问题ID
+     * @param {number} problemData.assignmentId 作业ID
+     * @param {string} problemData.originType 来源类型
+     * @param {string} problemData.title 标题
+     * @param {string} problemData.content 内容
+     * @param {string} problemData.type 类型
+     * @param {boolean} problemData.autoGrading 是否自动评分
+     * @param {string} problemData.expectedAnswer 预期答案
+     * @param {number} problemData.score 分数
+     * @param {number} problemData.sequence 序号
+     * @returns {Promise<Object>} 更新后的问题信息
+     * 返回字段：
+     *   - problemId: number 问题ID
+     *   - assignmentId: number 作业ID
+     *   - originType: string 来源类型
+     *   - title: string 标题
+     *   - content: string 内容
+     *   - type: string 类型
+     *   - autoGrading: boolean 是否自动评分
+     *   - expectedAnswer: string 预期答案
+     *   - score: number 分数
+     *   - sequence: number 序号
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async updateProblem(problemData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...problemData };
+            
+            // 确保ID字段是字符串类型
+            if (dataToSend.problemId !== undefined) dataToSend.problemId = String(dataToSend.problemId);
+            if (dataToSend.assignmentId !== undefined) dataToSend.assignmentId = String(dataToSend.assignmentId);
+            
+            const response = await axios.post('/api/problem/update', dataToSend);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.problemId !== undefined) response.data.problemId = String(response.data.problemId);
+                if (response.data.assignmentId !== undefined) response.data.assignmentId = String(response.data.assignmentId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('更新问题失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 保存问题（需要token）
+     * @param {Object} problemData 问题信息
+     * @param {number} [problemData.problemId] 问题ID（可选，更新时填写）
+     * @param {number} problemData.assignmentId 作业ID
+     * @param {string} problemData.originType 来源类型
+     * @param {string} problemData.title 标题
+     * @param {string} problemData.content 内容
+     * @param {string} problemData.type 类型
+     * @param {boolean} problemData.autoGrading 是否自动评分
+     * @param {string} problemData.expectedAnswer 预期答案
+     * @param {number} problemData.score 分数
+     * @param {number} problemData.sequence 序号
+     * @returns {Promise<Object>} 保存后的问题信息
+     * 返回字段：同updateProblem返回字段
+     */
+    async saveProblem(problemData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...problemData };
+            
+            // 确保ID字段是字符串类型
+            if (dataToSend.problemId !== undefined) dataToSend.problemId = String(dataToSend.problemId);
+            if (dataToSend.assignmentId !== undefined) dataToSend.assignmentId = String(dataToSend.assignmentId);
+            
+            const response = await axios.post('/api/problem/save', dataToSend);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.problemId !== undefined) response.data.problemId = String(response.data.problemId);
+                if (response.data.assignmentId !== undefined) response.data.assignmentId = String(response.data.assignmentId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('保存问题失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据问题ID获取问题信息（需要token）
+     * @param {number} problemId 问题ID
+     * @returns {Promise<Object>} 问题信息
+     * 返回字段：同updateProblem返回字段
+     */
+    async getProblemById(problemId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const problemIdStr = String(problemId);
+            
+            const response = await axios.get(`/api/problem/${problemIdStr}`);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.problemId !== undefined) response.data.problemId = String(response.data.problemId);
+                if (response.data.assignmentId !== undefined) response.data.assignmentId = String(response.data.assignmentId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取问题信息失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据问题类型获取问题列表（需要token）
+     * @param {string} type 问题类型
+     * @returns {Promise<Array<Object>>} 问题列表
+     * 每项字段：同updateProblem返回字段
+     */
+    async getProblemsByType(type) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/problem/type/${type}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.problemId !== undefined) item.problemId = String(item.problemId);
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取问题列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据作业ID获取问题列表（需要token）
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Array<Object>>} 问题列表
+     * 每项字段：同updateProblem返回字段
+     */
+    async getProblemsByAssignment(assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const assignmentIdStr = String(assignmentId);
+            
+            const response = await axios.get(`/api/problem/assignment/${assignmentIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.problemId !== undefined) item.problemId = String(item.problemId);
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取作业问题列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据作业ID和问题类型获取问题列表（需要token）
+     * @param {number} assignmentId 作业ID
+     * @param {string} type 问题类型
+     * @returns {Promise<Array<Object>>} 问题列表
+     * 每项字段：同updateProblem返回字段
+     */
+    async getProblemsByAssignmentAndType(assignmentId, type) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const assignmentIdStr = String(assignmentId);
+            
+            const response = await axios.get(`/api/problem/assignment/${assignmentIdStr}/type/${type}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.problemId !== undefined) item.problemId = String(item.problemId);
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取作业特定类型问题列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 删除问题（需要token）
+     * @param {number} problemId 问题ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - additionalProp1: Object 附加属性1
+     *   - additionalProp2: Object 附加属性2
+     *   - additionalProp3: Object 附加属性3
+     */
+    async deleteProblem(problemId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const problemIdStr = String(problemId);
+            
+            const response = await axios.delete('/api/problem/delete', { 
+                data: problemIdStr 
+            });
+            
+            return response.data;
+        } catch (error) {
+            console.error('删除问题失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
+
+// 作业相关API
+export const assignmentAPI = {
+    /**
+     * 更新作业（需要token）
+     * @param {Object} assignmentData 作业信息
+     * @param {number} assignmentData.assignmentId 作业ID
+     * @param {string} assignmentData.type 类型
+     * @param {number} assignmentData.creatorId 创建者ID
+     * @param {number} assignmentData.courseId 课程ID
+     * @param {string} assignmentData.title 标题
+     * @param {string} assignmentData.description 描述
+     * @param {boolean} assignmentData.isAnswerPublic 答案是否公开
+     * @param {boolean} assignmentData.isScoreVisible 分数是否可见
+     * @param {boolean} assignmentData.isRedoAllowed 是否允许重做
+     * @param {number} assignmentData.maxAttempts 最大尝试次数
+     * @param {string} assignmentData.startTime 开始时间（ISO格式）
+     * @param {string} assignmentData.endTime 结束时间（ISO格式）
+     * @param {string} assignmentData.status 状态
+     * @returns {Promise<Object>} 更新后的作业信息
+     * 返回字段：
+     *   - assignmentId: number 作业ID
+     *   - type: string 类型
+     *   - creatorId: number 创建者ID
+     *   - courseId: number 课程ID
+     *   - title: string 标题
+     *   - description: string 描述
+     *   - isAnswerPublic: boolean 答案是否公开
+     *   - isScoreVisible: boolean 分数是否可见
+     *   - isRedoAllowed: boolean 是否允许重做
+     *   - maxAttempts: number 最大尝试次数
+     *   - startTime: string 开始时间（ISO格式）
+     *   - endTime: string 结束时间（ISO格式）
+     *   - status: string 状态
+     *   - createdAt: string 创建时间（ISO格式）
+     *   - updatedAt: string 更新时间（ISO格式）
+     */
+    async updateAssignment(assignmentData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...assignmentData };
+            
+            // 确保ID字段是字符串类型
+            if (dataToSend.assignmentId !== undefined) dataToSend.assignmentId = String(dataToSend.assignmentId);
+            if (dataToSend.creatorId !== undefined) dataToSend.creatorId = String(dataToSend.creatorId);
+            if (dataToSend.courseId !== undefined) dataToSend.courseId = String(dataToSend.courseId);
+            
+            const response = await axios.post('/api/assignment/update', dataToSend);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.assignmentId !== undefined) response.data.assignmentId = String(response.data.assignmentId);
+                if (response.data.creatorId !== undefined) response.data.creatorId = String(response.data.creatorId);
+                if (response.data.courseId !== undefined) response.data.courseId = String(response.data.courseId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('更新作业失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 保存作业（需要token）
+     * @param {Object} assignmentData 作业信息
+     * @param {number} [assignmentData.assignmentId] 作业ID（可选，更新时填写）
+     * @param {string} assignmentData.type 类型
+     * @param {number} assignmentData.creatorId 创建者ID
+     * @param {number} assignmentData.courseId 课程ID
+     * @param {string} assignmentData.title 标题
+     * @param {string} assignmentData.description 描述
+     * @param {boolean} assignmentData.isAnswerPublic 答案是否公开
+     * @param {boolean} assignmentData.isScoreVisible 分数是否可见
+     * @param {boolean} assignmentData.isRedoAllowed 是否允许重做
+     * @param {number} assignmentData.maxAttempts 最大尝试次数
+     * @param {string} assignmentData.startTime 开始时间（ISO格式）
+     * @param {string} assignmentData.endTime 结束时间（ISO格式）
+     * @param {string} assignmentData.status 状态
+     * @returns {Promise<Object>} 保存后的作业信息
+     * 返回字段：同updateAssignment返回字段
+     */
+    async saveAssignment(assignmentData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 创建数据副本，避免修改原始数据
+            const dataToSend = { ...assignmentData };
+            
+            // 确保ID字段是字符串类型
+            if (dataToSend.assignmentId !== undefined) dataToSend.assignmentId = String(dataToSend.assignmentId);
+            if (dataToSend.creatorId !== undefined) dataToSend.creatorId = String(dataToSend.creatorId);
+            if (dataToSend.courseId !== undefined) dataToSend.courseId = String(dataToSend.courseId);
+            
+            const response = await axios.post('/api/assignment/save', dataToSend);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.assignmentId !== undefined) response.data.assignmentId = String(response.data.assignmentId);
+                if (response.data.creatorId !== undefined) response.data.creatorId = String(response.data.creatorId);
+                if (response.data.courseId !== undefined) response.data.courseId = String(response.data.courseId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('保存作业失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据作业ID获取作业信息（需要token）
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Object>} 作业信息
+     * 返回字段：同updateAssignment返回字段
+     */
+    async getAssignmentById(assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const assignmentIdStr = String(assignmentId);
+            
+            const response = await axios.get(`/api/assignment/${assignmentIdStr}`);
+            
+            // 确保返回的ID字段是字符串类型
+            if (response.data) {
+                if (response.data.assignmentId !== undefined) response.data.assignmentId = String(response.data.assignmentId);
+                if (response.data.creatorId !== undefined) response.data.creatorId = String(response.data.creatorId);
+                if (response.data.courseId !== undefined) response.data.courseId = String(response.data.courseId);
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取作业信息失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据创建者ID获取作业列表（需要token）
+     * @param {number} creatorId 创建者ID
+     * @returns {Promise<Array<Object>>} 作业列表
+     * 每项字段：同updateAssignment返回字段
+     */
+    async getAssignmentsByCreatorId(creatorId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const creatorIdStr = String(creatorId);
+            
+            const response = await axios.get(`/api/assignment/creatorId/${creatorIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                    if (item.creatorId !== undefined) item.creatorId = String(item.creatorId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取创建者作业列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据创建者ID和作业类型获取作业列表（需要token）
+     * @param {number} creatorId 创建者ID
+     * @param {string} type 作业类型
+     * @returns {Promise<Array<Object>>} 作业列表
+     * 每项字段：同updateAssignment返回字段
+     */
+    async getAssignmentsByCreatorIdAndType(creatorId, type) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const creatorIdStr = String(creatorId);
+            
+            const response = await axios.get(`/api/assignment/creatorId/${creatorIdStr}/type/${type}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                    if (item.creatorId !== undefined) item.creatorId = String(item.creatorId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取创建者特定类型作业列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据课程ID和作业类型获取作业列表（需要token）
+     * @param {number} courseId 课程ID
+     * @param {string} type 作业类型
+     * @returns {Promise<Array<Object>>} 作业列表
+     * 每项字段：同updateAssignment返回字段
+     */
+    async getAssignmentsByCourseIdAndType(courseId, type) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            
+            const response = await axios.get(`/api/assignment/course/${courseIdStr}/type/${type}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                    if (item.creatorId !== undefined) item.creatorId = String(item.creatorId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程特定类型作业列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 根据课程ID和创建者ID获取作业列表（需要token）
+     * @param {number} courseId 课程ID
+     * @param {number} creatorId 创建者ID
+     * @returns {Promise<Array<Object>>} 作业列表
+     * 每项字段：同updateAssignment返回字段
+     */
+    async getAssignmentsByCourseIdAndCreatorId(courseId, creatorId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+            const creatorIdStr = String(creatorId);
+            
+            const response = await axios.get(`/api/assignment/course/${courseIdStr}/creatorId/${creatorIdStr}`);
+            
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.assignmentId !== undefined) item.assignmentId = String(item.assignmentId);
+                    if (item.creatorId !== undefined) item.creatorId = String(item.creatorId);
+                    if (item.courseId !== undefined) item.courseId = String(item.courseId);
+                });
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('获取课程特定创建者作业列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 删除作业（需要token）
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Object>} 删除结果
+     * 返回字段：
+     *   - additionalProp1: Object 附加属性1
+     *   - additionalProp2: Object 附加属性2
+     *   - additionalProp3: Object 附加属性3
+     */
+    async deleteAssignment(assignmentId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const assignmentIdStr = String(assignmentId);
+            
+            const response = await axios.delete('/api/assignment/delete', { 
+                data: assignmentIdStr 
+            });
+            
+            return response.data;
+        } catch (error) {
+            console.error('删除作业失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
+
