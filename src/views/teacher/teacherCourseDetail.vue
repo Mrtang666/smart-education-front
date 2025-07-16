@@ -90,6 +90,7 @@
               @remove-homework="removeHomework"
               @search-clear="handleHomeworkSearchClear"
               @search-input="handleHomeworkSearchInput"
+              @publish-homework="publishHomework"
             />
           </el-tab-pane>
 
@@ -467,7 +468,7 @@
     </el-dialog>
 
     <!-- 添加作业对话框 -->
-    <el-dialog v-model="addHomeworkDialogVisible" title="添加作业" width="600px">
+    <el-dialog v-model="addHomeworkDialogVisible" :title="homeworkFormTitle" width="600px">
       <el-form :model="homeworkForm" label-width="100px" :rules="homeworkRules" ref="homeworkFormRef">
         <el-form-item label="作业标题" prop="title">
           <el-input v-model="homeworkForm.title" placeholder="请输入作业标题" />
@@ -478,8 +479,14 @@
         <el-form-item label="作业描述">
           <el-input v-model="homeworkForm.description" type="textarea" :rows="3" placeholder="请输入作业描述" />
         </el-form-item>
-        <el-form-item label="总分" prop="totalScore">
-          <el-input-number v-model="homeworkForm.totalScore" :min="1" :max="100" />
+        <el-form-item label="开始时间" prop="startTime">
+          <el-date-picker
+            v-model="homeworkForm.startTime"
+            type="datetime"
+            placeholder="选择开始时间"
+            format="YYYY-MM-DD HH:mm"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+          />
         </el-form-item>
         <el-form-item label="截止日期" prop="endTime">
           <el-date-picker
@@ -489,6 +496,14 @@
             format="YYYY-MM-DD HH:mm"
             value-format="YYYY-MM-DDTHH:mm:ss"
           />
+        </el-form-item>
+        <el-form-item label="最大尝试次数" prop="maxAttempts">
+          <el-input-number v-model="homeworkForm.maxAttempts" :min="1" :max="10" />
+        </el-form-item>
+        <el-form-item label="选项">
+          <el-checkbox v-model="homeworkForm.isAnswerPublic">公开答案</el-checkbox>
+          <el-checkbox v-model="homeworkForm.isScoreVisible">分数可见</el-checkbox>
+          <el-checkbox v-model="homeworkForm.isRedoAllowed">允许重做</el-checkbox>
         </el-form-item>
         <el-form-item label="作业文件">
           <el-upload
@@ -790,7 +805,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit,  Search } from '@element-plus/icons-vue'
-import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI, docAPI } from '@/api/api'
+import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI, docAPI, assignmentAPI, problemAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import { getExamStatus, updateExamsStatus, formatDateTime } from '@/utils/examManager'
 
@@ -859,10 +874,14 @@ const homeworkFormRef = ref(null)
 const homeworkForm = ref({
   title: '',
   description: '',
-  totalScore: 100,
   endTime: '',
-  homeworkId: null,
-  type: 'homework' // 添加type字段，指定为作业类型
+  startTime: new Date().toISOString(), // 默认开始时间为当前时间
+  maxAttempts: 1,
+  type: 'TEACHER_ASSIGNED', // 教师端默认设为教师布置类型
+  isAnswerPublic: false,
+  isScoreVisible: true,
+  isRedoAllowed: false,
+  status: 'DRAFT' // 默认为草稿状态
 })
 const homeworkFormTitle = ref('创建作业')
 const isSavingHomework = ref(false)
@@ -895,12 +914,15 @@ const homeworkRules = {
     { required: true, message: '请输入作业标题', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
   ],
-  totalScore: [
-    { required: true, message: '请输入总分', trigger: 'blur' },
-    { type: 'number', min: 1, message: '总分必须大于0', trigger: 'blur' }
+  startTime: [
+    { required: true, message: '请选择开始时间', trigger: 'change' }
   ],
   endTime: [
     { required: true, message: '请选择截止日期', trigger: 'change' }
+  ],
+  maxAttempts: [
+    { required: true, message: '请设置最大尝试次数', trigger: 'blur' },
+    { type: 'number', min: 1, message: '最大尝试次数必须大于0', trigger: 'blur' }
   ]
 }
 
@@ -912,15 +934,43 @@ async function fetchCourseHomeworks() {
     const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
     console.log('获取课程作业，课程ID:', courseIdStr)
     
-    // 修改为使用getExamsInCourseByType接口，指定type为'homework'
-    const response = await examAPI.getExamsInCourseByType(courseIdStr, 'homework')
+    // 使用getAssignmentsByCourseIdAndType接口获取教师布置类型的作业
+    const response = await assignmentAPI.getAssignmentsByCourseIdAndType(courseIdStr, 'TEACHER_ASSIGNED')
     console.log('获取到的作业数据:', response)
     
     if (Array.isArray(response)) {
-      // 确保所有ID都是字符串形式
-      homeworks.value = response.map(homework => ({
-        ...homework,
-        homeworkId: homework.examId ? new BigNumber(homework.examId).toString() : homework.examId
+      // 确保所有ID都是字符串形式并正确映射字段名
+      homeworks.value = response.map(assignment => ({
+        // 基础标识字段
+        assignmentId: assignment.assignmentId,
+        homeworkId: assignment.assignmentId, // 兼容旧代码
+        
+        // 基本信息
+        title: assignment.title || '',
+        description: assignment.description || '',
+        type: assignment.type || 'TEACHER_ASSIGNED',
+        
+        // 课程和创建者信息
+        courseId: assignment.courseId,
+        creatorId: assignment.creatorId,
+        
+        // 时间设置
+        startTime: assignment.startTime || '',
+        endTime: assignment.endTime || '',
+        
+        // 选项设置
+        isAnswerPublic: assignment.isAnswerPublic || false,
+        isScoreVisible: assignment.isScoreVisible || true,
+        isRedoAllowed: assignment.isRedoAllowed || false,
+        maxAttempts: assignment.maxAttempts || 1,
+        
+        // 状态信息
+        status: assignment.status || 'DRAFT',
+        
+        // 额外数据（用于展示）
+        submissionRate: 0, // 提交率，需要从后端获取或计算
+        createdAt: assignment.createdAt,
+        updatedAt: assignment.updatedAt
       }));
     } else {
       homeworks.value = []
@@ -941,10 +991,14 @@ function showAddHomeworkDialog() {
   homeworkForm.value = {
     title: '',
     description: '',
-    totalScore: 100,
     endTime: '',
-    homeworkId: null,
-    type: 'homework' // 添加type字段，指定为作业类型
+    startTime: new Date().toISOString(), // 默认开始时间为当前时间
+    maxAttempts: 1,
+    type: 'TEACHER_ASSIGNED', // 教师端默认设为教师布置类型
+    isAnswerPublic: false,
+    isScoreVisible: true,
+    isRedoAllowed: false,
+    status: 'DRAFT' // 默认为草稿状态
   }
   
   homeworkFileList.value = []
@@ -953,24 +1007,15 @@ function showAddHomeworkDialog() {
 
 // 编辑作业
 function editHomework(homework) {
-  homeworkFormTitle.value = '编辑作业'
-  // 填充表单数据
-  homeworkForm.value = {
-    title: homework.title,
-    description: homework.description || '',
-    totalScore: homework.totalScore,
-    endTime: homework.endTime,
-    homeworkId: homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId,
-    type: 'homework' // 确保type字段设置为作业类型
-  }
-  
-  // 如果有附件，加载附件列表
-  homeworkFileList.value = homework.attachments ? homework.attachments.map(attachment => ({
-    name: attachment.fileName,
-    url: attachment.fileUrl
-  })) : []
-  
-  addHomeworkDialogVisible.value = true
+  // 导航到作业详情页面
+  router.push({
+    name: 'HomeworkDetail',
+    params: { id: homework.assignmentId },
+    query: { 
+      courseId: courseId,
+      courseName: courseName
+    }
+  })
 }
 
 // 保存作业
@@ -1000,29 +1045,41 @@ async function saveHomework() {
         if (homeworkForm.value.homeworkId) {
           // 更新作业
           const homeworkData = {
-            examId: homeworkForm.value.homeworkId,
+            assignmentId: homeworkForm.value.homeworkId, // 使用homeworkId作为assignmentId
+            type: homeworkForm.value.type, // 保留原始类型
+            creatorId: teacherId,
+            courseId: courseIdStr,
             title: homeworkForm.value.title,
-            description: homeworkForm.value.description,
-            totalScore: homeworkForm.value.totalScore,
+            description: homeworkForm.value.description || '',
+            isAnswerPublic: homeworkForm.value.isAnswerPublic || false,
+            isScoreVisible: homeworkForm.value.isScoreVisible || true,
+            isRedoAllowed: homeworkForm.value.isRedoAllowed || false,
+            maxAttempts: homeworkForm.value.maxAttempts || 1,
+            startTime: homeworkForm.value.startTime || new Date().toISOString(),
             endTime: homeworkForm.value.endTime,
-            type: 'homework'
+            status: homeworkForm.value.status // 保留原始状态
           }
           
-          await examAPI.updateExam(homeworkData)
+          await assignmentAPI.updateAssignment(homeworkData)
           ElMessage.success('作业更新成功')
         } else {
           // 创建新作业
           const homeworkData = {
-            title: homeworkForm.value.title,
-            description: homeworkForm.value.description,
+            type: 'TEACHER_ASSIGNED', // 新建时设为教师布置类型
+            creatorId: teacherId,
             courseId: courseIdStr,
-            teacherId: teacherId,
-            totalScore: homeworkForm.value.totalScore,
+            title: homeworkForm.value.title,
+            description: homeworkForm.value.description || '',
+            isAnswerPublic: homeworkForm.value.isAnswerPublic || false,
+            isScoreVisible: homeworkForm.value.isScoreVisible || true,
+            isRedoAllowed: homeworkForm.value.isRedoAllowed || false,
+            maxAttempts: homeworkForm.value.maxAttempts || 1,
+            startTime: homeworkForm.value.startTime || new Date().toISOString(),
             endTime: homeworkForm.value.endTime,
-            type: 'homework'
+            status: 'DRAFT' // 新建时设为草稿状态
           }
           
-          await examAPI.saveExam(homeworkData)
+          await assignmentAPI.saveAssignment(homeworkData)
           ElMessage.success('作业创建成功')
         }
         
@@ -1042,33 +1099,46 @@ async function saveHomework() {
 }
 
 // 删除作业
-function removeHomework(homework) {
-  ElMessageBox.confirm(
-    `确定要删除作业"${homework.title}"吗？删除后将无法恢复。`,
-    '删除确认',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(async () => {
+async function removeHomework(homework) {
+  try {
+    // 使用 ElMessageBox 进行确认
+    await ElMessageBox.confirm(
+      `确定要删除作业"${homework.title}"吗？删除后将无法恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    // 显示加载状态
+    const loadingInstance = ElLoading.service({
+      lock: true,
+      text: '正在删除作业...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+    
     try {
-      // 确保homeworkId是字符串形式
-      const homeworkIdStr = homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
+      // 确保作业ID是字符串形式
+      const assignmentId = homework.assignmentId ? new BigNumber(homework.assignmentId).toString() : homework.assignmentId
       
-      await examAPI.deleteExamById(homeworkIdStr)
+      // 调用API删除作业
+      await assignmentAPI.deleteAssignment(assignmentId)
       
-      // 重新获取作业列表
-      await fetchCourseHomeworks()
+      // 从列表中移除该作业
+      homeworks.value = homeworks.value.filter(item => item.assignmentId !== homework.assignmentId)
       
       ElMessage.success('作业删除成功')
-    } catch (error) {
-      console.error('删除作业失败:', error)
-      ElMessage.error('删除作业失败，请稍后重试')
+    } finally {
+      loadingInstance.close()
     }
-  }).catch(() => {
-    // 用户取消删除
-  })
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除作业失败:', error)
+      ElMessage.error(`删除作业失败: ${error.message || '请稍后重试'}`)
+    }
+  }
 }
 
 // 查看作业提交情况
@@ -1080,9 +1150,11 @@ async function viewHomeworkSubmissions(homework) {
     isLoadingHomeworkSubmissions.value = true
     
     // 确保homeworkId是字符串形式
-    const homeworkIdStr = homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
+    const assignmentIdStr = homework.homeworkId ? new BigNumber(homework.homeworkId).toString() : homework.homeworkId
     
-    const submissions = await examAPI.getExamStudents(homeworkIdStr)
+    // 这里可能需要修改为使用assignmentAPI的相应方法
+    // 暂时仍使用assignmentAPI.getAssignmentsByCreatorId，但实际应用中可能需要替换
+    const submissions = await assignmentAPI.getAssignmentsByCreatorId(assignmentIdStr)
     
     // 确保所有ID都是字符串形式
     homeworkSubmissions.value = submissions.map(submission => ({
@@ -1103,7 +1175,7 @@ async function viewHomeworkSubmissions(homework) {
 // 更新提交分数
 async function updateSubmissionScore(submission) {
   try {
-    await examAPI.gradeExamAnswer({
+    await assignmentAPI.gradeAssignmentAnswer({
       answerId: submission.submissionId,
       score: submission.score,
       feedback: submission.feedback
@@ -3570,6 +3642,56 @@ function removeDoc(filename) {
   }).catch(() => {
     // 用户取消删除操作
   })
+}
+
+// 发布作业
+async function publishHomework(homework) {
+  try {
+    // 显示加载中
+    const loadingInstance = ElLoading.service({
+      lock: true,
+      text: '正在发布作业...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+    
+    try {
+      // 确保ID是字符串形式
+      const assignmentId = homework.assignmentId ? new BigNumber(homework.assignmentId).toString() : homework.assignmentId
+      
+      // 创建更新对象
+      const updateData = {
+        assignmentId: assignmentId,
+        type: homework.type,
+        creatorId: homework.creatorId,
+        courseId: homework.courseId,
+        title: homework.title,
+        description: homework.description || '',
+        isAnswerPublic: homework.isAnswerPublic || false,
+        isScoreVisible: homework.isScoreVisible || true,
+        isRedoAllowed: homework.isRedoAllowed || false,
+        maxAttempts: homework.maxAttempts || 1,
+        startTime: homework.startTime || new Date().toISOString(),
+        endTime: homework.endTime,
+        status: 'PUBLISHED' // 将状态设置为已发布
+      }
+      
+      // 调用API更新作业状态
+      await assignmentAPI.updateAssignment(updateData)
+      
+      // 更新本地状态
+      const index = homeworks.value.findIndex(item => item.assignmentId === homework.assignmentId)
+      if (index !== -1) {
+        homeworks.value[index].status = 'PUBLISHED'
+      }
+      
+      ElMessage.success('作业已成功发布')
+    } finally {
+      loadingInstance.close()
+    }
+  } catch (error) {
+    console.error('发布作业失败:', error)
+    ElMessage.error(`发布作业失败: ${error.message || '请稍后重试'}`)
+  }
 }
 </script>
 

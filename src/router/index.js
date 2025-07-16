@@ -62,6 +62,12 @@ const routes = [
         component: () => import("@/views/teacher/teacherExercise.vue"),
       }, 
       {
+        path: "homework/:id",
+        component: () => import("@/views/teacher/HomeworkDetail.vue"),
+        props: true,
+        name: "HomeworkDetail"
+      },
+      {
         path: "analysis",
         component: () => import("@/views/teacher/teacherAnalysis.vue"),
       },

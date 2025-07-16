@@ -27,6 +27,7 @@
             <el-option label="全部" value=""></el-option>
             <el-option label="进行中" value="进行中"></el-option>
             <el-option label="已结束" value="已结束"></el-option>
+            
           </el-select>
           
           <el-date-picker
