@@ -72,11 +72,6 @@
         </div>
       </div>
 
-      <!-- 帮助中心 -->
-      <div v-if="activeMenu === 'help'" class="help-center">
-        <p class="placeholder-text">帮助中心页面内容将在后续开发中添加</p>
-      </div>
-
       <!-- 关于 -->
       <div v-if="activeMenu === 'about'" class="about-section">
         <div class="app-info">
@@ -84,7 +79,7 @@
           <h3 class="app-name">慧课</h3>
           <p class="app-version">版本: 1.3.3</p>
           <p class="app-description">
-            慧课是一款专为学生和教师设计的教育管理系统，提供课程管理、作业提交、考试安排等功能。
+            慧课是一款专为学生和教师设计的教育管理系统，提供课程管理、作业提交、考试安排等一些必要功能，其中最具特色的是其专门为教师和学生设计的AI智能辅导功能。
           </p>
         </div>
         
@@ -95,7 +90,7 @@
           </div>
           <div class="detail-item">
             <span class="detail-label">技术支持:</span>
-            <span class="detail-value">support@huike.com</span>
+            <span class="detail-value">慧课研发团队</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">版权所有:</span>
@@ -115,7 +110,7 @@
   >
     <div class="agreement-content">
       <h3>隐私政策</h3>
-      <p>最后更新日期：2025年1月1日</p>
+      <p>最后更新日期：2025年7月20日</p>
       
       <h4>1. 引言</h4>
       <p>欢迎使用慧课（以下简称"我们"或"平台"）。我们非常重视您的个人信息和隐私保护。本隐私政策旨在向您说明我们如何收集、使用、存储和共享您的个人信息，以及您享有的相关权利。请您在使用我们的服务前，仔细阅读并了解本隐私政策的全部内容。</p>
@@ -156,7 +151,7 @@
       
       <h4>8. 联系我们</h4>
       <p>如果您对本隐私政策有任何疑问或建议，请通过以下方式联系我们：</p>
-      <p>电子邮箱：privacy@smart-edu.com</p>
+      <p>电子邮箱：暂无</p>
     </div>
     <template #footer>
       <span class="dialog-footer">
@@ -174,7 +169,7 @@
   >
     <div class="agreement-content">
       <h3>用户服务协议</h3>
-      <p>最后更新日期：2025年1月1日</p>
+      <p>最后更新日期：2025年7月20日</p>
       
       <h4>1. 协议的接受</h4>
       <p>欢迎使用慧课（以下简称"平台"）。本协议是您与平台之间关于使用平台服务所订立的协议。请您在使用平台服务前，仔细阅读并充分理解本协议的全部内容。一旦您开始使用平台服务，即表示您已充分理解并接受本协议的所有条款。</p>
@@ -229,7 +224,6 @@ import { studentAPI } from '@/api/api';  // 只导入studentAPI
 const menuItems = [
   { id: 'account', name: '账号管理' },
   { id: 'privacy', name: '隐私设置' },
-  { id: 'help', name: '帮助中心' },
   { id: 'about', name: '关于' }
 ];
 

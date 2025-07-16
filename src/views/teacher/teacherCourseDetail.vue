@@ -1,3 +1,4 @@
+<!-- 课程文档的删除功能和下载功能有问题，待完善 -->
 /* eslint-disable no-unused-vars */
 <template>
   <div class="course-detail">
@@ -1478,19 +1479,10 @@ async function fetchCourseMaterials() {
     const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString();
     console.log('获取课程资料，课程ID:', courseIdStr)
     
-    const response = await courseFileAPI.getCourseFiles(courseIdStr)
-    console.log('获取到的课程资料:', response)
+    // 直接设置空数组，避免调用后端API
+    materials.value = []
+    console.log('课程资料接口已禁用，返回空数组')
     
-    if (Array.isArray(response)) {
-      // 确保所有资料ID都是字符串形式
-      materials.value = response.map(material => ({
-        ...material,
-        id: material.fileId ? new BigNumber(material.fileId).toString() : material.fileId,
-        name: material.fileName
-      }));
-    } else {
-      materials.value = []
-    }
   } catch (error) {
     console.error('获取课程资料失败:', error)
     ElMessage.error('获取课程资料失败，请稍后重试')
@@ -2338,23 +2330,13 @@ async function uploadMaterial() {
     try {
       isUploading.value = true
       
-      // 创建FormData对象
-      const formData = new FormData()
-      formData.append('file', uploadForm.value.file)
-      formData.append('fileName', uploadForm.value.name)
-      formData.append('description', uploadForm.value.description || '')
+      // 显示禁用消息
+      console.error('上传资料失败:', '上传文件功能已禁用')
+      ElMessage.error('上传文件功能已禁用')
       
-      // 确保courseId是字符串形式
-      const courseIdStr = courseId ? new BigNumber(courseId).toString() : courseId.toString()
-      
-      // 上传文件
-      await courseFileAPI.uploadCourseFile(courseIdStr, formData)
-      
-      ElMessage.success('资料上传成功')
+      // 关闭对话框
       uploadDialogVisible.value = false
       
-      // 重新获取课程资料列表
-      await fetchCourseMaterials()
     } catch (error) {
       console.error('上传资料失败:', error)
       ElMessage.error('上传资料失败，请稍后重试')
@@ -2374,36 +2356,10 @@ async function downloadMaterial(material) {
       return
     }
     
-    // 显示下载中提示
-    const loadingInstance = ElLoading.service({
-      text: '文件下载中...',
-      background: 'rgba(255, 255, 255, 0.7)'
-    })
+    // 显示禁用消息
+    console.error('下载资料失败:', '下载文件功能已禁用')
+    ElMessage.error('下载文件功能已禁用')
     
-    // 获取下载链接并下载文件
-    const blob = await courseFileAPI.downloadCourseFile(fileIdStr)
-    
-    // 检查blob是否有效
-    if (!blob || blob.size === 0) {
-      throw new Error('下载的文件为空或无效')
-    }
-    
-    // 创建下载链接
-    const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-    link.href = url
-    link.download = material.name || material.fileName || `下载文件_${new Date().getTime()}`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
-    // 延迟释放URL对象，确保下载开始
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url)
-    }, 100)
-    
-    ElMessage.success('文件下载成功')
-    loadingInstance.close()
   } catch (error) {
     console.error('下载资料失败:', error)
     ElMessage.error(`下载资料失败: ${error.message || '请稍后重试'}`)
@@ -2425,12 +2381,12 @@ function removeMaterial(material) {
       // 确保资料ID是字符串形式
       const fileIdStr = material.id || material.fileId
       
-      await courseFileAPI.deleteCourseFile(fileIdStr)
+      console.error('结束考勤失败:', '删除文件功能已禁用')
+      ElMessage.error('删除文件功能已禁用')
       
       // 重新获取课程资料列表
       await fetchCourseMaterials()
       
-      ElMessage.success('资料已删除')
     } catch (error) {
       console.error('删除资料失败:', error)
       ElMessage.error('删除资料失败，请稍后重试')

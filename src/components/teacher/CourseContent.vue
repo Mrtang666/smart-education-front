@@ -58,36 +58,6 @@
       </div>
     </div>
 
-    <div class="content-section">
-      <div class="section-header">
-        <h3>课程资料</h3>
-        <el-button type="primary" size="small" @click="$emit('show-upload')">
-          <el-icon><Upload /></el-icon>
-          上传资料
-        </el-button>
-      </div>
-      <div class="section-body">
-        <div v-if="materials.length === 0" class="empty-tip">
-          暂无课程资料
-        </div>
-        <div v-else class="materials-list">
-          <div v-for="material in materials" :key="material.id" class="material-item">
-            <el-icon><Document /></el-icon>
-            <span class="material-name">{{ material.name }}</span>
-            <span class="material-size">{{ formatFileSize(material.size) }}</span>
-            <div class="material-actions">
-              <el-button link type="primary" @click="$emit('download-material', material)">
-                <el-icon><Download /></el-icon> 下载
-              </el-button>
-              <el-button link type="danger" @click="$emit('remove-material', material)">
-                <el-icon><Delete /></el-icon> 删除
-              </el-button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 课程文档部分 -->
     <div class="content-section">
       <div class="section-header">
@@ -104,12 +74,12 @@
         <div v-else class="materials-list">
           <div v-for="(doc, index) in processedDocuments" :key="index" class="material-item">
             <el-icon><Document /></el-icon>
-            <span class="material-name">{{ typeof doc === 'string' ? doc : JSON.stringify(doc) }}</span>
+            <span class="material-name">{{ Array.isArray(doc) && doc.length > 0 ? doc[0] : '' }}</span>
             <div class="material-actions">
-              <el-button link type="primary" @click="$emit('download-doc', doc)">
+              <el-button link type="primary" @click="$emit('download-doc', Array.isArray(doc) && doc.length > 0 ? doc[0] : '')">
                 <el-icon><Download /></el-icon> 下载
               </el-button>
-              <el-button link type="danger" @click="$emit('remove-doc', doc)">
+              <el-button link type="danger" @click="$emit('remove-doc', Array.isArray(doc) && doc.length > 0 ? doc[0] : '')">
                 <el-icon><Delete /></el-icon> 删除
               </el-button>
             </div>
@@ -133,10 +103,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  materials: {
-    type: Array,
-    required: true
-  },
   documents: {
     type: Array,
     default: () => []
@@ -152,8 +118,57 @@ const processedDocuments = computed(() => {
     return [];
   }
   
-  // 直接返回文档列表，因为已经在API层处理过了
-  return props.documents;
+  // 处理文档数据
+  const result = [];
+  
+  // 遍历文档列表
+  props.documents.forEach(doc => {
+    if (typeof doc === 'string') {
+      // 首先尝试按逗号分割
+      if (doc.includes(',')) {
+        const splitDocs = doc.split(',').map(item => item.trim()).filter(item => item);
+        splitDocs.forEach(item => result.push([item]));
+        return;
+      }
+      
+      // 检查是否是连续文件名
+      const fileExtensions = ['.pdf', '.txt', '.docx', '.pptx', '.xlsx', '.doc', '.ppt', '.xls'];
+      let currentString = doc;
+      let lastIndex = 0;
+      let foundFiles = [];
+      
+      // 遍历所有可能的文件扩展名
+      fileExtensions.forEach(ext => {
+        let extIndex = currentString.indexOf(ext);
+        while (extIndex !== -1) {
+          // 找到一个文件扩展名
+          const endPos = extIndex + ext.length;
+          const fileName = currentString.substring(lastIndex, endPos);
+          foundFiles.push(fileName.trim());
+          
+          // 更新搜索位置
+          lastIndex = endPos;
+          
+          // 继续查找下一个扩展名
+          extIndex = currentString.indexOf(ext, lastIndex);
+        }
+      });
+      
+      // 如果找到了文件，添加到结果中
+      if (foundFiles.length > 0) {
+        foundFiles.forEach(file => result.push([file]));
+      } else {
+        // 没有找到文件，作为单个文件添加
+        result.push([doc]);
+      }
+    } else if (Array.isArray(doc)) {
+      // 如果已经是数组格式，直接添加
+      result.push(doc);
+    }
+  });
+  
+  console.log('处理后的文档列表:', result);
+  return result;
 });
 
 defineEmits([
@@ -161,9 +176,6 @@ defineEmits([
   'view-knowledge', 
   'edit-knowledge', 
   'remove-knowledge', 
-  'show-upload',
-  'download-material',
-  'remove-material',
   'show-upload-doc',
   'download-doc',
   'remove-doc'
@@ -232,30 +244,6 @@ function getCategoryColor(category) {
   const colorIndex = hashCode % colors.length;
   
   return colors[colorIndex];
-}
-
-// 格式化文件大小
-function formatFileSize(size) {
-  if (!size) return '未知大小'
-  
-  // 如果已经是格式化后的字符串，直接返回
-  if (typeof size === 'string' && (size.includes('KB') || size.includes('MB') || size.includes('GB'))) {
-    return size
-  }
-  
-  // 转换为数字
-  const sizeNum = Number(size)
-  if (isNaN(sizeNum)) return size
-  
-  if (sizeNum < 1024) {
-    return sizeNum + ' B'
-  } else if (sizeNum < 1024 * 1024) {
-    return (sizeNum / 1024).toFixed(1) + ' KB'
-  } else if (sizeNum < 1024 * 1024 * 1024) {
-    return (sizeNum / (1024 * 1024)).toFixed(1) + ' MB'
-  } else {
-    return (sizeNum / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
-  }
 }
 </script>
 
@@ -421,12 +409,6 @@ function formatFileSize(size) {
   flex: 1;
   font-weight: 500;
   color: #303133;
-}
-
-.material-size {
-  color: #909399;
-  font-size: 13px;
-  margin: 0 15px;
 }
 
 .material-actions {

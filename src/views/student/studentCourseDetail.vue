@@ -10,7 +10,7 @@
  * - examAPI: 获取课程考试和作业
  * - attendanceAPI: 获取课程考勤
  */ -->
- <!-- 考勤功能暂时没有数据，需要拿数据进行测试是否可行，目前考勤只接了一个获取数据的接口 -->
+ <!-- 学生端课程文档的下载接口有问题，待完善 -->
 <template>
   <div class="course-detail-container">
     <!-- 左侧导航栏 -->
@@ -43,9 +43,9 @@
         <span>考勤</span>
       </div>
       
-      <div class="nav-item" :class="{ active: activeSection === 'material' }" @click="setActiveSection('material')">
-        <i class="el-icon-folder"></i>
-        <span>资料</span>
+      <div class="nav-item" :class="{ active: activeSection === 'document' }" @click="setActiveSection('document')">
+        <i class="el-icon-document"></i>
+        <span>文档</span>
       </div>
     </div>
     
@@ -290,40 +290,35 @@
           </el-skeleton>
         </div>
         
-        <!-- 资料部分 -->
-        <div v-if="activeSection === 'material'" class="material-content">
-          <div class="material-header">
-            <h3>课程资料</h3>
-            <div class="material-search">
+        <!-- 文档部分 -->
+        <div v-if="activeSection === 'document'" class="document-content">
+          <div class="document-header">
+            <h3>课程文档</h3>
+            <div class="document-search">
               <el-input
-                v-model="materialSearchKeyword"
+                v-model="documentSearchKeyword"
                 placeholder="搜索文件名"
                 prefix-icon="el-icon-search"
                 clearable
-                @clear="materialSearchKeyword = ''"
+                @clear="documentSearchKeyword = ''"
                 style="width: 250px;"
               />
             </div>
           </div>
           
-          <el-skeleton :loading="materialLoading" animated :rows="3">
+          <el-skeleton :loading="documentLoading" animated :rows="3">
             <template #default>
-              <el-empty v-if="filteredMaterialFiles.length === 0" description="暂无课程资料"></el-empty>
-              <div v-else class="material-list">
-                <div v-for="file in filteredMaterialFiles" :key="file.fileId" class="material-item">
-                  <div class="material-icon">
-                    <i class="el-icon-document"></i>
+              <el-empty v-if="filteredDocuments.length === 0" description="暂无课程文档"></el-empty>
+              <div v-else class="document-list">
+                <div v-for="(doc, index) in filteredDocuments" :key="index" class="document-item">
+                  <div class="document-icon">
+                    <i :class="getDocumentIcon(doc)"></i>
                   </div>
-                  <div class="material-info">
-                    <div class="material-name">{{ file.fileName }}</div>
-                    <div class="material-meta">
-                      <span class="material-size">{{ formatFileSize(file.fileSize) }}</span>
-                      <span class="material-uploader">{{ file.uploaderName || '未知上传者' }}</span>
-                      <span class="material-date">{{ formatDate(file.uploadTime) }}</span>
-                    </div>
+                  <div class="document-info">
+                    <div class="document-name">{{ doc }}</div>
                   </div>
-                  <div class="material-actions">
-                    <el-button type="primary" size="small" @click="handleDownload(file)">
+                  <div class="document-actions">
+                    <el-button type="primary" size="small" @click="downloadDocument(doc)">
                       <i class="el-icon-download"></i> 下载
                     </el-button>
                   </div>
@@ -334,11 +329,11 @@
         </div>
       </div>
     </div>
-    </div>
+  </div>
 </template>
 
 <script>
-import { knowledgeAPI, examAPI, attendanceAPI, courseFileAPI } from '@/api/api';
+import { knowledgeAPI, examAPI, attendanceAPI, docAPI } from '@/api/api';
 import { getUserInfo } from '@/utils/auth';
 
 export default {
@@ -384,10 +379,10 @@ export default {
       attendanceDialogVisible: false,
       selectedAttendance: null,
       
-      // 资料区数据
-      materialFiles: [],
-      materialLoading: false,
-      materialSearchKeyword: '',
+      // 文档区数据
+      documents: [],
+      documentLoading: false,
+      documentSearchKeyword: '',
     }
   },
   computed: {
@@ -450,15 +445,16 @@ export default {
       return stats;
     },
     
-    // 过滤后的资料文件列表
-    filteredMaterialFiles() {
-      if (!this.materialSearchKeyword) {
-        return this.materialFiles;
+    // 过滤后的文档列表
+    filteredDocuments() {
+      if (!this.documentSearchKeyword) {
+        return this.documents;
       }
-      const keyword = this.materialSearchKeyword.toLowerCase();
-      return this.materialFiles.filter(file => 
-        file.fileName && file.fileName.toLowerCase().includes(keyword)
-      );
+      const keyword = this.documentSearchKeyword.toLowerCase();
+      
+      return this.documents.filter(doc => {
+        return typeof doc === 'string' && doc.toLowerCase().includes(keyword);
+      });
     },
   },
   created() {
@@ -481,9 +477,9 @@ export default {
     // 加载数据
     this.loadCourseData();
     
-    // 如果当前选中的是资料区，则加载资料
-    if (this.activeSection === 'material') {
-      this.fetchMaterialFiles();
+    // 如果当前选中的是文档区，则加载文档
+    if (this.activeSection === 'document') {
+      this.fetchDocuments();
     }
   },
   methods: {
@@ -491,9 +487,9 @@ export default {
     setActiveSection(section) {
       this.activeSection = section;
       
-      // 如果切换到资料区，则加载资料
-      if (section === 'material' && this.materialFiles.length === 0) {
-        this.fetchMaterialFiles();
+      // 如果切换到文档区，则加载文档
+      if (section === 'document' && this.documents.length === 0) {
+        this.fetchDocuments();
       }
     },
     
@@ -631,8 +627,8 @@ export default {
       this.fetchAssignments();
       // 获取考试
       this.fetchExams();
-      // 获取课程资料
-      this.fetchMaterialFiles();
+      // 获取课程文档
+      this.fetchDocuments();
     },
     
     // 获取知识点
@@ -986,122 +982,6 @@ export default {
       });
     },
     
-    // 资料区：获取文件
-    async fetchMaterialFiles() {
-      this.materialLoading = true;
-      try {
-        // 确保courseId是字符串形式
-        const courseIdStr = this.courseId ? this.courseId.toString() : this.courseId;
-        console.log('获取课程文件，课程ID:', courseIdStr);
-        
-        // 调用API获取课程文件
-        const response = await courseFileAPI.getCourseFiles(courseIdStr);
-        console.log('获取到的文件数据:', response);
-        
-        if (Array.isArray(response)) {
-          // 处理文件数据
-          this.materialFiles = response.map(file => {
-            // 根据文件扩展名判断文件类型
-            const fileExt = file.fileName ? file.fileName.split('.').pop().toLowerCase() : '';
-            const fileType = this.getFileTypeByExt(fileExt);
-            
-            return {
-              ...file,
-              fileType: fileType
-            };
-          });
-        } else {
-          this.materialFiles = [];
-        }
-      } catch (error) {
-        console.error('获取课程文件失败:', error);
-        this.$message.error('获取课程文件失败，请稍后再试');
-        this.materialFiles = [];
-      } finally {
-        this.materialLoading = false;
-      }
-    },
-    
-    // 资料区：下载文件
-    async handleDownload(file) {
-      try {
-        this.$message.info('开始下载文件...');
-        
-        // 确保文件ID是字符串形式
-        const fileIdStr = file.fileId ? file.fileId.toString() : file.fileId;
-        if (!fileIdStr) {
-          this.$message.error('文件ID无效，无法下载');
-          return;
-        }
-        
-        // 调用API下载文件
-        const blob = await courseFileAPI.downloadCourseFile(fileIdStr);
-        
-        // 检查blob是否有效
-        if (!blob || blob.size === 0) {
-          throw new Error('下载的文件为空或无效');
-        }
-        
-        // 创建下载链接
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = file.fileName || `下载文件_${new Date().getTime()}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // 延迟释放URL对象，确保下载开始
-        setTimeout(() => {
-          window.URL.revokeObjectURL(url);
-        }, 100);
-        
-        this.$message.success('文件下载成功');
-      } catch (error) {
-        console.error('下载文件失败:', error);
-        this.$message.error(`下载文件失败: ${error.message || '请稍后再试'}`);
-      }
-    },
-    
-    // 根据文件扩展名获取文件类型
-    getFileTypeByExt(ext) {
-      const docTypes = ['doc', 'docx', 'rtf', 'txt'];
-      const pptTypes = ['ppt', 'pptx'];
-      const excelTypes = ['xls', 'xlsx', 'csv'];
-      const pdfTypes = ['pdf'];
-      const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'];
-      const videoTypes = ['mp4', 'avi', 'mov', 'wmv', 'flv'];
-      const audioTypes = ['mp3', 'wav', 'ogg', 'flac'];
-      const codeTypes = ['java', 'py', 'js', 'html', 'css', 'c', 'cpp', 'h', 'json', 'xml'];
-      
-      if (docTypes.includes(ext)) return 'document';
-      if (pptTypes.includes(ext)) return 'presentation';
-      if (excelTypes.includes(ext)) return 'spreadsheet';
-      if (pdfTypes.includes(ext)) return 'pdf';
-      if (imageTypes.includes(ext)) return 'image';
-      if (videoTypes.includes(ext)) return 'video';
-      if (audioTypes.includes(ext)) return 'audio';
-      if (codeTypes.includes(ext)) return 'code';
-      
-      return 'other';
-    },
-    
-    // 格式化文件大小
-    formatFileSize(size) {
-      if (!size) return '未知大小';
-      
-      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-      let fileSize = size;
-      let unitIndex = 0;
-      
-      while (fileSize >= 1024 && unitIndex < units.length - 1) {
-        fileSize /= 1024;
-        unitIndex++;
-      }
-      
-      return `${fileSize.toFixed(2)} ${units[unitIndex]}`;
-    },
-
     // 考勤记录表格行样式
     getAttendanceRowClass({ row }) {
       if (row.status === '已到' || row.status === '出勤') {
@@ -1148,7 +1028,138 @@ export default {
         '已结束': 'attendance-present-header'
       };
       return classes[status] || 'attendance-present-header'; // 默认样式
-    }
+    },
+    
+    // 获取文档列表
+    async fetchDocuments() {
+      this.documentLoading = true;
+      try {
+        console.log('开始获取文档列表');
+        
+        // 调用API获取文档列表
+        const fileList = await docAPI.listDocs();
+        console.log('获取到的文档列表:', fileList);
+        
+        // 处理文档数据，将可能连在一起的文档名称分开
+        const processedDocuments = [];
+        
+        if (Array.isArray(fileList)) {
+          // 遍历文档列表
+          fileList.forEach(doc => {
+            if (typeof doc === 'string') {
+              // 首先尝试按逗号分割
+              if (doc.includes(',')) {
+                const splitDocs = doc.split(',').map(item => item.trim()).filter(item => item);
+                processedDocuments.push(...splitDocs);
+                return;
+              }
+              
+              // 检查是否是连续文件名
+              const fileExtensions = ['.pdf', '.txt', '.docx', '.pptx', '.xlsx', '.doc', '.ppt', '.xls'];
+              let currentString = doc;
+              let lastIndex = 0;
+              let foundFiles = [];
+              
+              // 遍历所有可能的文件扩展名
+              fileExtensions.forEach(ext => {
+                let extIndex = currentString.indexOf(ext);
+                while (extIndex !== -1) {
+                  // 找到一个文件扩展名
+                  const endPos = extIndex + ext.length;
+                  const fileName = currentString.substring(lastIndex, endPos);
+                  foundFiles.push(fileName.trim());
+                  
+                  // 更新搜索位置
+                  lastIndex = endPos;
+                  
+                  // 继续查找下一个扩展名
+                  extIndex = currentString.indexOf(ext, lastIndex);
+                }
+              });
+              
+              // 如果找到了文件，添加到结果中
+              if (foundFiles.length > 0) {
+                processedDocuments.push(...foundFiles);
+              } else {
+                // 没有找到文件，作为单个文件添加
+                processedDocuments.push(doc);
+              }
+            } else if (Array.isArray(doc)) {
+              // 如果已经是数组格式，处理每个元素
+              doc.forEach(item => {
+                if (typeof item === 'string') {
+                  processedDocuments.push(item);
+                }
+              });
+            }
+          });
+        }
+        
+        this.documents = processedDocuments;
+        console.log('处理后的文档列表:', this.documents);
+      } catch (error) {
+        console.error('获取文档列表失败:', error);
+        this.$message.error('获取文档列表失败，请稍后再试');
+        this.documents = [];
+      } finally {
+        this.documentLoading = false;
+      }
+    },
+    
+    // 下载文档
+    async downloadDocument(filename) {
+      try {
+        this.$message.info('文档下载中，请稍候...');
+        
+        // 使用API下载文档
+        const blob = await docAPI.downloadDoc(filename);
+        
+        // 创建下载链接
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // 清理
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          document.body.removeChild(link);
+        }, 100);
+        
+        this.$message.success('文档下载成功');
+      } catch (error) {
+        console.error('下载文档失败:', error);
+        this.$message.error('下载文档失败，请稍后重试');
+      }
+    },
+
+    // 根据文件扩展名获取对应的图标
+    getDocumentIcon(filename) {
+      if (!filename) return 'el-icon-document';
+      
+      const extension = filename.split('.').pop().toLowerCase();
+      
+      const iconMap = {
+        'pdf': 'el-icon-document',
+        'doc': 'el-icon-document',
+        'docx': 'el-icon-document',
+        'txt': 'el-icon-document',
+        'ppt': 'el-icon-document',
+        'pptx': 'el-icon-document',
+        'xls': 'el-icon-document',
+        'xlsx': 'el-icon-document',
+        'png': 'el-icon-picture',
+        'jpg': 'el-icon-picture',
+        'jpeg': 'el-icon-picture',
+        'gif': 'el-icon-picture',
+        'zip': 'el-icon-folder',
+        'rar': 'el-icon-folder'
+      };
+      
+      return iconMap[extension] || 'el-icon-document';
+    },
   }
 }
 </script>
@@ -1616,31 +1627,31 @@ export default {
   margin-top: 20px;
 }
 
-/* 资料区样式 */
-.material-content {
+/* 文档区样式 */
+.document-content {
   padding: 20px 0;
 }
 
-.material-header {
+.document-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.material-header h3 {
+.document-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 500;
 }
 
-.material-list {
+.document-list {
   border: 1px solid #ebeef5;
   border-radius: 8px;
   overflow: hidden;
 }
 
-.material-item {
+.document-item {
   display: flex;
   align-items: center;
   padding: 16px 20px;
@@ -1648,41 +1659,36 @@ export default {
   transition: background-color 0.3s;
 }
 
-.material-item:hover {
+.document-item:hover {
   background-color: #f5f7fa;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.material-item:last-child {
+.document-item:last-child {
   border-bottom: none;
 }
 
-.material-icon {
+.document-icon {
   font-size: 24px;
-  color: #909399;
+  color: #409EFF;
   margin-right: 16px;
 }
 
-.material-info {
+.document-info {
   flex: 1;
   overflow: hidden;
 }
 
-.material-name {
+.document-name {
   font-size: 15px;
-  margin-bottom: 4px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.material-meta {
-  font-size: 13px;
-  color: #909399;
-  display: flex;
-  gap: 16px;
-}
-
-.material-actions {
+.document-actions {
   margin-left: 16px;
 }
 
