@@ -4075,3 +4075,172 @@ export const assignmentAPI = {
     }
 };
 
+// 学生答题相关API
+export const studentAnswerAPI = {
+    /**
+     * 提交学生答案
+     * @param {number} studentId 学生ID
+     * @param {number} problemId 问题ID
+     * @param {string} answer 答案内容
+     * @returns {Promise<Object>} 提交结果
+     */
+    async submitAnswer(studentId, problemId, answer) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.post('/api/student-answer/submit', {
+                studentId,
+                problemId,
+                answer
+            });
+            return response.data;
+        } catch (error) {
+            console.error('提交答案失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 为学生答案评分
+     * @param {number} answerId 答案ID
+     * @param {number} score 分数
+     * @returns {Promise<Object>} 评分结果
+     */
+    async gradeAnswer(answerId, score) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.post('/api/student-answer/grade', {
+                answerId,
+                score
+            });
+            return response.data;
+        } catch (error) {
+            console.error('答案评分失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取特定问题的学生答案
+     * @param {number} problemId 问题ID
+     * @returns {Promise<Array>} 学生答案列表
+     */
+    async getAnswersByProblem(problemId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/problem/${problemId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取问题答案失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取作业的最终得分
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Array>} 最终得分列表
+     */
+    async getFinalScoresByAssignment(assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/final-scores/assignment/${assignmentId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取作业最终得分失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取答案的最终得分
+     * @param {number} answerId 答案ID
+     * @returns {Promise<number>} 最终得分
+     */
+    async getFinalScore(answerId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/final-score/${answerId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取答案最终得分失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取学生在作业中的完成率
+     * @param {number} studentId 学生ID
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Object>} 完成率数据
+     */
+    async getCompletionRate(studentId, assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/completion-rate`, {
+                params: {
+                    studentId,
+                    assignmentId
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('获取完成率失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取学生在作业中的准确率
+     * @param {number} studentId 学生ID
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Object>} 准确率数据
+     */
+    async getAccuracyRate(studentId, assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/accuracy-rate`, {
+                params: {
+                    studentId,
+                    assignmentId
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('获取准确率失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取作业的所有答案
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Array>} 答案列表
+     */
+    async getAnswersByAssignment(assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/assignment/${assignmentId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取作业答案失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 删除学生答案
+     * @param {number} answerId 答案ID
+     * @returns {Promise<Object>} 删除结果
+     */
+    async deleteAnswer(answerId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.delete(`/api/student-answer/${answerId}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除答案失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
+
