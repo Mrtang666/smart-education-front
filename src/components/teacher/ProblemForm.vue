@@ -1,10 +1,16 @@
 <template>
   <div class="problem-form">
     <el-form :model="form" label-width="100px">
-      <el-form-item label="题目标题" required>
-        <el-input v-model="form.title" placeholder="请输入题目标题" />
+      <el-form-item label="题干" required>
+        <el-input
+          v-model="form.title"
+          placeholder="请输入题目的问题描述"
+          type="textarea"
+          :rows="2"
+        />
+        <div class="form-tip">题干是题目的主要问题描述</div>
       </el-form-item>
-      
+
       <el-form-item label="题目类型" required>
         <el-select v-model="form.type" placeholder="请选择题目类型" @change="handleTypeChange">
           <el-option label="单选题" value="SINGLE_CHOICE" />
@@ -14,53 +20,91 @@
           <el-option label="判断题" value="TRUE_FALSE" />
         </el-select>
       </el-form-item>
-      
+
       <el-form-item label="分值" required>
         <el-input-number v-model="form.score" :min="1" :max="100" />
       </el-form-item>
-      
-      <el-form-item label="题目内容" required>
-        <el-input 
-          v-model="form.content" 
-          type="textarea" 
-          :rows="4" 
-          placeholder="请输入题目内容" 
+
+      <!-- 选择题的选项输入 -->
+      <el-form-item
+        v-if="['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.type)"
+        label="题目选项"
+        required
+      >
+        <el-input
+          v-model="form.content"
+          type="textarea"
+          :rows="6"
+          placeholder="请输入选项内容，支持以下格式：&#10;A. 选项内容&#10;B. 选项内容&#10;或者每行一个选项"
         />
+        <div class="form-tip">
+          <strong>支持格式：</strong><br>
+          • A. 选项内容<br>
+          • A) 选项内容<br>
+          • A 选项内容<br>
+          • 每行一个选项（自动编号）
+        </div>
+      </el-form-item>
+
+      <!-- 非选择题的内容输入 -->
+      <el-form-item
+        v-else
+        label="题目内容"
+        required
+      >
+        <el-input
+          v-model="form.content"
+          type="textarea"
+          :rows="4"
+          :placeholder="getContentPlaceholder()"
+        />
+        <div class="form-tip">{{ getContentTip() }}</div>
       </el-form-item>
       
-      <!-- 单选题/多选题选项 -->
+      <!-- 选择题选项预览和答案设置 -->
       <template v-if="['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.type)">
-        <el-divider>选项设置</el-divider>
-        
-        <div v-for="(option, index) in form.options" :key="index" class="option-form-item">
-          <el-form-item :label="`选项 ${['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'][index]}`">
-            <div class="option-input-group">
-              <el-input v-model="option.content" placeholder="请输入选项内容" />
-              <el-checkbox 
-                v-model="option.isCorrect" 
-                :disabled="form.type === 'SINGLE_CHOICE' && isAnyOtherOptionCorrect(index)"
-              >
-                正确答案
-              </el-checkbox>
-              <el-button 
-                type="danger" 
-                icon="Delete" 
-                circle 
-                @click="removeOption(index)"
-                :disabled="form.options.length <= 2"
-              />
-            </div>
-          </el-form-item>
+        <el-divider>选项预览</el-divider>
+
+        <div v-if="parsedOptions.length > 0" class="options-preview-section">
+          <div v-for="(option, index) in parsedOptions" :key="index" class="option-preview-item">
+            <span class="option-label">{{ option.value }}</span>
+            <span class="option-content">{{ option.content }}</span>
+          </div>
         </div>
-        
-        <el-form-item>
-          <el-button 
-            type="primary" 
-            @click="addOption" 
-            :disabled="form.options.length >= 8"
-          >
-            添加选项
-          </el-button>
+        <div v-else class="no-options-hint">
+          <el-alert
+            title="暂无选项"
+            description="请在上方的题目选项中输入选项内容"
+            type="warning"
+            :closable="false"
+          />
+        </div>
+
+        <el-form-item label="正确答案" required>
+          <div v-if="form.type === 'SINGLE_CHOICE'">
+            <el-radio-group v-model="form.expectedAnswer">
+              <el-radio
+                v-for="option in parsedOptions"
+                :key="option.value"
+                :label="option.value"
+              >
+                {{ option.value }}. {{ option.content }}
+              </el-radio>
+            </el-radio-group>
+            <div class="form-tip">单选题请选择一个正确答案</div>
+          </div>
+          <div v-else-if="form.type === 'MULTI_CHOICE'">
+            <el-checkbox-group v-model="selectedAnswers">
+              <el-checkbox
+                v-for="option in parsedOptions"
+                :key="option.value"
+                :label="option.value"
+              >
+                {{ option.value }}. {{ option.content }}
+              </el-checkbox>
+            </el-checkbox-group>
+            <div class="form-tip">多选题可以选择多个正确答案</div>
+          </div>
         </el-form-item>
       </template>
       
@@ -96,7 +140,7 @@
 
 <script setup>
 /* eslint-disable no-undef */
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -119,14 +163,114 @@ const form = ref({
   title: '',
   type: 'SINGLE_CHOICE',
   content: '',
-  options: [
-    { content: '', value: 'A', isCorrect: false },
-    { content: '', value: 'B', isCorrect: false }
-  ],
   expectedAnswer: '',
   score: 10,
   assignmentId: props.homeworkId
 })
+
+// 多选题的选中答案数组
+const selectedAnswers = ref([])
+
+// 解析选择题选项（从content字段自动格式化）
+function parseOptionsFromContent(content) {
+  if (!content) return []
+
+  const options = []
+
+  // 格式1: A. 选项内容\nB. 选项内容
+  const pattern1 = /([A-H])\.\s*([^\n\r]+)/g
+  let match1
+  while ((match1 = pattern1.exec(content)) !== null) {
+    options.push({
+      value: match1[1],
+      content: match1[2].trim(),
+      isCorrect: false
+    })
+  }
+
+  if (options.length > 0) return options
+
+  // 格式2: A) 选项内容\nB) 选项内容
+  const pattern2 = /([A-H])\)\s*([^\n\r]+)/g
+  let match2
+  while ((match2 = pattern2.exec(content)) !== null) {
+    options.push({
+      value: match2[1],
+      content: match2[2].trim(),
+      isCorrect: false
+    })
+  }
+
+  if (options.length > 0) return options
+
+  // 格式3: A 选项内容\nB 选项内容
+  const pattern3 = /([A-H])\s+([^\n\r]+)/g
+  let match3
+  while ((match3 = pattern3.exec(content)) !== null) {
+    options.push({
+      value: match3[1],
+      content: match3[2].trim(),
+      isCorrect: false
+    })
+  }
+
+  if (options.length > 0) return options
+
+  // 格式4: 按行分割，自动分配A、B、C、D
+  const lines = content.split(/[\n\r]+/).filter(line => line.trim())
+  if (lines.length > 1) {
+    return lines.map((line, index) => ({
+      value: String.fromCharCode(65 + index), // A, B, C, D...
+      content: line.trim(),
+      isCorrect: false
+    }))
+  }
+
+  return []
+}
+
+// 解析后的选项列表
+const parsedOptions = computed(() => {
+  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
+    return parseOptionsFromContent(form.value.content)
+  }
+  return []
+})
+
+// 获取内容输入框的占位符
+function getContentPlaceholder() {
+  switch (form.value.type) {
+    case 'FILL_BLANK':
+      return '请输入填空题的详细描述或提示信息'
+    case 'ESSAY_QUESTION':
+      return '请输入简答题的详细要求和评分标准'
+    case 'TRUE_FALSE':
+      return '请输入判断题的详细描述'
+    default:
+      return '请输入题目内容'
+  }
+}
+
+// 获取内容输入框的提示
+function getContentTip() {
+  switch (form.value.type) {
+    case 'FILL_BLANK':
+      return '填空题的内容描述，可以包含答题提示'
+    case 'ESSAY_QUESTION':
+      return '简答题的详细要求，包括答题要点和评分标准'
+    case 'TRUE_FALSE':
+      return '判断题的详细描述，需要判断正误的内容'
+    default:
+      return '题目的详细内容描述'
+  }
+}
+
+// 监听多选题答案变化
+watch(selectedAnswers, (newVal) => {
+  if (form.value.type === 'MULTI_CHOICE') {
+    form.value.expectedAnswer = newVal.join(',')
+  }
+}, { deep: true })
 
 // 监听props的变化
 watch(() => props.problemData, (newVal) => {
@@ -138,7 +282,7 @@ watch(() => props.problemData, (newVal) => {
 // 初始化表单数据
 function initFormData(data) {
   if (!data) return
-  
+
   form.value = {
     problemId: data.problemId,
     title: data.title || '',
@@ -148,129 +292,70 @@ function initFormData(data) {
     assignmentId: props.homeworkId,
     expectedAnswer: data.expectedAnswer || (data.type === 'TRUE_FALSE' ? 'true' : '')
   }
-  
-  // 初始化选项
-  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(data.type)) {
-    if (data.options && Array.isArray(data.options) && data.options.length > 0) {
-      form.value.options = data.options.map(opt => ({
-        ...opt,
-        isCorrect: isCorrectOption(data.type, data.expectedAnswer, opt.value)
-      }))
-    } else {
-      // 默认选项
-      form.value.options = [
-        { content: '', value: 'A', isCorrect: false },
-        { content: '', value: 'B', isCorrect: false }
-      ]
+
+  // 初始化多选题的答案数组
+  if (data.type === 'MULTI_CHOICE' && data.expectedAnswer) {
+    try {
+      // 尝试解析JSON格式
+      const answers = JSON.parse(data.expectedAnswer)
+      selectedAnswers.value = Array.isArray(answers) ? answers : []
+    } catch (e) {
+      // 如果不是JSON格式，按分隔符分割
+      selectedAnswers.value = data.expectedAnswer.split(/[,;，；\s]+/)
+        .map(a => a.trim().toUpperCase())
+        .filter(a => a.length > 0)
     }
   } else {
-    form.value.options = []
+    selectedAnswers.value = []
   }
 }
 
 // 处理题目类型变化
 function handleTypeChange(newType) {
-  // 根据题目类型重置部分表单数据
-  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(newType)) {
-    if (!form.value.options || form.value.options.length < 2) {
-      form.value.options = [
-        { content: '', value: 'A', isCorrect: false },
-        { content: '', value: 'B', isCorrect: false }
-      ]
-    }
-    form.value.expectedAnswer = ''
-  } else if (newType === 'TRUE_FALSE') {
+  // 重置答案相关数据
+  form.value.expectedAnswer = ''
+  selectedAnswers.value = []
+
+  // 根据题目类型设置默认值
+  if (newType === 'TRUE_FALSE') {
     form.value.expectedAnswer = 'true'
-  } else {
-    form.value.options = []
-    form.value.expectedAnswer = ''
-  }
-}
-
-// 添加选项
-function addOption() {
-  if (form.value.options.length >= 8) return
-  
-  const optionValues = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-  form.value.options.push({
-    content: '',
-    value: optionValues[form.value.options.length],
-    isCorrect: false
-  })
-}
-
-// 移除选项
-function removeOption(index) {
-  if (form.value.options.length <= 2) return
-  form.value.options.splice(index, 1)
-  
-  // 重新设置选项的value值
-  const optionValues = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-  form.value.options.forEach((opt, idx) => {
-    opt.value = optionValues[idx]
-  })
-}
-
-// 判断是否有其他选项被选为正确答案（单选题使用）
-function isAnyOtherOptionCorrect(currentIndex) {
-  return form.value.options.some((opt, idx) => idx !== currentIndex && opt.isCorrect)
-}
-
-// 判断选项是否为正确答案
-function isCorrectOption(type, expectedAnswer, optionValue) {
-  if (!expectedAnswer) return false
-  
-  if (type === 'SINGLE_CHOICE') {
-    return expectedAnswer === optionValue
-  } else if (type === 'MULTI_CHOICE') {
-    try {
-      const answers = JSON.parse(expectedAnswer)
-      return Array.isArray(answers) && answers.includes(optionValue)
-    } catch (e) {
-      return false
+  } else if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(newType)) {
+    // 选择题：如果content为空，提供示例格式
+    if (!form.value.content) {
+      form.value.content = 'A. 选项A\nB. 选项B\nC. 选项C\nD. 选项D'
     }
   }
-  
-  return false
 }
+
+
 
 // 保存题目
 function saveProblem() {
   // 验证表单
   if (!form.value.title) {
-    ElMessage.warning('请输入题目标题')
+    ElMessage.warning('请输入题干')
     return
   }
-  
+
   if (!form.value.content) {
     ElMessage.warning('请输入题目内容')
     return
   }
-  
+
   if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
-    // 检查选项是否完整
-    if (form.value.options.some(opt => !opt.content)) {
-      ElMessage.warning('请填写所有选项内容')
+    // 检查选项是否解析成功
+    if (parsedOptions.value.length === 0) {
+      ElMessage.warning('请输入有效的选项内容')
       return
     }
-    
+
     // 检查是否有正确答案
-    if (!form.value.options.some(opt => opt.isCorrect)) {
-      ElMessage.warning('请至少选择一个正确答案')
+    if (!form.value.expectedAnswer) {
+      ElMessage.warning('请选择正确答案')
       return
     }
-    
-    // 处理正确答案
-    if (form.value.type === 'SINGLE_CHOICE') {
-      const correctOption = form.value.options.find(opt => opt.isCorrect)
-      form.value.expectedAnswer = correctOption ? correctOption.value : ''
-    } else {
-      // 多选题
-      const correctValues = form.value.options
-        .filter(opt => opt.isCorrect)
-        .map(opt => opt.value)
-      form.value.expectedAnswer = JSON.stringify(correctValues)
-    }
+
+    // 多选题的答案已经通过watch自动设置
   } else if (form.value.type === 'FILL_BLANK' || form.value.type === 'ESSAY_QUESTION') {
     if (!form.value.expectedAnswer) {
       ElMessage.warning('请输入参考答案')
@@ -308,17 +393,82 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.option-form-item {
-  margin-bottom: 10px;
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
+  line-height: 1.4;
 }
 
-.option-input-group {
+.options-preview-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.option-preview-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
 }
 
-.option-input-group .el-input {
-  flex-grow: 1;
+.option-preview-item:last-child {
+  margin-bottom: 0;
 }
-</style> 
+
+.option-label {
+  font-weight: 600;
+  margin-right: 12px;
+  min-width: 20px;
+  color: #409EFF;
+  background: #f0f9ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.option-content {
+  flex: 1;
+  color: #606266;
+  font-size: 14px;
+}
+
+.no-options-hint {
+  margin-bottom: 20px;
+}
+
+.el-radio-group,
+.el-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.el-radio,
+.el-checkbox {
+  margin-right: 0;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s ease;
+}
+
+.el-radio:hover,
+.el-checkbox:hover {
+  background: #f0f9ff;
+  border-color: #c6e2ff;
+}
+
+.el-radio.is-checked,
+.el-checkbox.is-checked {
+  background: #f0f9ff;
+  border-color: #409EFF;
+}
+</style>

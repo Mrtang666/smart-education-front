@@ -3525,18 +3525,30 @@ const uploadDocRules = {
 async function fetchDocuments() {
   try {
     console.log('开始获取文档列表');
-    
+
     // 调用API获取文档列表，API层已经处理好数据格式
     const fileList = await docAPI.listDocs();
     console.log('获取到的文档列表:', fileList);
-    
+
     // 直接使用API返回的文件列表
     documents.value = Array.isArray(fileList) ? fileList : [];
-    
+
     console.log('设置的文档列表:', documents.value);
+
+    // 如果文档列表为空，显示提示信息
+    if (documents.value.length === 0) {
+      console.info('当前没有课程文档');
+    }
   } catch (error) {
     console.error('获取文档列表失败:', error);
-    ElMessage.error('获取文档列表失败，请稍后重试');
+
+    // 根据错误类型显示不同的提示信息
+    if (error.message && error.message.includes('文档服务暂时不可用')) {
+      ElMessage.warning('文档服务暂时不可用，请稍后重试');
+    } else {
+      ElMessage.warning('获取课程文档列表失败，文档功能可能暂时不可用');
+    }
+
     documents.value = [];
   }
 }

@@ -13,8 +13,13 @@ import zhCn from "element-plus/es/locale/lang/zh-cn";
 import * as ElementPlusIconsVue from "@element-plus/icons-vue";
 // 引入stagewise工具栏 - 使用组件方式
 import { setupStagewise } from "./plugins/stagewise";
+// 引入错误处理工具
+import { initErrorHandler } from "./utils/errorHandler";
 // 不再使用这种初始化方法
 // import initStagewise from "./plugins/stagewise-init";
+
+// 初始化错误处理器（处理ResizeObserver等开发环境错误）
+initErrorHandler();
 
 const app = createApp(App);
 

@@ -1035,7 +1035,7 @@ export default {
       this.documentLoading = true;
       try {
         console.log('开始获取文档列表');
-        
+
         // 调用API获取文档列表
         const fileList = await docAPI.listDocs();
         console.log('获取到的文档列表:', fileList);
@@ -1099,7 +1099,14 @@ export default {
         console.log('处理后的文档列表:', this.documents);
       } catch (error) {
         console.error('获取文档列表失败:', error);
-        this.$message.error('获取文档列表失败，请稍后再试');
+
+        // 根据错误类型显示不同的提示信息
+        if (error.message && error.message.includes('文档服务暂时不可用')) {
+          this.$message.warning('文档服务暂时不可用，请稍后重试');
+        } else {
+          this.$message.warning('获取课程文档列表失败，文档功能可能暂时不可用');
+        }
+
         this.documents = [];
       } finally {
         this.documentLoading = false;

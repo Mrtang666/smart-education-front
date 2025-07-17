@@ -3434,16 +3434,25 @@ export const docAPI = {
             // 创建FormData对象
             const formData = new FormData();
             formData.append('file', file);
-            
+
             const response = await axios.post('http://118.89.136.119:8000/docs/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
-                }
+                },
+                timeout: 30000 // 30秒超时
             });
-            
+
             return response.data;
         } catch (error) {
             console.error('上传文档失败:', error.response ? error.response.data : error.message);
+
+            // 如果是网络错误，提供更友好的错误信息
+            if (error.code === 'ECONNREFUSED' ||
+                error.code === 'ENOTFOUND' ||
+                error.message.includes('Network Error')) {
+                throw new Error('文档服务暂时不可用，请稍后重试');
+            }
+
             throw error;
         }
     },
@@ -3455,11 +3464,19 @@ export const docAPI = {
     async listDocs() {
         const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.get('http://118.89.136.119:8000/docs/list');
-            console.log('原始文档列表响应:', response.data);
-            
-            // 处理响应数据，确保返回格式化的文件列表
-            let fileList = [];
+            // 添加超时处理
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+            try {
+                const response = await axios.get('http://118.89.136.119:8000/docs/list', {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                console.log('原始文档列表响应:', response.data);
+
+                // 处理响应数据，确保返回格式化的文件列表
+                let fileList = [];
             
             if (response.data) {
                 // 如果是字符串，可能是JSON字符串或单个文件名
@@ -3539,10 +3556,29 @@ export const docAPI = {
                 }
             }
             
-            console.log('处理后的文档列表:', fileList);
-            return fileList;
+                console.log('处理后的文档列表:', fileList);
+                return fileList;
+            } catch (timeoutError) {
+                clearTimeout(timeoutId);
+                if (timeoutError.name === 'AbortError') {
+                    console.warn('文档服务请求超时，返回空列表');
+                    return [];
+                }
+                throw timeoutError;
+            }
         } catch (error) {
             console.error('获取文档列表失败:', error.response ? error.response.data : error.message);
+
+            // 如果是网络错误或服务器不可用，返回空列表而不是抛出错误
+            if (error.code === 'ECONNREFUSED' ||
+                error.code === 'ENOTFOUND' ||
+                error.message.includes('Network Error') ||
+                error.message.includes('timeout')) {
+                console.warn('文档服务不可用，返回空列表');
+                return [];
+            }
+
+            // 其他错误继续抛出
             throw error;
         }
     },
@@ -3714,7 +3750,10 @@ export const problemAPI = {
     async getProblemsByType(type) {
         const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/problem/type/${type}`);
+            // 使用POST请求体方式
+            const response = await axios.post('/api/problem/getByType', {
+                type: type
+            });
             
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
@@ -3802,16 +3841,41 @@ export const problemAPI = {
     async deleteProblem(problemId) {
         const axios = createTeacherAuthorizedAxios();
         try {
-            // 确保ID是字符串类型
-            const problemIdStr = String(problemId);
-            
-            const response = await axios.delete('/api/problem/delete', { 
-                data: problemIdStr 
+            // 确保ID是数字类型，后端期望Long类型
+            const problemIdNum = Number(problemId);
+
+            if (isNaN(problemIdNum)) {
+                throw new Error('无效的题目ID');
+            }
+
+            console.log(`删除题目，ID: ${problemIdNum}`);
+
+            const response = await axios.delete('/api/problem/delete', {
+                data: problemIdNum
             });
-            
-            return response.data;
+
+            // 处理返回数据，确保返回格式一致
+            const result = {
+                success: true,
+                message: '题目删除成功',
+                deletedProblemId: problemIdNum,
+                ...response.data
+            };
+
+            console.log('删除题目成功:', result);
+            return result;
         } catch (error) {
             console.error('删除问题失败:', error.response ? error.response.data : error.message);
+
+            // 提供更详细的错误信息
+            if (error.response && error.response.status === 400) {
+                throw new Error('请求参数错误，请检查题目ID是否有效');
+            } else if (error.response && error.response.status === 404) {
+                throw new Error('题目不存在或已被删除');
+            } else if (error.response && error.response.status === 403) {
+                throw new Error('没有权限删除此题目');
+            }
+
             throw error;
         }
     }
