@@ -1,88 +1,99 @@
 <template>
   <div class="homework-basic-info">
-    <div class="basic-form">
-      <div class="form-item">
-        <label><span class="required">*</span> 作业标题</label>
-        <el-input v-model="formData.title" placeholder="请输入作业标题" />
-      </div>
-
-      <div class="form-item">
-        <label>作业描述</label>
-        <el-input 
-          v-model="formData.description" 
-          type="textarea" 
-          :rows="3" 
-          placeholder="请输入作业描述" 
-        />
-      </div>
+    <el-form :model="formData" label-position="top" label-width="100px">
+      <el-row :gutter="20">
+        <el-col :span="24">
+          <el-form-item label="作业标题" required>
+            <el-input v-model="formData.title" placeholder="请输入作业标题" />
+          </el-form-item>
+        </el-col>
+      </el-row>
       
-      <div class="form-item">
-        <label><span class="required">*</span> 开始时间</label>
-        <el-date-picker
-          v-model="formData.startTime"
-          type="datetime"
-          placeholder="选择开始时间"
-          format="YYYY-MM-DD HH:mm"
-          value-format="YYYY-MM-DDTHH:mm:ss"
-        />
-      </div>
+      <el-row :gutter="20">
+        <el-col :span="24">
+          <el-form-item label="作业描述">
+            <el-input 
+              v-model="formData.description" 
+              type="textarea" 
+              :rows="4" 
+              placeholder="请输入作业描述" 
+            />
+          </el-form-item>
+        </el-col>
+      </el-row>
       
-      <div class="form-item">
-        <label><span class="required">*</span> 截止日期</label>
-        <el-date-picker
-          v-model="formData.endTime"
-          type="datetime"
-          placeholder="选择截止日期"
-          format="YYYY-MM-DD HH:mm"
-          value-format="YYYY-MM-DDTHH:mm:ss"
-        />
-      </div>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="开始时间" required>
+            <el-date-picker
+              v-model="formData.startTime"
+              type="datetime"
+              placeholder="选择开始时间"
+              format="YYYY-MM-DD HH:mm"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="截止日期" required>
+            <el-date-picker
+              v-model="formData.endTime"
+              type="datetime"
+              placeholder="选择截止日期"
+              format="YYYY-MM-DD HH:mm"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </el-col>
+      </el-row>
       
-      <div class="form-item">
-        <label>最大尝试次数</label>
-        <div class="number-input-container">
-          <el-button @click="decrementAttempts">-</el-button>
-          <el-input v-model.number="formData.maxAttempts" type="number" :min="1" :max="10" />
-          <el-button @click="incrementAttempts">+</el-button>
-        </div>
-      </div>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="最大尝试次数">
+            <div class="attempts-input">
+              <el-button :disabled="formData.maxAttempts <= 1" @click="decrementAttempts">-</el-button>
+              <el-input-number v-model="formData.maxAttempts" :min="1" :max="10" controls-position="right" />
+              <el-button :disabled="formData.maxAttempts >= 10" @click="incrementAttempts">+</el-button>
+            </div>
+          </el-form-item>
+        </el-col>
+      </el-row>
       
-      <div class="divider">选项设置</div>
+      <el-divider content-position="left">选项设置</el-divider>
       
-      <div class="form-item option-item">
-        <label>答案设置</label>
-        <div class="option-container">
-          <el-checkbox v-model="formData.isAnswerPublic">公开答案</el-checkbox>
-          <div class="option-hint">启用后，学生在提交作业后可以查看正确答案</div>
-        </div>
-      </div>
+      <el-row :gutter="20">
+        <el-col :span="24">
+          <div class="options-container">
+            <div class="option-item">
+              <el-checkbox v-model="formData.isAnswerPublic">公开答案</el-checkbox>
+              <div class="option-hint">启用后，学生在提交作业后可以查看正确答案</div>
+            </div>
+            
+            <div class="option-item">
+              <el-checkbox v-model="formData.isScoreVisible">分数可见</el-checkbox>
+              <div class="option-hint">启用后，学生可以查看自己的得分情况</div>
+            </div>
+            
+            <div class="option-item">
+              <el-checkbox v-model="formData.isRedoAllowed">允许重做</el-checkbox>
+              <div class="option-hint">启用后，学生可以在最大尝试次数内重新提交作业</div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
       
-      <div class="form-item option-item">
-        <label>分数设置</label>
-        <div class="option-container">
-          <el-checkbox v-model="formData.isScoreVisible">分数可见</el-checkbox>
-          <div class="option-hint">启用后，学生可以查看自己的得分情况</div>
-        </div>
-      </div>
-      
-      <div class="form-item option-item">
-        <label>重做设置</label>
-        <div class="option-container">
-          <el-checkbox v-model="formData.isRedoAllowed">允许重做</el-checkbox>
-          <div class="option-hint">启用后，学生可以在最大尝试次数内重新提交作业</div>
-        </div>
-      </div>
-      
-      <div class="form-item button-container">
+      <el-form-item>
         <el-button type="primary" @click="saveChanges">保存设置</el-button>
-      </div>
-    </div>
+      </el-form-item>
+    </el-form>
   </div>
 </template>
 
 <script setup>
 /* eslint-disable no-undef */
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 
 const props = defineProps({
   homeworkData: {
@@ -105,6 +116,22 @@ const formData = ref({
   isScoreVisible: true,
   isRedoAllowed: false
 })
+
+// 监听props变化，当props.homeworkData发生变化时更新本地表单
+watch(() => props.homeworkData, (newValue) => {
+  if (newValue) {
+    formData.value = {
+      title: newValue.title || '',
+      description: newValue.description || '',
+      startTime: newValue.startTime || '',
+      endTime: newValue.endTime || '',
+      maxAttempts: newValue.maxAttempts || 1,
+      isAnswerPublic: newValue.isAnswerPublic || false,
+      isScoreVisible: newValue.isScoreVisible !== undefined ? newValue.isScoreVisible : true,
+      isRedoAllowed: newValue.isRedoAllowed || false
+    }
+  }
+}, { immediate: true, deep: true })
 
 // 增加尝试次数
 function incrementAttempts() {
@@ -153,106 +180,46 @@ onMounted(() => {
 
 <style scoped>
 .homework-basic-info {
-  max-width: 800px;
-  margin: 0 auto;
+  padding: 10px;
 }
 
-.basic-form {
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-.form-item {
-  margin-bottom: 20px;
-}
-
-.form-item label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #303133;
-  font-weight: bold;
-}
-
-.form-item .required {
-  color: #f56c6c;
-  margin-right: 4px;
-}
-
-.form-item .el-input,
-.form-item .el-date-picker,
-.form-item .el-input-number {
-  width: 100%;
-}
-
-.form-item .el-input-number {
-  width: 150px; /* Adjust as needed */
-}
-
-.number-input-container {
+.attempts-input {
   display: flex;
   align-items: center;
-  width: 150px; /* Adjust as needed */
+  gap: 10px;
 }
 
-.number-input-container .el-button {
-  width: 30px;
-  height: 30px;
+.el-divider {
+  margin: 30px 0;
+}
+
+.options-container {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  margin: 0 5px;
-  border-radius: 4px;
-  border: 1px solid #dcdfe6;
-  background-color: #f5f7fa;
-  color: #606266;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s, border-color 0.3s;
-}
-
-.number-input-container .el-button:hover {
-  background-color: #ebeef5;
-  border-color: #c0c4cc;
-}
-
-.number-input-container .el-button:active {
-  background-color: #ebeef5;
-  border-color: #c0c4cc;
-}
-
-.divider {
-  height: 1px;
-  background-color: #ebeef5;
-  margin: 20px 0;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .option-item {
-  margin-bottom: 15px;
-}
-
-.option-container {
   display: flex;
-  align-items: center;
-  margin-top: 8px;
+  align-items: flex-start;
+  padding: 10px 15px;
+  background-color: #f5f7fa;
+  border-radius: 6px;
 }
 
-.option-container .el-checkbox {
-  margin-right: 10px;
+.el-checkbox {
+  margin-right: 15px;
 }
 
 .option-hint {
-  font-size: 12px;
   color: #909399;
+  font-size: 13px;
   line-height: 1.4;
-  margin-left: 10px;
 }
 
-.button-container {
+.el-form-item:last-child {
+  margin-top: 20px;
+  margin-bottom: 0;
   text-align: right;
 }
 </style> 
