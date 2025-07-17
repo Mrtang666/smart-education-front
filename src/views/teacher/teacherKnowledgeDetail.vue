@@ -45,20 +45,56 @@
         </div>
       </div>
 
-      <!-- 题型统计图表 -->
+      <!-- 教师智能备课模块 -->
+      <div class="detail-card teaching-assistant-card">
+        <div class="card-header">
+          <h3>智能备课助手</h3>
+          <div class="header-actions">
+            <el-button type="primary" size="small" @click="showGenerateDialog">
+              <el-icon><Document /></el-icon>生成教学方案
+            </el-button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div v-if="!teachingPlan" class="empty-content">
+            <el-empty description="暂无教学方案" :image-size="100">
+              <template #image>
+                <el-icon style="font-size: 50px; color: #909399;"><Document /></el-icon>
+              </template>
+              <el-button type="primary" @click="showGenerateDialog">生成教学方案</el-button>
+            </el-empty>
+          </div>
+          <div v-else class="teaching-plan-content">
+            <div class="plan-header">
+              <h4>当前教学方案</h4>
+              <div class="plan-actions">
+                <el-button type="primary" size="small" @click="showImproveDialog">
+                  <el-icon><Edit /></el-icon>改进方案
+                </el-button>
+                <el-button type="success" size="small" @click="showGenerateDialog">
+                  <el-icon><Document /></el-icon>重新生成
+                </el-button>
+              </div>
+            </div>
+            <div class="plan-content">
+              <div class="plan-text markdown-content" v-html="teachingPlanHtml"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 题型统计图表 - 已注释
       <div class="detail-card chart-card" v-if="questions.length > 0">
         <div class="card-header">
           <h3>习题统计</h3>
         </div>
         <div class="card-body chart-body">
           <div class="charts-container">
-            <!-- 题型分布图表 -->
             <div class="chart-item">
               <div class="chart-title">题型分布</div>
               <div id="questionTypeChart" class="question-type-chart"></div>
             </div>
-            
-            <!-- 难度分布图表 -->
+
             <div class="chart-item">
               <div class="chart-title">难度分布</div>
               <div id="difficultyChart" class="difficulty-chart"></div>
@@ -66,8 +102,9 @@
           </div>
         </div>
       </div>
+      -->
 
-      <!-- 习题区域 -->
+      <!-- 习题区域 - 已注释
       <div class="detail-card questions-card">
         <div class="card-header">
           <h3>相关习题 ({{ questions.length }})</h3>
@@ -77,7 +114,7 @@
             </el-button>
           </div>
         </div>
-        
+
         <div class="card-body">
           <div v-if="loading" class="loading-container">
             <el-skeleton :rows="5" animated />
@@ -124,8 +161,7 @@
               </div>
             </div>
           </div>
-          
-          <!-- 分页控件 -->
+
           <div class="pagination-container" v-if="questions.length > 0">
             <el-pagination
               v-model:current-page="currentPage"
@@ -140,6 +176,7 @@
           </div>
         </div>
       </div>
+      -->
     </div>
 
     <!-- 编辑知识点对话框 -->
@@ -188,7 +225,7 @@
       </template>
     </el-dialog>
 
-    <!-- 添加/编辑习题对话框 -->
+    <!-- 添加/编辑习题对话框 - 已注释
     <el-dialog v-model="questionDialogVisible" :title="isEditingQuestion ? '编辑习题' : '添加习题'" width="700px">
       <el-form :model="questionForm" label-width="100px" :rules="questionRules" ref="questionFormRef">
         <el-form-item label="题目类型" prop="questionType">
@@ -202,14 +239,13 @@
         <el-form-item label="题目内容" prop="content">
           <el-input v-model="questionForm.content" type="textarea" :rows="3" placeholder="请输入题目内容" />
         </el-form-item>
-        
-        <!-- 选择题选项 -->
+
         <template v-if="questionForm.questionType === '选择题' || questionForm.questionType === '判断题'">
           <el-form-item label="选项">
             <div v-for="(option, index) in questionForm.options" :key="index" class="option-input-item">
               <div class="option-input-key">{{ option.key }}.</div>
               <el-input v-model="option.text" placeholder="请输入选项内容" :disabled="questionForm.questionType === '判断题'" />
-              <el-button @click="removeOption(index)" type="danger" circle plain 
+              <el-button @click="removeOption(index)" type="danger" circle plain
                 v-if="questionForm.options.length > 2 && questionForm.questionType === '选择题'">
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -221,14 +257,14 @@
             </div>
           </el-form-item>
         </template>
-        
+
         <el-form-item label="参考答案" prop="referenceAnswer">
           <template v-if="questionForm.questionType === '选择题' || questionForm.questionType === '判断题'">
             <el-select v-model="questionForm.referenceAnswer" placeholder="请选择正确答案">
-              <el-option 
-                v-for="option in questionForm.options" 
-                :key="option.key" 
-                :label="option.key" 
+              <el-option
+                v-for="option in questionForm.options"
+                :key="option.key"
+                :label="option.key"
                 :value="option.key">
               </el-option>
             </el-select>
@@ -237,7 +273,7 @@
             <el-input v-model="questionForm.referenceAnswer" type="textarea" :rows="2" placeholder="请输入参考答案" />
           </template>
         </el-form-item>
-        
+
         <el-form-item label="难度等级" prop="difficulty">
           <el-select v-model="questionForm.difficulty" placeholder="请选择难度等级">
             <el-option label="简单" value="简单"></el-option>
@@ -245,11 +281,11 @@
             <el-option label="困难" value="困难"></el-option>
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="分值" prop="scorePoints">
           <el-input-number v-model="questionForm.scorePoints" :min="1" :max="100" />
         </el-form-item>
-        
+
         <el-form-item label="解析">
           <el-input v-model="questionForm.analysis" type="textarea" :rows="2" placeholder="请输入题目解析（可选）" />
         </el-form-item>
@@ -261,17 +297,122 @@
         </div>
       </template>
     </el-dialog>
+    -->
+
+    <!-- 生成教学方案对话框 -->
+    <el-dialog v-model="generateDialogVisible" title="生成教学方案" width="600px">
+      <el-alert
+        title="提示"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 20px;">
+        <template #default>
+          AI生成教学方案需要1-2分钟时间，请耐心等待。系统会根据您的配置生成个性化的教学方案。
+        </template>
+      </el-alert>
+      <el-form :model="generateForm" label-width="120px" :rules="generateRules" ref="generateFormRef">
+        <el-form-item label="学科类型" prop="subjectType">
+          <el-input v-model="generateForm.subjectType" placeholder="请输入学科类型或课程名称" />
+        </el-form-item>
+        <el-form-item label="知识点大纲" prop="courseOutline">
+          <el-input
+            v-model="generateForm.courseOutline"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入知识点名称或内容大纲"
+          />
+        </el-form-item>
+        <el-form-item label="课程时长" prop="duration">
+          <el-input-number
+            v-model="generateForm.duration"
+            :min="10"
+            :max="180"
+            :step="5"
+            controls-position="right"
+          />
+          <span style="margin-left: 8px; color: #909399;">分钟</span>
+        </el-form-item>
+        <el-form-item label="难度等级" prop="difficultyLevel">
+          <el-select v-model="generateForm.difficultyLevel" placeholder="请选择难度等级">
+            <el-option label="简单" value="简单"></el-option>
+            <el-option label="中等" value="中等"></el-option>
+            <el-option label="困难" value="困难"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="教学风格" prop="teachingStyle">
+          <el-select v-model="generateForm.teachingStyle" placeholder="请选择教学风格">
+            <el-option label="讲授式" value="讲授式"></el-option>
+            <el-option label="互动式" value="互动式"></el-option>
+            <el-option label="探究式" value="探究式"></el-option>
+            <el-option label="案例式" value="案例式"></el-option>
+            <el-option label="实践式" value="实践式"></el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="generateDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="generateTeachingPlan" :loading="generating">
+            {{ generating ? 'AI正在生成中，请耐心等待...' : '生成方案' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 改进教学方案对话框 -->
+    <el-dialog v-model="improveDialogVisible" title="改进教学方案" width="600px">
+      <el-alert
+        title="提示"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 20px;">
+        <template #default>
+          AI改进教学方案需要1-2分钟时间，请耐心等待。请详细描述您的改进建议，系统会据此优化方案。
+        </template>
+      </el-alert>
+      <el-form :model="improveForm" label-width="120px" :rules="improveRules" ref="improveFormRef">
+        <el-form-item label="当前方案">
+          <el-input
+            v-model="improveForm.teachingPlan"
+            type="textarea"
+            :rows="8"
+            readonly
+            placeholder="当前教学方案"
+          />
+        </el-form-item>
+        <el-form-item label="改进建议" prop="suggestion">
+          <el-input
+            v-model="improveForm.suggestion"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入您的改进建议，例如：增加更多互动环节、调整教学重点、优化教学方法等"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="improveDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="improveTeachingPlan" :loading="improving">
+            {{ improving ? 'AI正在改进中，请耐心等待...' : '改进方案' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Edit, Plus, DocumentRemove, Delete, Document } from '@element-plus/icons-vue'
-import { knowledgeAPI } from '@/api/api'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, Edit, Document } from '@element-plus/icons-vue'
+// 题目模块相关导入已注释：watch, nextTick, onUnmounted, ElMessageBox, Plus, DocumentRemove, Delete, echarts
+import { knowledgeAPI, teachingAssistantAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
-import * as echarts from 'echarts'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const route = useRoute()
 const router = useRouter()
@@ -301,6 +442,47 @@ const contentForm = ref({
   description: ''
 })
 
+// 教师智能备课相关变量
+const teachingPlan = ref('')
+const generateDialogVisible = ref(false)
+const improveDialogVisible = ref(false)
+const generating = ref(false)
+const improving = ref(false)
+
+// 生成教学方案表单
+const generateForm = ref({
+  subjectType: '',
+  courseOutline: '',
+  duration: 45,
+  difficultyLevel: '中等',
+  teachingStyle: '讲授式'
+})
+
+// 改进教学方案表单
+const improveForm = ref({
+  teachingPlan: '',
+  suggestion: ''
+})
+
+// 表单引用
+const generateFormRef = ref(null)
+const improveFormRef = ref(null)
+
+// 计算属性：将教学方案转换为HTML
+const teachingPlanHtml = computed(() => {
+  if (!teachingPlan.value) return ''
+
+  // 配置marked选项
+  marked.setOptions({
+    breaks: true, // 支持换行
+    gfm: true, // 支持GitHub风格的Markdown
+  })
+
+  // 将Markdown转换为HTML并清理
+  const rawHtml = marked(teachingPlan.value)
+  return DOMPurify.sanitize(rawHtml)
+})
+
 // 表单验证规则
 const rules = {
   name: [
@@ -312,6 +494,37 @@ const rules = {
   ]
 }
 
+// 生成教学方案表单验证规则
+const generateRules = {
+  subjectType: [
+    { required: true, message: '请输入学科类型或课程名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  courseOutline: [
+    { required: true, message: '请输入知识点名称或内容大纲', trigger: 'blur' },
+    { min: 5, max: 1000, message: '长度在 5 到 1000 个字符', trigger: 'blur' }
+  ],
+  duration: [
+    { required: true, message: '请输入课程时长', trigger: 'blur' }
+  ],
+  difficultyLevel: [
+    { required: true, message: '请选择难度等级', trigger: 'change' }
+  ],
+  teachingStyle: [
+    { required: true, message: '请选择教学风格', trigger: 'change' }
+  ]
+}
+
+// 改进教学方案表单验证规则
+const improveRules = {
+  suggestion: [
+    { required: true, message: '请输入改进建议', trigger: 'blur' },
+    { min: 5, max: 500, message: '长度在 5 到 500 个字符', trigger: 'blur' }
+  ]
+}
+
+// 题目模块相关变量 - 已注释
+/*
 // 相关习题
 const questions = ref([])
 // 分页相关
@@ -387,11 +600,14 @@ const questionRules = {
     { required: true, message: '请输入分值', trigger: 'blur' }
   ]
 }
+*/
 
+// 题目模块相关监听器 - 已注释
+/*
 // 监听题目类型变化，重置参考答案
 watch(() => questionForm.value.questionType, (newType) => {
   questionForm.value.referenceAnswer = ''
-  
+
   if (newType === '判断题') {
     // 为判断题设置固定的选项
     questionForm.value.options = [
@@ -417,7 +633,10 @@ watch(() => questions.value, () => {
     })
   }
 }, { deep: true })
+*/
 
+// 题目模块相关图表函数 - 已注释
+/*
 // 初始化图表
 function initCharts() {
   nextTick(() => {
@@ -433,25 +652,25 @@ function initTypeChart() {
     console.error('找不到题型图表容器元素');
     return;
   }
-  
+
   // 设置图表容器高度
   chartDom.style.height = '100%';
-  
+
   // 清空现有图表实例
   if (typeChart) {
     typeChart.dispose();
   }
-  
+
   // 创建图表实例
   typeChart = echarts.init(chartDom);
-  
+
   // 计算题型统计数据
   const typeCount = {};
   questions.value.forEach(question => {
     const type = question.questionType || '未知类型';
     typeCount[type] = (typeCount[type] || 0) + 1;
   });
-  
+
   // 对数据排序，确保图表显示有序
   const sortedTypes = Object.keys(typeCount).sort();
   const data = sortedTypes.map(type => ({
@@ -461,7 +680,7 @@ function initTypeChart() {
       color: typeColors[type] || typeColors['未知类型']
     }
   }));
-  
+
   const option = {
     tooltip: {
       trigger: 'item',
@@ -516,13 +735,15 @@ function initTypeChart() {
       }
     ]
   };
-  
+
   typeChart.setOption(option);
-  
+
   // 响应窗口大小变化
   window.addEventListener('resize', handleResize);
 }
+*/
 
+/*
 // 初始化难度分布图表
 function initDifficultyChart() {
   const chartDom = document.getElementById('difficultyChart');
@@ -530,31 +751,31 @@ function initDifficultyChart() {
     console.error('找不到难度图表容器元素');
     return;
   }
-  
+
   // 设置图表容器高度
   chartDom.style.height = '100%';
-  
+
   // 清空现有图表实例
   if (difficultyChart) {
     difficultyChart.dispose();
   }
-  
+
   // 创建图表实例
   difficultyChart = echarts.init(chartDom);
-  
+
   // 计算难度分布数据
   const difficultyCount = {};
   questions.value.forEach(question => {
     const difficulty = question.difficulty || '未知难度';
     difficultyCount[difficulty] = (difficultyCount[difficulty] || 0) + 1;
   });
-  
+
   // 对难度进行排序：简单、中等、困难
   const difficultyOrder = ['简单', '中等', '困难', '未知难度'];
   const sortedDifficulties = Object.keys(difficultyCount).sort((a, b) => {
     return difficultyOrder.indexOf(a) - difficultyOrder.indexOf(b);
   });
-  
+
   const data = sortedDifficulties.map(difficulty => ({
     name: difficulty,
     value: difficultyCount[difficulty],
@@ -562,7 +783,7 @@ function initDifficultyChart() {
       color: difficultyColors[difficulty] || difficultyColors['未知难度']
     }
   }));
-  
+
   const option = {
     tooltip: {
       trigger: 'item',
@@ -617,12 +838,13 @@ function initDifficultyChart() {
       }
     ]
   };
-  
+
   difficultyChart.setOption(option);
-  
+
   // 响应窗口大小变化
   window.addEventListener('resize', handleResize);
 }
+*/
 
 // 获取知识点详情
 async function fetchKnowledgeDetail() {
@@ -646,9 +868,23 @@ async function fetchKnowledgeDetail() {
         description: response.description || '',
         teachPlan: response.teachPlan || ''
       }
-      
-      // 获取相关习题
-      await fetchQuestions()
+
+      // 初始化生成教学方案表单的默认值
+      generateForm.value = {
+        subjectType: courseName.value || '',
+        courseOutline: response.name || '',
+        duration: 45,
+        difficultyLevel: response.difficultyLevel || '中等',
+        teachingStyle: '讲授式'
+      }
+
+      // 如果已有教学计划，则显示
+      if (response.teachPlan) {
+        teachingPlan.value = response.teachPlan
+      }
+
+      // 获取相关习题 - 已注释
+      // await fetchQuestions()
     } else {
       ElMessage.error('获取知识点详情失败')
       knowledgeData.value = null
@@ -662,19 +898,187 @@ async function fetchKnowledgeDetail() {
   }
 }
 
+// 教师智能备课相关函数
+// 显示生成教学方案对话框
+function showGenerateDialog() {
+  // 重新初始化表单数据
+  generateForm.value = {
+    subjectType: courseName.value || '',
+    courseOutline: knowledgeData.value?.name || '',
+    duration: 45,
+    difficultyLevel: knowledgeData.value?.difficultyLevel || '中等',
+    teachingStyle: '讲授式'
+  }
+  generateDialogVisible.value = true
+}
+
+// 显示改进教学方案对话框
+function showImproveDialog() {
+  if (!teachingPlan.value) {
+    ElMessage.warning('请先生成教学方案')
+    return
+  }
+
+  improveForm.value = {
+    teachingPlan: teachingPlan.value,
+    suggestion: ''
+  }
+  improveDialogVisible.value = true
+}
+
+// 生成教学方案
+async function generateTeachingPlan() {
+  if (!generateFormRef.value) return
+
+  generateFormRef.value.validate(async (valid) => {
+    if (valid) {
+      generating.value = true
+      try {
+        console.log('生成教学方案，数据:', generateForm.value)
+
+        const response = await teachingAssistantAPI.generateLesson(generateForm.value)
+        console.log('生成教学方案响应:', response)
+
+        // 灵活处理响应格式，支持多种可能的字段名
+        let generatedPlan = null
+        if (response) {
+          generatedPlan = response.teachingPlan || response.plan || response.content || response.result || response.data
+
+          // 如果响应是字符串，直接使用
+          if (typeof response === 'string') {
+            generatedPlan = response
+          }
+        }
+
+        if (generatedPlan) {
+          teachingPlan.value = generatedPlan
+          ElMessage.success('教学方案生成成功')
+          generateDialogVisible.value = false
+
+          // 可选：将生成的教学方案保存到知识点的teachPlan字段
+          await saveTeachingPlanToKnowledge(generatedPlan)
+        } else {
+          ElMessage.error('生成教学方案失败，请稍后重试')
+        }
+      } catch (error) {
+        console.error('生成教学方案失败:', error)
+
+        // 特殊处理超时错误
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          ElMessage.error('AI生成教学方案超时，请稍后重试。生成过程可能需要1-2分钟，请耐心等待。')
+        } else if (error.response?.status === 500) {
+          ElMessage.error('服务器处理超时，请稍后重试')
+        } else {
+          ElMessage.error('生成教学方案失败: ' + (error.message || '请稍后重试'))
+        }
+      } finally {
+        generating.value = false
+      }
+    }
+  })
+}
+
+// 改进教学方案
+async function improveTeachingPlan() {
+  if (!improveFormRef.value) return
+
+  improveFormRef.value.validate(async (valid) => {
+    if (valid) {
+      improving.value = true
+      try {
+        console.log('改进教学方案，数据:', improveForm.value)
+
+        const response = await teachingAssistantAPI.improveLesson(improveForm.value)
+        console.log('改进教学方案响应:', response)
+
+        // 灵活处理响应格式，支持多种可能的字段名
+        let improvedPlan = null
+        if (response) {
+          improvedPlan = response.improvedPlan || response.teachingPlan || response.plan || response.content || response.result || response.data
+
+          // 如果响应是字符串，直接使用
+          if (typeof response === 'string') {
+            improvedPlan = response
+          }
+        }
+
+        if (improvedPlan) {
+          teachingPlan.value = improvedPlan
+          ElMessage.success('教学方案改进成功')
+          improveDialogVisible.value = false
+
+          // 可选：将改进的教学方案保存到知识点的teachPlan字段
+          await saveTeachingPlanToKnowledge(improvedPlan)
+        } else {
+          ElMessage.error('改进教学方案失败，请稍后重试')
+        }
+      } catch (error) {
+        console.error('改进教学方案失败:', error)
+
+        // 特殊处理超时错误
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          ElMessage.error('AI改进教学方案超时，请稍后重试。改进过程可能需要1-2分钟，请耐心等待。')
+        } else if (error.response?.status === 500) {
+          ElMessage.error('服务器处理超时，请稍后重试')
+        } else {
+          ElMessage.error('改进教学方案失败: ' + (error.message || '请稍后重试'))
+        }
+      } finally {
+        improving.value = false
+      }
+    }
+  })
+}
+
+// 将教学方案保存到知识点
+async function saveTeachingPlanToKnowledge(plan) {
+  try {
+    // 从localstorage中获取教师ID
+    const userInfoStr = localStorage.getItem('user_info')
+    if (!userInfoStr) {
+      console.warn('未找到用户信息，无法保存教学方案到知识点')
+      return
+    }
+
+    const userInfo = JSON.parse(userInfoStr)
+    if (!userInfo || !userInfo.teacherId) {
+      console.warn('用户信息不完整，无法保存教学方案到知识点')
+      return
+    }
+
+    // 确保教师ID和知识点ID是字符串形式
+    const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
+    const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
+
+    const updateData = {
+      knowledgeId: knowledgeIdStr,
+      teachPlan: plan,
+      teacherId: teacherId
+    }
+
+    await knowledgeAPI.updateKnowledge(updateData)
+    console.log('教学方案已保存到知识点')
+  } catch (error) {
+    console.error('保存教学方案到知识点失败:', error)
+    // 不显示错误消息，因为这是可选操作
+  }
+}
+
+// 题目模块相关函数 - 已注释
+/*
 // 获取相关习题
 async function fetchQuestions() {
   loading.value = true
   try {
     // 确保知识点ID是字符串形式
     const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
-    
+
     const response = await knowledgeAPI.getQuestionsByKnowledgeId(knowledgeIdStr)
     console.log('获取到的相关习题:', response)
-    
+
     if (Array.isArray(response)) {
       questions.value = response
-      
+
       // 确保在DOM更新后初始化图表
       if (response.length > 0) {
         // 使用nextTick确保DOM已更新
@@ -697,6 +1101,7 @@ async function fetchQuestions() {
     loading.value = false
   }
 }
+*/
 
 // 返回上一页
 function goBack() {
@@ -805,11 +1210,12 @@ async function saveKnowledgeContent() {
   }
 }
 
+/*
 // 添加习题
 function addQuestion() {
   isEditingQuestion.value = false
   currentEditingQuestion.value = null
-  
+
   // 重置表单
   questionForm.value = {
     questionType: '选择题',
@@ -825,7 +1231,7 @@ function addQuestion() {
     scorePoints: 5,
     analysis: ''
   }
-  
+
   questionDialogVisible.value = true
 }
 
@@ -858,22 +1264,24 @@ function deleteQuestion(question) {
     // 用户取消删除
   })
 }
+*/
 
+/*
 // 编辑习题
 function editQuestion(question) {
   isEditingQuestion.value = true
   currentEditingQuestion.value = question
-  
+
   // 从题目内容中提取选项（如果是选择题）
   let content = question.content;
   let options = [];
-  
+
   if (question.questionType === '选择题') {
     // 尝试从内容中提取选项
     const contentLines = content.split('\n');
     let mainContent = [];
     let optionsStarted = false;
-    
+
     for (const line of contentLines) {
       const trimmedLine = line.trim();
       // 查找选项格式的行 (A. xxx, B. xxx 等)
@@ -887,25 +1295,25 @@ function editQuestion(question) {
         mainContent.push(trimmedLine);
       }
     }
-    
+
     // 更新题目内容（仅保留主要内容）
     content = mainContent.join('\n');
   }
-  
+
   // 复制问题数据到表单
   questionForm.value = {
     questionType: question.questionType || '选择题',
     content: content || '',
-    options: options.length > 0 ? options : 
-      question.questionType === '判断题' ? 
-        [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }] : 
+    options: options.length > 0 ? options :
+      question.questionType === '判断题' ?
+        [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }] :
         [{ key: 'A', text: '' }, { key: 'B', text: '' }, { key: 'C', text: '' }, { key: 'D', text: '' }],
     referenceAnswer: question.referenceAnswer || '',
     difficulty: question.difficulty || '中等',
     scorePoints: question.scorePoints || 5,
     analysis: question.analysis || ''
   }
-  
+
   questionDialogVisible.value = true
 }
 
@@ -951,9 +1359,9 @@ function removeOption(index) {
     if (questionForm.value.referenceAnswer === questionForm.value.options[index].key) {
       questionForm.value.referenceAnswer = ''
     }
-    
+
     questionForm.value.options.splice(index, 1)
-    
+
     // 重新排序选项的key
     const keys = ['A', 'B', 'C', 'D', 'E', 'F']
     questionForm.value.options.forEach((option, idx) => {
@@ -961,7 +1369,9 @@ function removeOption(index) {
     })
   }
 }
+*/
 
+/*
 // 保存习题
 async function saveQuestion() {
   questionFormRef.value.validate(async (valid) => {
@@ -972,21 +1382,21 @@ async function saveQuestion() {
         if (!userInfoStr) {
           throw new Error('未找到用户信息，请重新登录')
         }
-        
+
         const userInfo = JSON.parse(userInfoStr)
         if (!userInfo || !userInfo.teacherId) {
           throw new Error('用户信息不完整或不是教师账号')
         }
-        
+
         // 确保教师ID和知识点ID是字符串形式
         const teacherId = userInfo.teacherId ? new BigNumber(userInfo.teacherId).toString() : userInfo.teacherId
         const knowledgeIdStr = knowledgeId ? new BigNumber(knowledgeId).toString() : knowledgeId
-        
+
         // 准备提交的数据
         let content = questionForm.value.content;
-        
+
         // 如果是选择题或判断题，将选项内容添加到题目内容中
-        if ((questionForm.value.questionType === '选择题' || questionForm.value.questionType === '判断题') && 
+        if ((questionForm.value.questionType === '选择题' || questionForm.value.questionType === '判断题') &&
             questionForm.value.options.length > 0) {
           // 添加换行
           content += '\n\n';
@@ -995,7 +1405,7 @@ async function saveQuestion() {
             content += `${option.key}. ${option.text}\n`;
           });
         }
-        
+
         const questionData = {
           questionType: questionForm.value.questionType,
           content: content,
@@ -1006,7 +1416,7 @@ async function saveQuestion() {
           teacherId: teacherId,
           knowledgeId: knowledgeIdStr
         }
-        
+
         if (isEditingQuestion.value && currentEditingQuestion.value) {
           // 更新现有习题
           questionData.questionId = currentEditingQuestion.value.questionId
@@ -1017,10 +1427,10 @@ async function saveQuestion() {
           await knowledgeAPI.addQuestion(questionData)
           ElMessage.success('习题添加成功')
         }
-        
+
         // 重新获取习题列表
         await fetchQuestions()
-        
+
         // 关闭对话框
         questionDialogVisible.value = false
       } catch (error) {
@@ -1030,6 +1440,7 @@ async function saveQuestion() {
     }
   })
 }
+*/
 
 // 在组件挂载时获取知识点详情
 onMounted(async () => {
@@ -1041,7 +1452,9 @@ onMounted(async () => {
   
   try {
     await fetchKnowledgeDetail()
-    
+
+    // 题目模块相关初始化 - 已注释
+    /*
     // 额外的图表初始化尝试
     if (questions.value.length > 0) {
       // 延迟一段时间再初始化图表，确保DOM已完全渲染
@@ -1050,12 +1463,15 @@ onMounted(async () => {
         initCharts()
       }, 500)
     }
+    */
   } catch (error) {
     console.error('初始化知识点详情失败:', error)
     ElMessage.error('加载知识点详情失败，请稍后重试')
   }
 })
 
+// 题目模块相关清理 - 已注释
+/*
 // 组件卸载时清理图表实例
 onUnmounted(() => {
   if (typeChart) {
@@ -1079,6 +1495,7 @@ const handleResize = () => {
     difficultyChart.resize();
   }
 };
+*/
 </script>
 
 <style scoped>
@@ -1789,6 +2206,195 @@ const handleResize = () => {
 
 .knowledge-description {
   padding: 10px 0;
+}
+
+/* 教师智能备课模块样式 */
+.teaching-assistant-card {
+  margin-bottom: 16px;
+}
+
+.teaching-plan-content {
+  padding: 0;
+}
+
+.plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.plan-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.plan-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.plan-content {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #ebeef5;
+}
+
+.plan-text {
+  margin: 0;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+/* Markdown内容样式 */
+.markdown-content {
+  text-align: left;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #303133;
+  text-align: left;
+}
+
+.markdown-content h1 {
+  font-size: 20px;
+  border-bottom: 1px solid #ebeef5;
+  padding-bottom: 8px;
+}
+
+.markdown-content h2 {
+  font-size: 18px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 6px;
+}
+
+.markdown-content h3 {
+  font-size: 16px;
+}
+
+.markdown-content h4 {
+  font-size: 15px;
+}
+
+.markdown-content h5,
+.markdown-content h6 {
+  font-size: 14px;
+}
+
+.markdown-content p {
+  margin: 8px 0;
+  text-align: left;
+  line-height: 1.6;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+  text-align: left;
+}
+
+.markdown-content li {
+  margin: 4px 0;
+  text-align: left;
+}
+
+.markdown-content blockquote {
+  margin: 8px 0;
+  padding: 8px 16px;
+  background-color: #f8f9fa;
+  border-left: 4px solid #409EFF;
+  color: #606266;
+  text-align: left;
+}
+
+.markdown-content code {
+  background-color: #f1f2f3;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: #e83e8c;
+}
+
+.markdown-content pre {
+  background-color: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+  text-align: left;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #303133;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  text-align: left;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: #303133;
+}
+
+.markdown-content em {
+  font-style: italic;
+  color: #606266;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #ebeef5;
+  margin: 16px 0;
+}
+
+/* 对话框样式优化 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dialog-footer .el-button {
+  min-width: 80px;
 }
 
 .description-text {

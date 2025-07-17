@@ -23,7 +23,7 @@
             </div>
             <div class="knowledge-footer">
               <span class="teach-plan-label">教学计划:</span>
-              <span class="teach-plan-content">{{ knowledge.teachPlan || '暂无教学计划' }}</span>
+              <span class="teach-plan-content truncated-teach-plan">{{ knowledge.teachPlan || '暂无教学计划' }}</span>
             </div>
             <div class="knowledge-actions">
               <el-button link type="primary" @click.stop="$emit('edit-knowledge', knowledge)">编辑</el-button>
@@ -345,6 +345,21 @@ function getCategoryColor(category) {
 .teach-plan-label {
   font-weight: 600;
   margin-right: 5px;
+}
+
+.teach-plan-content {
+  flex: 1;
+}
+
+.truncated-teach-plan {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .knowledge-actions {

@@ -265,7 +265,7 @@
                   :content="scope.row.teachPlan || '暂无教学计划'"
                 >
                   <template #reference>
-                    <span class="knowledge-teach-plan">{{ scope.row.teachPlan || '暂无教学计划' }}</span>
+                    <span class="knowledge-teach-plan truncated-teach-plan">{{ scope.row.teachPlan || '暂无教学计划' }}</span>
                   </template>
                 </el-popover>
               </template>

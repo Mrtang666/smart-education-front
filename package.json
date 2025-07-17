@@ -14,8 +14,10 @@
     "axios": "^1.10.0",
     "bignumber.js": "^9.3.0",
     "core-js": "^3.8.3",
+    "dompurify": "^3.2.6",
     "echarts": "^5.6.0",
     "element-plus": "^2.9.11",
+    "marked": "^16.0.0",
     "vant": "^4.9.19",
     "vue": "^3.2.13",
     "vue-router": "^4.0.3"
