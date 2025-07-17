@@ -823,7 +823,20 @@ export const studentAssistantAPI = {
 
             console.log(`学生问答，学生ID: ${studentIdStr}，问题:`, askData.question);
 
-            const response = await axios.post(`/api/student-assistant/student/${studentIdStr}/ask`, askData);
+            // 构建查询参数
+            const params = {
+                question: askData.question
+            };
+
+            // 如果有课程ID，添加到查询参数中
+            if (askData.courseId) {
+                params.courseId = String(askData.courseId);
+            }
+
+            const response = await axios.post(`/api/student-assistant/student/${studentIdStr}/ask`, null, {
+                params: params,
+                timeout: 60000  // 设置60秒超时，AI响应可能需要较长时间
+            });
             return response.data;
         } catch (error) {
             console.error('学生问答失败:', error.response ? error.response.data : error.message);
@@ -3313,9 +3326,11 @@ export const courseSelectionAPI = {
 
             console.log(`学生通过邀请码加入课程，学生ID: ${studentIdStr}, 邀请码: ${inviteCodeStr}`);
 
-            const response = await axios.post('/api/course-selection/join-by-invite-code', {
-                studentId: studentIdStr,
-                inviteCode: inviteCodeStr
+            const response = await axios.post('/api/course-selection/join-by-invite-code', null, {
+                params: {
+                    studentId: studentIdStr,
+                    inviteCode: inviteCodeStr
+                }
             });
             return response.data;
         } catch (error) {
