@@ -1,8 +1,13 @@
+<!-- 邀请码功能待测试是否能正确运行 -->
 <template>
   <div class="content-section">
     <div class="section-header">
       <h3>学生列表</h3>
       <div class="header-actions">
+        <el-button type="success" size="small" @click="generateInviteCode">
+          <el-icon><Share /></el-icon>
+          生成邀请码
+        </el-button>
         <el-button type="danger" size="small" v-if="selectedStudents.length > 0" @click="$emit('batch-remove-students')">
           <el-icon><Delete /></el-icon>
           批量删除 ({{ selectedStudents.length }})
@@ -150,6 +155,54 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 邀请码对话框 -->
+    <el-dialog
+      v-model="inviteCodeDialogVisible"
+      title="课程邀请码"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="invite-code-content">
+        <div v-if="generatingInviteCode" class="generating-container">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <p>正在生成邀请码...</p>
+        </div>
+        <div v-else-if="currentInviteCode" class="invite-code-result">
+          <div class="invite-code-display">
+            <label>邀请码：</label>
+            <div class="code-container">
+              <span class="invite-code">{{ currentInviteCode }}</span>
+              <el-button type="primary" size="small" @click="copyInviteCode">
+                <el-icon><DocumentCopy /></el-icon>
+                复制
+              </el-button>
+            </div>
+          </div>
+          <div class="invite-code-info">
+            <p><strong>使用说明：</strong></p>
+            <ul>
+              <li>学生可以使用此邀请码加入课程</li>
+              <li>邀请码长期有效，请妥善保管</li>
+              <li>可以将邀请码分享给需要加入课程的学生</li>
+            </ul>
+          </div>
+        </div>
+        <div v-else class="error-container">
+          <el-empty description="生成邀请码失败" :image-size="80">
+            <el-button type="primary" @click="generateInviteCode">重新生成</el-button>
+          </el-empty>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="inviteCodeDialogVisible = false">关闭</el-button>
+          <el-button type="primary" @click="generateInviteCode" v-if="!generatingInviteCode">
+            重新生成
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -159,10 +212,12 @@ import {
   Delete,
   Plus,
   Loading,
-  TrendCharts
+  TrendCharts,
+  Share,
+  DocumentCopy
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { teachingAssistantAPI } from '@/api/api'
+import { teachingAssistantAPI, courseSelectionAPI } from '@/api/api'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -218,6 +273,11 @@ const analysisResult = ref('')
 const selectedStudent = ref(null)
 const progressPercentage = ref(0)
 const progressText = ref('正在初始化...')
+
+// 邀请码相关状态
+const inviteCodeDialogVisible = ref(false)
+const generatingInviteCode = ref(false)
+const currentInviteCode = ref('')
 
 // 过滤学生列表
 const filteredStudents = computed(() => {
@@ -418,6 +478,98 @@ function resetAnalysisState() {
   progressPercentage.value = 0
   progressText.value = '正在初始化...'
   selectedStudent.value = null
+}
+
+// 生成课程邀请码
+async function generateInviteCode() {
+  if (!props.courseId) {
+    ElMessage.error('课程ID不能为空')
+    return
+  }
+
+  inviteCodeDialogVisible.value = true
+  generatingInviteCode.value = true
+  currentInviteCode.value = ''
+
+  try {
+    console.log('开始生成课程邀请码，课程ID:', props.courseId)
+
+    const response = await courseSelectionAPI.generateInviteCode(props.courseId)
+    console.log('生成邀请码API响应:', response)
+
+    // 灵活处理不同的响应格式
+    let inviteCode = null
+    if (response) {
+      // 尝试多种可能的字段名（包括下划线和驼峰格式）
+      inviteCode = response.invite_code ||  // 下划线格式（实际API格式）
+                   response.inviteCode ||
+                   response.code ||
+                   response.data?.invite_code ||
+                   response.data?.inviteCode ||
+                   response.data?.code ||
+                   response.result?.invite_code ||
+                   response.result?.inviteCode ||
+                   response.result?.code ||
+                   (typeof response === 'string' ? response : null)
+    }
+
+    if (inviteCode) {
+      currentInviteCode.value = inviteCode
+      ElMessage.success('邀请码生成成功')
+    } else {
+      console.error('无法从响应中提取邀请码，响应数据:', response)
+      throw new Error('邀请码生成失败：无法从响应中获取邀请码')
+    }
+  } catch (error) {
+    console.error('生成邀请码失败:', error)
+
+    let errorMessage = '生成邀请码失败'
+    if (error.response?.status === 401) {
+      errorMessage = '登录已过期，请重新登录'
+    } else if (error.response?.status === 403) {
+      errorMessage = '没有权限生成邀请码'
+    } else if (error.response?.status === 404) {
+      errorMessage = '课程不存在'
+    } else if (error.response?.status >= 500) {
+      errorMessage = '服务器错误，请稍后重试'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
+    ElMessage.error(errorMessage)
+    currentInviteCode.value = ''
+  } finally {
+    generatingInviteCode.value = false
+  }
+}
+
+// 复制邀请码到剪贴板
+async function copyInviteCode() {
+  if (!currentInviteCode.value) {
+    ElMessage.warning('没有可复制的邀请码')
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(currentInviteCode.value)
+    ElMessage.success('邀请码已复制到剪贴板')
+  } catch (error) {
+    console.error('复制失败:', error)
+
+    // 备用复制方法
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = currentInviteCode.value
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      ElMessage.success('邀请码已复制到剪贴板')
+    } catch (fallbackError) {
+      console.error('备用复制方法也失败:', fallbackError)
+      ElMessage.error('复制失败，请手动复制邀请码')
+    }
+  }
 }
 </script>
 
@@ -917,4 +1069,116 @@ function resetAnalysisState() {
 }
 
 /* 移除滚动条样式，因为内容现在自适应显示 */
-</style> 
+
+/* 邀请码对话框样式 */
+.invite-code-content {
+  padding: 20px 0;
+}
+
+.generating-container {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.generating-container .el-icon {
+  font-size: 40px;
+  color: #409EFF;
+  margin-bottom: 16px;
+}
+
+.generating-container p {
+  margin: 0;
+  color: #606266;
+  font-size: 16px;
+}
+
+.invite-code-result {
+  text-align: left;
+}
+
+.invite-code-display {
+  margin-bottom: 24px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.invite-code-display label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #303133;
+  font-size: 14px;
+}
+
+.code-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.invite-code {
+  flex: 1;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border: 2px solid #409EFF;
+  border-radius: 6px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: 600;
+  color: #409EFF;
+  letter-spacing: 2px;
+  text-align: center;
+  user-select: all;
+}
+
+.invite-code-info {
+  padding: 16px;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  border-left: 4px solid #409EFF;
+}
+
+.invite-code-info p {
+  margin: 0 0 12px 0;
+  color: #303133;
+  font-size: 14px;
+}
+
+.invite-code-info ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.invite-code-info li {
+  margin: 6px 0;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .code-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invite-code {
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+}
+</style>

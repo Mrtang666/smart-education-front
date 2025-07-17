@@ -849,7 +849,10 @@ export const studentAssistantAPI = {
 
             console.log(`学生带历史问答，学生ID: ${studentIdStr}，消息数量:`, historyData.messages?.length || 0);
 
-            const response = await axios.post(`/api/student-assistant/student/${studentIdStr}/ask/history`, historyData);
+            // 为AI聊天设置更长的超时时间（60秒）
+            const response = await axios.post(`/api/student-assistant/student/${studentIdStr}/ask/history`, historyData, {
+                timeout: 60000
+            });
             return response.data;
         } catch (error) {
             console.error('学生带历史问答失败:', error.response ? error.response.data : error.message);
@@ -872,7 +875,8 @@ export const studentAssistantAPI = {
             console.log('学生流式问答，消息数量:', streamData.messages?.length || 0);
 
             const response = await axios.post('/api/student-assistant/stream/chat-history', streamData, {
-                responseType: 'stream'
+                responseType: 'stream',
+                timeout: 60000  // 为流式聊天设置更长的超时时间（60秒）
             });
             return response.data;
         } catch (error) {
@@ -3289,6 +3293,59 @@ export const courseSelectionAPI = {
             };
         } catch (error) {
             console.error('批量删除课程学生失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 8.通过邀请码加入课程（需要token）
+     * @param {string} studentId 学生ID
+     * @param {string} inviteCode 邀请码
+     * @returns {Promise<Object>} 加入课程结果
+     * 返回字段：由后端返回，通常包含加入成功状态和消息
+     */
+    async joinByInviteCode(studentId, inviteCode) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const studentIdStr = String(studentId);
+            const inviteCodeStr = String(inviteCode);
+
+            console.log(`学生通过邀请码加入课程，学生ID: ${studentIdStr}, 邀请码: ${inviteCodeStr}`);
+
+            const response = await axios.post('/api/course-selection/join-by-invite-code', {
+                studentId: studentIdStr,
+                inviteCode: inviteCodeStr
+            });
+            return response.data;
+        } catch (error) {
+            console.error('通过邀请码加入课程失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 9.生成课程邀请码（需要token）
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Object>} 邀请码生成结果
+     * 返回字段：由后端返回，通常包含生成的邀请码
+     */
+    async generateInviteCode(courseId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+
+            console.log(`生成课程邀请码，课程ID: ${courseIdStr}`);
+
+            const response = await axios.post('/api/course-selection/generate-invite-code', null, {
+                params: {
+                    courseId: courseIdStr
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('生成课程邀请码失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     }

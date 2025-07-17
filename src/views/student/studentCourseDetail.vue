@@ -11,6 +11,7 @@
  * - attendanceAPI: 获取课程考勤
  */ -->
  <!-- 学生端课程文档的下载接口有问题，待完善 -->
+  <!-- 学生端AI功能页面待写 -->
 <template>
   <div class="course-detail-container">
     <!-- 左侧导航栏 -->
