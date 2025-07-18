@@ -271,8 +271,8 @@
             <template #default="{ node, data }">
               <div class="catalog-node">
                 <span>{{ node.label }}</span>
-                <el-tag v-if="data.knowledgeId === currentKnowledgeId" size="mini" type="primary">当前</el-tag>
-                <el-tag v-else-if="data.completed" size="mini" type="success">已学</el-tag>
+                <el-tag v-if="data.knowledgeId === currentKnowledgeId" size="small" type="primary">当前</el-tag>
+                <el-tag v-else-if="data.completed" size="small" type="success">已学</el-tag>
               </div>
             </template>
           </el-tree>
@@ -286,7 +286,7 @@
 </template>
 
 <script>
-import { knowledgeAPI } from '@/api/api';
+import { knowledgeAPI, learningProgressAPI } from '@/api/api';
 import { BigNumber } from 'bignumber.js';
 import { getUserInfo } from '@/utils/auth';
 
@@ -517,22 +517,46 @@ export default {
     },
     
     // 标记知识点为已学习
-    markAsCompleted() {
+    async markAsCompleted() {
       if (!this.knowledgeId || !this.studentId) {
         this.$message.warning('无法标记学习状态，请确认您已登录');
         return;
       }
-      
+
+      try {
+        // 尝试调用API更新掌握程度为100%
+        await learningProgressAPI.updateMasteryLevel(
+          this.studentId,
+          this.knowledgeId,
+          100
+        );
+
+        console.log('学习进度已成功保存到数据库');
+        this.$message.success('已标记为学习完成！学习进度已保存');
+
+      } catch (error) {
+        console.warn('API保存学习进度失败，使用本地存储:', error);
+
+        // 如果是404错误，说明API接口不存在，使用本地存储
+        if (error.response && error.response.status === 404) {
+          console.log('学习进度API接口暂不可用，使用本地存储模式');
+          this.$message.success('已标记为学习完成！（本地保存）');
+        } else {
+          // 其他错误也使用本地存储作为备用方案
+          console.log('使用本地存储作为备用方案');
+          this.$message.success('已标记为学习完成！（本地保存）');
+        }
+      }
+
+      // 无论API调用是否成功，都更新本地状态
       this.isCompleted = true;
-      
-      // 保存学习状态到本地存储
+
+      // 保存学习状态到本地存储（作为备份或主要存储）
       this.saveLearningStatus();
-      
+
       // 刷新所有知识点的状态
       this.refreshAllKnowledgePointsStatus();
-      
-      this.$message.success('已标记为学习完成！');
-      
+
       // 更新进度条
       this.$nextTick(() => {
         this.updateProgressBar();
@@ -550,14 +574,37 @@ export default {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
-      }).then(() => {
+      }).then(async () => {
+        try {
+          // 尝试调用API重置掌握程度为0%
+          await learningProgressAPI.updateMasteryLevel(
+            this.studentId,
+            this.knowledgeId,
+            0
+          );
+
+          console.log('学习进度已成功从数据库重置');
+          this.$message.success('学习状态已重置！');
+
+        } catch (error) {
+          console.warn('API重置学习进度失败，使用本地存储:', error);
+
+          // 如果是404错误或其他错误，使用本地存储
+          if (error.response && error.response.status === 404) {
+            console.log('学习进度API接口暂不可用，使用本地存储模式');
+          } else {
+            console.log('使用本地存储作为备用方案');
+          }
+          this.$message.success('学习状态已重置！（本地重置）');
+        }
+
+        // 无论API调用是否成功，都更新本地状态
         this.isCompleted = false;
         this.removeFromCompletedList(); // 从已完成列表中移除
-        
+
         // 刷新所有知识点的状态
         this.refreshAllKnowledgePointsStatus();
-        
-        this.$message.success('学习状态已重置！');
+
         this.$nextTick(() => {
           this.updateProgressBar();
         });
@@ -654,8 +701,59 @@ export default {
     },
     
     // 加载学习状态
-    loadLearningStatus() {
-      this.updateCurrentKnowledgeStatus();
+    async loadLearningStatus() {
+      try {
+        // 首先尝试从数据库获取学习进度
+        await this.loadLearningProgressFromDatabase();
+      } catch (error) {
+        console.error('从数据库加载学习进度失败:', error);
+        // 如果数据库加载失败，回退到本地存储
+        this.updateCurrentKnowledgeStatus();
+      }
+    },
+
+    // 从数据库加载学习进度
+    async loadLearningProgressFromDatabase() {
+      if (!this.studentId || !this.knowledgeId) {
+        return;
+      }
+
+      try {
+        // 尝试获取当前知识点的学习进度
+        const progress = await learningProgressAPI.getStudentKnowledgeProgress(
+          this.studentId,
+          this.knowledgeId
+        );
+
+        console.log('成功从数据库加载学习进度:', progress);
+
+        // 根据掌握程度判断是否完成（80%以上认为完成）
+        if (progress && progress.masteryLevel >= 80) {
+          this.isCompleted = true;
+        } else {
+          this.isCompleted = false;
+        }
+
+        // 同步到本地存储作为备份
+        if (this.isCompleted) {
+          this.saveLearningStatus();
+        } else {
+          this.removeFromCompletedList();
+        }
+
+      } catch (error) {
+        // 如果API调用失败，使用本地存储的数据
+        console.warn('获取数据库学习进度失败，使用本地存储:', error);
+
+        if (error.response && error.response.status === 404) {
+          console.log('学习进度API接口暂不可用，使用本地存储模式');
+        } else {
+          console.log('API调用失败，回退到本地存储');
+        }
+
+        // 使用本地存储的学习状态
+        this.updateCurrentKnowledgeStatus();
+      }
     },
     
     // 刷新所有知识点的完成状态

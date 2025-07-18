@@ -167,10 +167,7 @@ const routes = [
       //   props: true,
       //   name: "studentExamDetail"
       // },
-      {
-        path: "schedule",
-        component: () => import("@/views/student/studentSchedule.vue"),
-      },
+
       {
         path: "plan",
         component: () => import("@/views/student/studentPlan.vue"),

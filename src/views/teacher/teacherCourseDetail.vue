@@ -653,7 +653,7 @@
               <el-checkbox
                 v-for="student in availableStudents"
                 :key="student.studentId"
-                :label="student.studentId"
+                :value="student.studentId"
                 border
               >
                 {{ student.fullName || student.username }}

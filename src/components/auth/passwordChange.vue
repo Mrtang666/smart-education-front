@@ -16,8 +16,8 @@
             </el-form-item>
             <el-form-item>
                 <el-radio-group v-model="userType">
-                    <el-radio label="student">学生</el-radio>
-                    <el-radio label="teacher">教师</el-radio>
+                    <el-radio value="student">学生</el-radio>
+                    <el-radio value="teacher">教师</el-radio>
                 </el-radio-group>
             </el-form-item>
             <el-form-item>

@@ -72,7 +72,7 @@
       </div>
 
       <!-- 学习计划方块 -->
-      <div class="feature-card" @click="navigateTo('schedule')">
+      <div class="feature-card" @click="navigateTo('plan')">
         <div class="card-icon green">
           <el-icon :size="32">
             <Calendar />
@@ -443,7 +443,7 @@ function navigateTo(page) {
       case 'exam':
         setActiveMenu('考试')
         break
-      case 'schedule':
+      case 'plan':
         setActiveMenu('计划')
         break
       default:
@@ -462,8 +462,8 @@ function navigateTo(page) {
     case 'exam':
       router.push('/student/exam')
       break
-    case 'schedule':
-      router.push('/student/schedule')
+    case 'plan':
+      router.push('/student/plan')
       break
     default:
       break

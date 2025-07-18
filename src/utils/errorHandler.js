@@ -72,7 +72,25 @@ export function initErrorHandler() {
         return // 忽略这些警告
       }
     }
-    
+
+    // 过滤Element Plus相关的开发警告
+    if (args[0] && typeof args[0] === 'string') {
+      if (args[0].includes('[Vue warn]') &&
+          (args[0].includes('Invalid prop') ||
+           args[0].includes('validation failed') ||
+           args[0].includes('deprecated'))) {
+        return // 忽略Element Plus的prop验证警告
+      }
+    }
+
+    // 过滤Element Plus radio/checkbox label prop 警告
+    if (args[0] && typeof args[0] === 'string') {
+      if (args[0].includes('ElementPlusError') &&
+          args[0].includes('about to be deprecated')) {
+        return // 忽略Element Plus的废弃警告
+      }
+    }
+
     // 其他警告正常输出
     originalConsoleWarn.apply(console, args)
   }

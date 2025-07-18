@@ -955,7 +955,7 @@ export const studentAssistantAPI = {
 // 学习进度api模块（代讨论）
 export const learningProgressAPI = {
     /**
-     *1. 获取学生整体学习进度（需要token）
+     *1.教师 获取学生整体学习进度（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Array<Object>>} 学生学习进度列表
      */
@@ -966,7 +966,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取学生学习进度统计（需要token）
+     * 教师 获取学生学习进度统计（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Object>} 统计信息
      */
@@ -977,7 +977,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取推荐学习资源（需要token）
+     *学生 获取推荐学习资源（需要token）
      * @param {number} studentId 学生ID
      * @param {number} [limit] 返回条数（可选）
      * @returns {Promise<Array<Object>>} 资源列表
@@ -991,7 +991,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 搜索推荐学习资源（需要token）
+     * 学生 搜索推荐学习资源（需要token）
      * @param {number} studentId 学生ID
      * @param {string} keywords 关键词
      * @param {number} [limit] 返回条数（可选）
@@ -1006,7 +1006,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取学生整体进度（需要token）
+     *教师 获取学生整体进度（需要token）
      * @param {number} studentId 学生ID
      * @returns {Promise<Object>} 整体进度信息
      */
@@ -1017,7 +1017,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取学生某知识点的进度（需要token）
+     *学生 获取学生某知识点的进度（需要token）
      * @param {number} studentId 学生ID
      * @param {number} knowledgeId 知识点ID
      * @returns {Promise<Object>} 进度信息
@@ -1029,7 +1029,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 按知识点名称获取学生知识点进度（需要token）
+     *  教师 按知识点名称获取学生知识点进度（需要token）
      * @param {number} studentId 学生ID
      * @param {string} name 知识点名称
      * @returns {Promise<Array<Object>>} 进度列表
@@ -1041,7 +1041,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取学生某课程的进度（需要token）
+     * 教师 获取学生某课程的进度（需要token）
      * @param {number} studentId 学生ID
      * @param {number} courseId 课程ID
      * @returns {Promise<Array<Object>>} 进度列表
@@ -1053,7 +1053,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取学生某课程的进度（对象形式，需token）
+     * 学生 获取学生某课程的进度（对象形式，需token）
      * @param {number} studentId 学生ID
      * @param {number} courseId 课程ID
      * @returns {Promise<Object>} 进度信息
@@ -1077,7 +1077,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 获取学生某课程的进度统计（需要token）
+     * 学生 获取学生某课程的进度统计（需要token）
      * @param {number} studentId 学生ID
      * @param {number} courseId 课程ID
      * @returns {Promise<Object>} 统计信息
@@ -1089,7 +1089,7 @@ export const learningProgressAPI = {
     },
 
     /**
-     * 按课程名称获取学生课程进度（需要token）
+     * 学生 按课程名称获取学生课程进度（需要token）
      * @param {number} studentId 学生ID
      * @param {string} name 课程名称
      * @returns {Promise<Array<Object>>} 进度列表
@@ -4023,7 +4023,7 @@ export const problemAPI = {
 // 作业相关API
 export const assignmentAPI = {
     /**
-     * 更新作业（需要token）
+     * 1.更新作业（需要token）
      * @param {Object} assignmentData 作业信息
      * @param {number} assignmentData.assignmentId 作业ID
      * @param {string} assignmentData.type 类型
@@ -4084,7 +4084,7 @@ export const assignmentAPI = {
     },
 
     /**
-     * 保存作业（需要token）
+     * 2.保存作业（需要token）
      * @param {Object} assignmentData 作业信息
      * @param {number} [assignmentData.assignmentId] 作业ID（可选，更新时填写）
      * @param {string} assignmentData.type 类型
@@ -4130,7 +4130,7 @@ export const assignmentAPI = {
     },
 
     /**
-     * 根据作业ID获取作业信息（需要token）
+     * 3.根据作业ID获取作业信息（需要token）
      * @param {number} assignmentId 作业ID
      * @returns {Promise<Object>} 作业信息
      * 返回字段：同updateAssignment返回字段
@@ -4158,7 +4158,7 @@ export const assignmentAPI = {
     },
 
     /**
-     * 根据创建者ID获取作业列表（需要token）
+     * 4.根据创建者ID获取作业列表（需要token）
      * @param {number} creatorId 创建者ID
      * @returns {Promise<Array<Object>>} 作业列表
      * 每项字段：同updateAssignment返回字段
@@ -4188,7 +4188,7 @@ export const assignmentAPI = {
     },
 
     /**
-     * 根据创建者ID和作业类型获取作业列表（需要token）
+     * 5.根据创建者ID和作业类型获取作业列表（需要token）
      * @param {number} creatorId 创建者ID
      * @param {string} type 作业类型
      * @returns {Promise<Array<Object>>} 作业列表
@@ -4219,7 +4219,7 @@ export const assignmentAPI = {
     },
 
     /**
-     * 根据课程ID和作业类型获取作业列表（需要token）
+     * 6.根据课程ID和作业类型获取作业列表（需要token）
      * @param {number} courseId 课程ID
      * @param {string} type 作业类型
      * @returns {Promise<Array<Object>>} 作业列表
@@ -4322,14 +4322,61 @@ export const studentAnswerAPI = {
     async submitAnswer(studentId, problemId, answer) {
         const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.post('/api/student-answer/submit', {
-                studentId,
-                problemId,
-                answer
+            // 确保参数类型正确
+            const params = {
+                studentId: String(studentId),
+                problemId: String(problemId),
+                answer: String(answer)
+            };
+
+            console.log('提交答案API调用参数:', params);
+
+            const response = await axios.post('/api/student-answer/submit', null, {
+                params: params
             });
+
+            console.log('提交答案API响应:', response.data);
             return response.data;
         } catch (error) {
             console.error('提交答案失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 提交学生答案并触发自动评分（需要token）
+     * @param {number} studentId 学生ID
+     * @param {number} problemId 问题ID
+     * @param {string} answer 答案内容
+     * @param {boolean} autoGrade 是否自动评分
+     * @returns {Promise<Object>} 提交结果，包含评分信息
+     */
+    async submitAnswerWithAutoGrading(studentId, problemId, answer, autoGrade = true) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            // 确保参数类型正确
+            const params = {
+                studentId: String(studentId),
+                problemId: String(problemId),
+                answer: String(answer),
+                autoGrade: autoGrade
+            };
+
+            console.log('提交答案并自动评分API调用参数:', params);
+
+            const response = await axios.post('/api/student-answer/submit-and-grade', null, {
+                params: params
+            });
+
+            console.log('提交答案并自动评分API响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('提交答案并自动评分失败:', error.response ? error.response.data : error.message);
+            // 如果自动评分接口不存在，回退到普通提交
+            if (error.response && error.response.status === 404) {
+                console.log('自动评分接口不存在，回退到普通提交');
+                return await this.submitAnswer(studentId, problemId, answer);
+            }
             throw error;
         }
     },
@@ -4373,12 +4420,17 @@ export const studentAnswerAPI = {
     /**
      * 获取作业的最终得分
      * @param {number} assignmentId 作业ID
+     * @param {number} studentId 学生ID
      * @returns {Promise<Array>} 最终得分列表
      */
-    async getFinalScoresByAssignment(assignmentId) {
+    async getFinalScoresByAssignment(assignmentId, studentId) {
         const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/student-answer/final-scores/assignment/${assignmentId}`);
+            const response = await axios.get(`/api/student-answer/final-scores/assignment/${assignmentId}`, {
+                params: {
+                    studentId: studentId
+                }
+            });
             return response.data;
         } catch (error) {
             console.error('获取作业最终得分失败:', error.response ? error.response.data : error.message);
@@ -4425,6 +4477,61 @@ export const studentAnswerAPI = {
     },
 
     /**
+     * 获取学生作业的重做次数信息
+     * @param {number} studentId 学生ID
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Object>} 重做次数信息
+     * 返回字段：
+     * - maxAttempts: number 最大重做次数
+     * - usedAttempts: number 已使用次数
+     * - remainingAttempts: number 剩余次数
+     * - canRedo: boolean 是否可以重做
+     */
+    async getRedoInfo(studentId, assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/student-answer/redo-info`, {
+                params: {
+                    studentId: String(studentId),
+                    assignmentId: String(assignmentId)
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('获取重做信息失败:', error.response ? error.response.data : error.message);
+            // 如果后端不支持，返回默认值
+            return {
+                maxAttempts: 0,
+                usedAttempts: 0,
+                remainingAttempts: 0,
+                canRedo: false
+            };
+        }
+    },
+
+    /**
+     * 重置学生作业（重做）
+     * @param {number} studentId 学生ID
+     * @param {number} assignmentId 作业ID
+     * @returns {Promise<Object>} 重置结果
+     */
+    async resetAssignment(studentId, assignmentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.post(`/api/student-answer/reset`, null, {
+                params: {
+                    studentId: String(studentId),
+                    assignmentId: String(assignmentId)
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('重置作业失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
      * 获取学生在作业中的准确率
      * @param {number} studentId 学生ID
      * @param {number} assignmentId 作业ID
@@ -4449,12 +4556,17 @@ export const studentAnswerAPI = {
     /**
      * 获取作业的所有答案
      * @param {number} assignmentId 作业ID
+     * @param {number} studentId 学生ID
      * @returns {Promise<Array>} 答案列表
      */
-    async getAnswersByAssignment(assignmentId) {
+    async getAnswersByAssignment(assignmentId, studentId) {
         const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/student-answer/assignment/${assignmentId}`);
+            const response = await axios.get(`/api/student-answer/assignment/${assignmentId}`, {
+                params: {
+                    studentId: studentId
+                }
+            });
             return response.data;
         } catch (error) {
             console.error('获取作业答案失败:', error.response ? error.response.data : error.message);

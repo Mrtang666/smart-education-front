@@ -116,7 +116,7 @@
               <el-radio
                 v-for="option in parsedOptions"
                 :key="option.value"
-                :label="option.value"
+                :value="option.value"
               >
                 {{ option.value }}. {{ option.content }}
               </el-radio>
@@ -128,7 +128,7 @@
               <el-checkbox
                 v-for="option in parsedOptions"
                 :key="option.value"
-                :label="option.value"
+                :value="option.value"
               >
                 {{ option.value }}. {{ option.content }}
               </el-checkbox>
@@ -154,8 +154,8 @@
       <template v-if="form.type === 'TRUE_FALSE'">
         <el-form-item label="正确答案" required>
           <el-radio-group v-model="form.expectedAnswer">
-            <el-radio label="true">正确</el-radio>
-            <el-radio label="false">错误</el-radio>
+            <el-radio value="true">正确</el-radio>
+            <el-radio value="false">错误</el-radio>
           </el-radio-group>
         </el-form-item>
       </template>

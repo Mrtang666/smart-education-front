@@ -41,11 +41,11 @@
           <!-- 题目导航 -->
           <div class="questions-nav">
             <el-button-group>
-              <el-button 
-                v-for="(q, index) in questions" 
+              <el-button
+                v-for="(q, index) in questions"
                 :key="q.questionId"
-                size="mini"
-                :type="currentQuestionIndex === index ? 'primary' : 
+                size="small"
+                :type="currentQuestionIndex === index ? 'primary' :
                        answeredQuestions[q.questionId] ? 'success' : 'default'"
                 @click="currentQuestionIndex = index"
               >{{ index + 1 }}</el-button>
@@ -72,7 +72,7 @@
               <div v-if="currentQuestion.questionType === 'SINGLE_CHOICE'" class="question-options">
                 <el-radio-group v-model="userAnswers[currentQuestion.questionId]">
                   <div v-for="(option, optIndex) in getQuestionOptions(currentQuestion)" :key="optIndex" class="option-item">
-                    <el-radio :label="String.fromCharCode(65 + optIndex)">
+                    <el-radio :value="String.fromCharCode(65 + optIndex)">
                       <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
                       <span class="option-content">{{ option }}</span>
                     </el-radio>
@@ -84,7 +84,7 @@
               <div v-else-if="currentQuestion.questionType === 'MULTIPLE_CHOICE'" class="question-options">
                 <el-checkbox-group v-model="userAnswers[currentQuestion.questionId]">
                   <div v-for="(option, optIndex) in getQuestionOptions(currentQuestion)" :key="optIndex" class="option-item">
-                    <el-checkbox :label="String.fromCharCode(65 + optIndex)">
+                    <el-checkbox :value="String.fromCharCode(65 + optIndex)">
                       <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
                       <span class="option-content">{{ option }}</span>
                     </el-checkbox>
@@ -479,10 +479,10 @@ export default {
         
         // 提交答案
         await studentExamAPI.submitAnswer(answerData);
-        
+
         // 标记为已答题
-        this.$set(this.answeredQuestions, questionId, { answered: true });
-        
+        this.answeredQuestions[questionId] = { answered: true };
+
         // 显示提交成功提示
         this.$message.success('答案已提交');
         

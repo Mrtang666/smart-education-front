@@ -97,7 +97,6 @@ import {
     Document,
     DataAnalysis,
     Notebook,
-    Calendar,
     Setting,
     HomeFilled
 } from '@element-plus/icons-vue'
@@ -186,7 +185,6 @@ const menuList = [
     { name: '课程', icon: Reading },
     { name: '作业', icon: Notebook },
     { name: '考试', icon: Document },
-    { name: '日程', icon: Calendar },
     { name: '计划', icon: DataAnalysis },
     { name: '设置', icon: Setting }
 ]
@@ -251,9 +249,6 @@ function handleMenuClick(menu) {
             break
         case '考试':
             router.push('/student/exam')
-            break
-        case '日程':
-            router.push('/student/schedule')
             break
         case '计划':
             router.push('/student/plan')

@@ -63,13 +63,19 @@
             </div>
             <div class="message-content">
               <div class="message-bubble ai-bubble">
-                <div class="message-text" v-html="formatAIResponse(message.content)"></div>
+                <div class="ai-response-content" v-html="formatAIResponse(message.content)"></div>
               </div>
               <div class="message-meta">
                 <span class="message-time">{{ formatTime(message.timestamp) }}</span>
                 <div class="message-actions">
-                  <el-button text size="small" class="action-btn" @click="copyMessage(message.content)">
+                  <el-button text size="small" class="action-btn" @click="copyMessage(message.content)" title="复制">
                     <el-icon><CopyDocument /></el-icon>
+                  </el-button>
+                  <el-button text size="small" class="action-btn" @click="regenerateResponse(message)" title="重新生成">
+                    <el-icon><Refresh /></el-icon>
+                  </el-button>
+                  <el-button text size="small" class="action-btn" @click="likeMessage()" title="点赞">
+                    <el-icon><Star /></el-icon>
                   </el-button>
                 </div>
               </div>
@@ -149,7 +155,7 @@
 import { ref, onMounted, nextTick, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  ChatDotRound, Loading, Promotion, Delete, More, CopyDocument
+  ChatDotRound, Loading, Promotion, Delete, More, CopyDocument, Refresh, Star
 } from '@element-plus/icons-vue'
 import { studentAssistantAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
@@ -274,12 +280,71 @@ function clearChat() {
 // 复制消息内容
 async function copyMessage(content) {
   try {
-    await navigator.clipboard.writeText(content)
+    // 移除HTML标签，只复制纯文本
+    const textContent = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')
+    await navigator.clipboard.writeText(textContent)
     ElMessage.success('已复制到剪贴板')
   } catch (error) {
     console.error('复制失败:', error)
     ElMessage.error('复制失败')
   }
+}
+
+// 重新生成回答
+async function regenerateResponse(message) {
+  const messageIndex = messages.value.findIndex(msg => msg === message)
+  if (messageIndex === -1) return
+
+  // 找到对应的用户问题
+  let userQuestion = ''
+  for (let i = messageIndex - 1; i >= 0; i--) {
+    if (messages.value[i].type === 'user') {
+      userQuestion = messages.value[i].content
+      break
+    }
+  }
+
+  if (!userQuestion) {
+    ElMessage.error('无法找到对应的问题')
+    return
+  }
+
+  // 移除当前AI回答
+  messages.value.splice(messageIndex, 1)
+
+  // 重新发送请求
+  isLoading.value = true
+  try {
+    const userInfo = getUserInfo()
+    if (!userInfo || !userInfo.studentId) {
+      throw new Error('无法获取学生信息，请重新登录')
+    }
+
+    const askData = { question: userQuestion }
+    if (courseId) {
+      askData.courseId = courseId
+    }
+
+    const response = await studentAssistantAPI.askQuestion(userInfo.studentId, askData)
+
+    if (response && response.answer) {
+      addMessage('ai', response.answer)
+    } else {
+      addMessage('ai', '抱歉，我暂时无法回答这个问题，请稍后再试。')
+    }
+  } catch (error) {
+    console.error('重新生成失败:', error)
+    addMessage('ai', '抱歉，重新生成失败，请稍后再试。')
+    ElMessage.error('重新生成失败')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 点赞消息
+function likeMessage() {
+  ElMessage.success('感谢您的反馈！')
+  // 这里可以添加实际的点赞逻辑，比如发送到后端
 }
 
 // 格式化时间
@@ -290,12 +355,50 @@ function formatTime(timestamp) {
   })
 }
 
-// 格式化AI回复（支持简单的markdown）
+// 格式化AI回复（支持丰富的markdown）
 function formatAIResponse(content) {
-  return content
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+  let formatted = content
+    // 代码块处理
+    .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+      const language = lang || 'text'
+      return `<div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">${language}</span>
+          <button class="copy-code-btn" onclick="copyCode(this)">复制</button>
+        </div>
+        <pre><code class="language-${language}">${code.trim()}</code></pre>
+      </div>`
+    })
+    // 行内代码
+    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+    // 粗体
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="bold-text">$1</strong>')
+    // 斜体
+    .replace(/\*(.*?)\*/g, '<em class="italic-text">$1</em>')
+    // 标题
+    .replace(/^### (.*$)/gm, '<h3 class="ai-heading-3">$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2 class="ai-heading-2">$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1 class="ai-heading-1">$1</h1>')
+    // 列表
+    .replace(/^\* (.*$)/gm, '<li class="ai-list-item">$1</li>')
+    .replace(/^- (.*$)/gm, '<li class="ai-list-item">$1</li>')
+    .replace(/^\d+\. (.*$)/gm, '<li class="ai-ordered-item">$1</li>')
+    // 换行
+    .replace(/\n\n/g, '</p><p class="ai-paragraph">')
     .replace(/\n/g, '<br>')
+
+  // 包装列表项
+  formatted = formatted.replace(/(<li class="ai-list-item">.*?<\/li>)/gs, '<ul class="ai-list">$1</ul>')
+  formatted = formatted.replace(/(<li class="ai-ordered-item">.*?<\/li>)/gs, '<ol class="ai-ordered-list">$1</ol>')
+
+  // 包装段落
+  if (!formatted.includes('<p class="ai-paragraph">')) {
+    formatted = `<p class="ai-paragraph">${formatted}</p>`
+  } else {
+    formatted = `<p class="ai-paragraph">${formatted}</p>`
+  }
+
+  return formatted
 }
 
 // 滚动到底部
@@ -307,7 +410,21 @@ function scrollToBottom() {
 
 // 组件挂载
 onMounted(() => {
-  // 可以在这里添加初始化逻辑
+  // 添加全局copyCode函数
+  window.copyCode = async function(button) {
+    const codeBlock = button.parentElement.nextElementSibling.querySelector('code')
+    if (codeBlock) {
+      try {
+        await navigator.clipboard.writeText(codeBlock.textContent)
+        button.textContent = '已复制'
+        setTimeout(() => {
+          button.textContent = '复制'
+        }, 2000)
+      } catch (error) {
+        console.error('复制代码失败:', error)
+      }
+    }
+  }
 })
 </script>
 
@@ -511,9 +628,12 @@ onMounted(() => {
 }
 
 .ai-bubble {
-  background: #f1f3f4;
-  color: #202124;
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
   border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .loading-bubble {
@@ -524,6 +644,131 @@ onMounted(() => {
 .message-text {
   margin: 0;
   font-size: 14px;
+}
+
+/* AI回答内容样式 */
+.ai-response-content {
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.ai-response-content .ai-paragraph {
+  margin: 0 0 12px 0;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.ai-response-content .ai-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.ai-response-content .bold-text {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ai-response-content .italic-text {
+  font-style: italic;
+  color: #6b7280;
+}
+
+.ai-response-content .ai-heading-1,
+.ai-response-content .ai-heading-2,
+.ai-response-content .ai-heading-3 {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ai-response-content .ai-heading-1 {
+  font-size: 18px;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 4px;
+}
+
+.ai-response-content .ai-heading-2 {
+  font-size: 16px;
+}
+
+.ai-response-content .ai-heading-3 {
+  font-size: 15px;
+}
+
+.ai-response-content .ai-list,
+.ai-response-content .ai-ordered-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.ai-response-content .ai-list-item,
+.ai-response-content .ai-ordered-item {
+  margin: 4px 0;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.ai-response-content .inline-code {
+  background: #f3f4f6;
+  color: #dc2626;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+}
+
+.ai-response-content .code-block {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.ai-response-content .code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 12px;
+}
+
+.ai-response-content .code-lang {
+  color: #64748b;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.ai-response-content .copy-code-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.ai-response-content .copy-code-btn:hover {
+  background: #2563eb;
+}
+
+.ai-response-content pre {
+  margin: 0;
+  padding: 12px;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.ai-response-content code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
 /* 消息元信息 */
