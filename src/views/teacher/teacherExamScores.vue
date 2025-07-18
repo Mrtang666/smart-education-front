@@ -41,6 +41,42 @@
         </div>
       </div>
 
+      <!-- 图表分析区域 -->
+      <div class="charts-section">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <div class="chart-container">
+              <div id="scoreDistributionChart" style="height: 350px;"></div>
+            </div>
+          </el-col>
+          <el-col :span="12">
+            <div class="chart-container">
+              <div id="questionTypeChart" style="height: 350px;"></div>
+            </div>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" style="margin-top: 20px;">
+          <el-col :span="8">
+            <div class="chart-container">
+              <div id="passRateChart" style="height: 300px;"></div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="chart-container">
+              <div id="scoreRangeChart" style="height: 300px;"></div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="chart-container">
+              <div id="completionChart" style="height: 300px;"></div>
+            </div>
+          </el-col>
+        </el-row>
+
+
+      </div>
+
       <div class="scores-container">
         <div class="scores-header">
           <div class="header-left">
@@ -64,26 +100,39 @@
             :data="filteredStudents"
             style="width: 100%"
             v-loading="isLoading"
-            :empty-text="isLoading ? '加载中...' : '暂无考试成绩数据'"
+            :empty-text="isLoading ? '加载中...' : '还没有学生完成作答哦'"
           >
-            <el-table-column prop="studentId" label="学号" width="120" sortable />
-            <el-table-column prop="fullName" label="姓名" width="120" sortable />
-            <el-table-column prop="score" label="分数" width="100" sortable>
+            <el-table-column label="用户名" min-width="120" sortable align="center" header-align="center">
+              <template #default="scope">
+                {{ scope.row.studentId }}
+              </template>
+            </el-table-column>
+            <el-table-column label="姓名" min-width="120" sortable align="center" header-align="center">
+              <template #default="scope">
+                {{ scope.row.fullName }}
+              </template>
+            </el-table-column>
+            <el-table-column label="邮箱" min-width="200" sortable align="center" header-align="center">
+              <template #default="scope">
+                {{ scope.row.email }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="score" label="分数" min-width="100" sortable align="center" header-align="center">
               <template #default="scope">
                 <span :class="getScoreClass(scope.row.score)">{{ scope.row.score || '未参加' }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="submitTime" label="提交时间" width="180" sortable>
+            <el-table-column prop="submitTime" label="提交时间" min-width="180" sortable align="center" header-align="center">
               <template #default="scope">
                 {{ formatDateTime(scope.row.submitTime) || '未提交' }}
               </template>
             </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
+            <el-table-column prop="status" label="状态" min-width="120" align="center" header-align="center">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status || '未知' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" min-width="150" fixed="right" align="center" header-align="center">
               <template #default="scope">
                 <el-button link type="primary" @click="viewStudentDetail(scope.row)" :disabled="!scope.row.score">查看详情</el-button>
               </template>
@@ -128,10 +177,6 @@
               <div class="stat-title">及格率</div>
               <div class="stat-value">{{ passRate }}%</div>
             </div>
-          </div>
-
-          <div class="chart-container" ref="chartContainer">
-            <div id="scoreDistributionChart" style="width: 100%; height: 300px;"></div>
           </div>
         </div>
       </div>
@@ -201,21 +246,35 @@ import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Loading } from '@element-plus/icons-vue'
-import { examAPI } from '@/api/api'
+import { examAPI, courseAPI, courseSelectionAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import * as echarts from 'echarts/core'
-import { BarChart, LineChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components'
+import { BarChart, LineChart, PieChart, RadarChart, ScatterChart } from 'echarts/charts'
+import {
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  TitleComponent,
+  DataZoomComponent,
+  MarkLineComponent,
+  MarkPointComponent
+} from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
 // 注册 ECharts 组件
 echarts.use([
   BarChart,
   LineChart,
+  PieChart,
+  RadarChart,
+  ScatterChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   TitleComponent,
+  DataZoomComponent,
+  MarkLineComponent,
+  MarkPointComponent,
   CanvasRenderer
 ])
 
@@ -223,7 +282,8 @@ const route = useRoute()
 const router = useRouter()
 const examId = route.params.examId
 const examTitle = ref(route.query.title || '考试成绩')
-const courseName = ref(route.query.courseName || '未知课程')
+const courseName = ref(route.query.courseName && route.query.courseName !== '未知课程' ? route.query.courseName : '加载中...')
+const courseId = ref(null) // 存储课程ID
 
 // 学生成绩列表
 const examStudents = ref([])
@@ -249,8 +309,12 @@ const studentAnswers = ref([])
 const isLoadingDetail = ref(false)
 
 // 图表相关
-const chartContainer = ref(null)
-let scoreChart = null
+// const chartContainer = ref(null)
+let scoreDistributionChart = null
+let questionTypeChart = null
+let passRateChart = null
+let scoreRangeChart = null
+let completionChart = null
 
 // 过滤学生列表
 const filteredStudents = computed(() => {
@@ -297,43 +361,184 @@ const passRate = computed(() => {
 async function fetchExamStudents() {
   try {
     isLoading.value = true
+    console.log('开始获取学生数据，courseId:', courseId.value)
 
     // 确保examId是字符串形式
     const examIdStr = examId ? new BigNumber(examId).toString() : examId.toString()
 
-    // 获取考试学生成绩列表（包含完整信息）
-    const response = await examAPI.getExamStudentScores(examIdStr)
-    console.log('获取到的考试学生成绩数据:', response)
+    // 新的逻辑：
+    // 1. 获取课程的所有学生（从courseSelectionAPI）
+    // 2. 获取已作答学生的成绩（从examAPI.getExamStudentScores）
+    // 3. 合并数据，显示完整的学生列表
 
-    if (Array.isArray(response)) {
-      // 确保所有ID都是字符串形式，并处理数据格式
-      examStudents.value = response.map(student => ({
-        ...student,
-        studentId: student.studentId ? new BigNumber(student.studentId).toString() : String(student.studentId),
-        score: student.score || 0,
-        submitTime: student.submitTime || null,
-        status: student.status || '未参加',
-        fullName: student.fullName || student.name || '未知学生'
-      }))
+    let allCourseStudents = []
+    let completedStudentsScores = []
+
+    // 1. 获取课程的所有学生
+    if (courseId.value) {
+      try {
+        console.log('正在获取课程学生列表，courseId:', courseId.value)
+        allCourseStudents = await courseSelectionAPI.getCourseStudents(courseId.value)
+        console.log('获取到的课程学生列表:', allCourseStudents)
+      } catch (error) {
+        console.warn('获取课程学生列表失败:', error)
+        allCourseStudents = []
+      }
     } else {
-      examStudents.value = []
+      console.warn('没有courseId，无法获取课程学生列表')
     }
 
-    // 获取考试统计信息
-    await fetchExamStatistics(examIdStr)
+    // 2. 获取已作答学生的成绩
+    try {
+      console.log('正在获取已作答学生成绩，examId:', examIdStr)
+      completedStudentsScores = await examAPI.getExamStudentScores(examIdStr)
+      console.log('获取到的已作答学生成绩:', completedStudentsScores)
+    } catch (error) {
+      console.warn('获取已作答学生成绩失败:', error)
+      completedStudentsScores = []
+    }
 
-    // 初始化图表
-    nextTick(() => {
-      initScoreChart()
-    })
+    // 3. 合并数据
+    console.log('开始合并数据')
+    await mergeStudentData(allCourseStudents, completedStudentsScores)
+
+    // 4. 如果最终没有学生数据，使用后备方案
+    if (examStudents.value.length === 0 && Array.isArray(completedStudentsScores) && completedStudentsScores.length > 0) {
+      console.log('使用后备方案：只显示已作答学生')
+      examStudents.value = completedStudentsScores.map(student => ({
+        ...student,
+        studentId: String(student.studentId),
+        fullName: student.fullName || student.name || `学生${student.studentId}`,
+        status: student.status || '已完成'
+      }))
+    }
+
+    // 5. 最终检查，确保有数据显示
+    console.log('最终学生数据数量:', examStudents.value.length)
+
+    // 获取考试统计信息和题型分析
+    await Promise.all([
+      fetchExamStatistics(examIdStr),
+      fetchQuestionTypeAnalysis(examIdStr)
+    ])
+
+
+
+    // 初始化图表（确保数据加载完成后再初始化）
+    await nextTick()
+    console.log('数据加载完成，开始初始化图表')
+    initAllCharts()
   } catch (error) {
     console.error('获取考试学生列表失败:', error)
     ElMessage.error('获取考试学生列表失败，请稍后重试')
     examStudents.value = []
+
+    // 即使数据获取失败，也要尝试获取统计信息和题型分析
+    const examIdStr = examId ? new BigNumber(examId).toString() : examId.toString()
+    try {
+      await Promise.all([
+        fetchExamStatistics(examIdStr),
+        fetchQuestionTypeAnalysis(examIdStr)
+      ])
+    } catch (statsError) {
+      console.error('获取统计信息失败:', statsError)
+      // 确保统计信息有默认值
+      calculateStatisticsFromStudentData()
+    }
+
+    // 即使数据获取失败，也要初始化图表显示无数据状态
+    await nextTick()
+    console.log('数据获取失败，但仍要初始化图表显示无数据状态')
+    initAllCharts()
   } finally {
     isLoading.value = false
   }
 }
+
+// 合并学生数据：课程学生列表 + 已作答学生成绩
+async function mergeStudentData(allCourseStudents, completedStudentsScores) {
+  try {
+    console.log('开始合并学生数据')
+    console.log('课程学生数量:', Array.isArray(allCourseStudents) ? allCourseStudents.length : 0)
+    console.log('已作答学生数量:', Array.isArray(completedStudentsScores) ? completedStudentsScores.length : 0)
+
+    // 确保输入参数是数组
+    const courseStudents = Array.isArray(allCourseStudents) ? allCourseStudents : []
+    const scoreStudents = Array.isArray(completedStudentsScores) ? completedStudentsScores : []
+
+    // 创建已作答学生的成绩映射（以studentId为key）
+    const scoresMap = new Map()
+    scoreStudents.forEach(scoreData => {
+      if (scoreData && scoreData.studentId) {
+        const studentId = String(scoreData.studentId)
+        scoresMap.set(studentId, scoreData)
+        console.log('添加成绩映射:', studentId, scoreData)
+      }
+    })
+    console.log('成绩映射表:', scoresMap)
+
+    // 合并数据：以课程学生为基础，添加成绩信息
+    if (courseStudents.length > 0) {
+      console.log('使用课程学生列表作为基础')
+      examStudents.value = courseStudents.map((student, index) => {
+        console.log(`学生${index}原始数据:`, student)
+
+        // 使用数据库ID作为内部标识
+        const internalId = String(student.studentId)
+        const scoreData = scoresMap.get(internalId)
+
+        const result = {
+          // 使用用户名作为学号显示（因为没有真正的学号字段）
+          studentId: student.username || `学生${index + 1}`,
+          // 使用fullName作为姓名
+          fullName: student.fullName || student.username || `学生${index + 1}`,
+          // 邮箱
+          email: student.email || '',
+          // 年级和班级（如果为null则显示为空）
+          grade: student.grade || '未设置',
+          className: student.className || '未设置',
+          // 电话
+          phone: student.phone || '',
+          // 内部ID用于成绩匹配
+          _internalId: internalId,
+          // 成绩相关信息
+          score: scoreData ? scoreData.score : null,
+          submitTime: scoreData ? scoreData.submitTime : null,
+          status: scoreData ? (scoreData.status || '已完成') : '未完成'
+        }
+
+        console.log(`学生${index}处理后数据:`, result)
+        return result
+      })
+    } else if (scoreStudents.length > 0) {
+      console.log('只有已作答学生数据，使用作为基础')
+      // 如果没有课程学生数据，只显示已作答的学生
+      examStudents.value = scoreStudents.map(student => ({
+        ...student,
+        studentId: String(student.studentId),
+        fullName: student.fullName || student.name || `学生${student.studentId}`,
+        status: student.status || '已完成'
+      }))
+    } else {
+      console.log('没有任何学生数据')
+      // 都没有数据
+      examStudents.value = []
+    }
+
+    console.log('合并后的学生数据数量:', examStudents.value.length)
+    console.log('合并后的学生数据:', examStudents.value)
+
+    // 强制触发响应式更新
+    nextTick(() => {
+      console.log('强制更新表格数据')
+    })
+  } catch (error) {
+    console.error('合并学生数据失败:', error)
+    examStudents.value = []
+  }
+}
+
+
 
 // 获取考试统计信息
 async function fetchExamStatistics(examIdStr) {
@@ -344,10 +549,47 @@ async function fetchExamStatistics(examIdStr) {
     // 可以将统计信息存储到响应式变量中，用于显示
     examStatistics.value = statistics
   } catch (error) {
-    console.error('获取考试统计信息失败:', error)
-    // 统计信息获取失败不影响主要功能，只记录错误
+    console.warn('getExamStatistics API不存在，使用计算的统计信息:', error)
+    // 基于学生成绩数据计算统计信息
+    calculateStatisticsFromStudentData()
   }
 }
+
+// 基于学生数据计算统计信息
+function calculateStatisticsFromStudentData() {
+  const completedStudents = examStudents.value.filter(s => s.status === '已完成' && s.score !== undefined && s.score !== null)
+  const scores = completedStudents.map(s => s.score)
+
+  examStatistics.value = {
+    totalStudents: examStudents.value.length,
+    submittedStudents: completedStudents.length,
+    averageScore: scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : 0,
+    maxScore: scores.length > 0 ? Math.max(...scores) : 0,
+    minScore: scores.length > 0 ? Math.min(...scores) : 0,
+    scoreDistribution: []
+  }
+}
+
+// 获取题型分析数据
+const questionTypeData = ref([])
+async function fetchQuestionTypeAnalysis(examIdStr) {
+  try {
+    const analysis = await examAPI.getExamQuestionTypeAnalysis(examIdStr)
+    console.log('获取到的题型分析数据:', analysis)
+
+    if (Array.isArray(analysis)) {
+      questionTypeData.value = analysis
+    } else {
+      questionTypeData.value = []
+    }
+  } catch (error) {
+    console.warn('获取题型分析失败，后端可能没有实现此接口:', error)
+    questionTypeData.value = []
+    // 不显示错误消息，因为这个接口可能后端没有实现
+  }
+}
+
+
 
 // 查看学生详情
 async function viewStudentDetail(student) {
@@ -393,19 +635,29 @@ async function viewStudentDetail(student) {
 }
 
 // 初始化成绩分布图表
-function initScoreChart() {
-  if (!chartContainer.value) return
-  
+function initScoreDistributionChart() {
+  console.log('初始化成绩分布图表')
   const chartDom = document.getElementById('scoreDistributionChart')
-  if (!chartDom) return
-  
-  // 如果已经初始化过，先销毁
-  if (scoreChart) {
-    scoreChart.dispose()
+  if (!chartDom) {
+    console.error('找不到scoreDistributionChart DOM元素')
+    return
   }
-  
-  scoreChart = echarts.init(chartDom)
-  
+  // 如果已经初始化过，先销毁
+  if (scoreDistributionChart) {
+    scoreDistributionChart.dispose()
+  }
+  scoreDistributionChart = echarts.init(chartDom)
+  // 检查是否有学生数据
+  const validStudents = examStudents.value.filter(s =>
+    s.score !== undefined && s.score !== null && typeof s.score === 'number'
+  )
+  console.log('有效学生数据数量:', validStudents.length)
+  if (validStudents.length === 0) {
+    // 显示无数据状态
+    console.log('显示成绩分布无数据状态')
+    scoreDistributionChart.setOption(createNoDataOption('分数分布', '暂时没有学生完成'))
+    return
+  }
   // 计算成绩分布
   const scoreRanges = [
     { min: 0, max: 59, label: '0-59分' },
@@ -414,22 +666,17 @@ function initScoreChart() {
     { min: 80, max: 89, label: '80-89分' },
     { min: 90, max: 100, label: '90-100分' }
   ]
-  
   const distribution = scoreRanges.map(range => {
     return {
       range: range.label,
-      count: examStudents.value.filter(s => 
-        s.score !== undefined && 
-        s.score !== null && 
-        s.score >= range.min && 
-        s.score <= range.max
+      count: validStudents.filter(s =>
+        s.score >= range.min && s.score <= range.max
       ).length
     }
   })
-  
   const option = {
     title: {
-      text: '成绩分布',
+      text: '分数分布',
       left: 'center'
     },
     tooltip: {
@@ -470,14 +717,396 @@ function initScoreChart() {
       }
     ]
   }
-  
-  scoreChart.setOption(option)
-  
+  scoreDistributionChart.setOption(option)
   // 响应窗口大小变化
   window.addEventListener('resize', () => {
-    if (scoreChart) {
-      scoreChart.resize()
+    if (scoreDistributionChart) {
+      scoreDistributionChart.resize()
     }
+  })
+}
+
+// 初始化题型得分分析图表
+function initQuestionTypeChart() {
+  console.log('初始化题型得分分析图表')
+  const chartDom = document.getElementById('questionTypeChart')
+  if (!chartDom) {
+    console.error('找不到questionTypeChart DOM元素')
+    return
+  }
+
+  if (questionTypeChart) {
+    questionTypeChart.dispose()
+  }
+
+  questionTypeChart = echarts.init(chartDom)
+
+  // 检查是否有题型数据
+  console.log('题型数据:', questionTypeData.value)
+  if (!questionTypeData.value || questionTypeData.value.length === 0) {
+    // 显示无数据状态
+    console.log('显示题型分析无数据状态')
+    questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有学生完成'))
+    return
+  }
+
+  // 使用真实的题型数据
+  const questionTypes = questionTypeData.value.map(item => ({
+    type: item.questionType || '未知题型',
+    totalScore: item.totalScore || 0,
+    avgScore: item.averageScore || 0
+  }))
+
+  const option = {
+    title: {
+      text: '题型得分分析',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    legend: {
+      data: ['总分', '平均得分'],
+      top: 30
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '15%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: questionTypes.map(item => item.type)
+    },
+    yAxis: {
+      type: 'value',
+      name: '分数'
+    },
+    series: [
+      {
+        name: '总分',
+        type: 'bar',
+        data: questionTypes.map(item => item.totalScore),
+        itemStyle: {
+          color: '#E6A23C'
+        }
+      },
+      {
+        name: '平均得分',
+        type: 'bar',
+        data: questionTypes.map(item => item.avgScore),
+        itemStyle: {
+          color: '#67C23A'
+        }
+      }
+    ]
+  }
+
+  questionTypeChart.setOption(option)
+}
+
+// 初始化及格率统计图表
+function initPassRateChart() {
+  console.log('初始化及格率统计图表')
+  const chartDom = document.getElementById('passRateChart')
+  if (!chartDom) {
+    console.error('找不到passRateChart DOM元素')
+    return
+  }
+
+  if (passRateChart) {
+    passRateChart.dispose()
+  }
+
+  passRateChart = echarts.init(chartDom)
+
+  // 检查是否有有效的成绩数据
+  const validStudents = examStudents.value.filter(s =>
+    s.score !== undefined && s.score !== null && typeof s.score === 'number'
+  )
+
+  console.log('及格率图表有效学生数据数量:', validStudents.length)
+
+  if (validStudents.length === 0) {
+    // 显示无数据状态
+    console.log('显示及格率无数据状态')
+    passRateChart.setOption(createNoDataOption('及格率统计', '暂时没有学生完成'))
+    return
+  }
+
+  const passCount = validStudents.filter(s => s.score >= 60).length
+  const failCount = validStudents.filter(s => s.score < 60).length
+
+  const option = {
+    title: {
+      text: '及格率统计',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c} ({d}%)'
+    },
+    legend: {
+      orient: 'vertical',
+      left: 'left',
+      top: 'middle'
+    },
+    series: [
+      {
+        name: '及格情况',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['60%', '50%'],
+        data: [
+          { value: passCount, name: '及格', itemStyle: { color: '#67C23A' } },
+          { value: failCount, name: '不及格', itemStyle: { color: '#F56C6C' } }
+        ],
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        label: {
+          show: true,
+          formatter: '{b}: {c}人\n({d}%)'
+        }
+      }
+    ]
+  }
+
+  passRateChart.setOption(option)
+}
+
+// 初始化分数段分布图表
+function initScoreRangeChart() {
+  console.log('初始化分数段分布图表')
+  const chartDom = document.getElementById('scoreRangeChart')
+  if (!chartDom) {
+    console.error('找不到scoreRangeChart DOM元素')
+    return
+  }
+
+  if (scoreRangeChart) {
+    scoreRangeChart.dispose()
+  }
+
+  scoreRangeChart = echarts.init(chartDom)
+
+  // 检查是否有有效的成绩数据
+  const validStudents = examStudents.value.filter(s =>
+    s.score !== undefined && s.score !== null && typeof s.score === 'number'
+  )
+
+  console.log('分数段图表有效学生数据数量:', validStudents.length)
+
+  if (validStudents.length === 0) {
+    // 显示无数据状态
+    console.log('显示分数段分布无数据状态')
+    scoreRangeChart.setOption(createNoDataOption('分数段分布', '暂时没有学生完成'))
+    return
+  }
+
+  const ranges = [
+    { name: '优秀(90-100)', min: 90, max: 100, color: '#9B59B6' },
+    { name: '良好(80-89)', min: 80, max: 89, color: '#409EFF' },
+    { name: '中等(70-79)', min: 70, max: 79, color: '#67C23A' },
+    { name: '及格(60-69)', min: 60, max: 69, color: '#E6A23C' },
+    { name: '不及格(0-59)', min: 0, max: 59, color: '#F56C6C' }
+  ]
+
+  const data = ranges.map(range => ({
+    name: range.name,
+    value: validStudents.filter(s =>
+      s.score >= range.min && s.score <= range.max
+    ).length,
+    itemStyle: { color: range.color }
+  }))
+
+  const option = {
+    title: {
+      text: '分数段分布',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c}人 ({d}%)'
+    },
+    series: [
+      {
+        name: '分数段',
+        type: 'pie',
+        radius: '60%',
+        center: ['50%', '50%'],
+        data: data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        label: {
+          show: true,
+          formatter: '{b}\n{c}人'
+        }
+      }
+    ]
+  }
+
+  scoreRangeChart.setOption(option)
+}
+
+// 初始化答题完成度图表
+function initCompletionChart() {
+  console.log('初始化答题完成度图表')
+  const chartDom = document.getElementById('completionChart')
+  if (!chartDom) {
+    console.error('找不到completionChart DOM元素')
+    return
+  }
+
+  if (completionChart) {
+    completionChart.dispose()
+  }
+
+  completionChart = echarts.init(chartDom)
+
+  // 检查是否有学生数据
+  console.log('答题完成度图表学生数据数量:', examStudents.value ? examStudents.value.length : 0)
+  if (!examStudents.value || examStudents.value.length === 0) {
+    // 显示无数据状态
+    console.log('显示答题完成度无数据状态')
+    completionChart.setOption(createNoDataOption('答题完成度', '暂时没有学生完成'))
+    return
+  }
+
+  const completedCount = examStudents.value.filter(s => s.status === '已完成').length
+  const incompleteCount = examStudents.value.length - completedCount
+
+  const option = {
+    title: {
+      text: '答题完成度',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c}人 ({d}%)'
+    },
+    series: [
+      {
+        name: '完成情况',
+        type: 'pie',
+        radius: '70%',
+        center: ['50%', '50%'],
+        data: [
+          {
+            value: completedCount,
+            name: '已完成',
+            itemStyle: { color: '#67C23A' }
+          },
+          {
+            value: incompleteCount,
+            name: '未完成',
+            itemStyle: { color: '#F56C6C' }
+          }
+        ],
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        label: {
+          show: true,
+          formatter: '{b}\n{c}人\n{d}%'
+        }
+      }
+    ]
+  }
+
+  completionChart.setOption(option)
+}
+
+
+
+// 创建无数据图表配置的通用函数
+function createNoDataOption(title, message = '暂时没有学生完成') {
+  return {
+    title: {
+      text: title,
+      left: 'center',
+      top: '20px',
+      textStyle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#bbb'
+      }
+    },
+    graphic: [
+      {
+        type: 'group',
+        left: 'center',
+        top: 'middle',
+        children: [
+          {
+            type: 'text',
+            style: {
+              text: '🧐',
+              fontSize: 60,
+              fill: '#e0e0e0',
+              textAlign: 'center'
+            },
+            top: -30
+          },
+          {
+            type: 'text',
+            style: {
+              text: message,
+              fontSize: 20,
+              fill: '#bbb',
+              textAlign: 'center',
+              fontWeight: 'bold'
+            },
+            top: 40
+          }
+        ]
+      }
+    ],
+    backgroundColor: '#fafbfc'
+  }
+}
+
+// 统一初始化所有图表
+function initAllCharts() {
+  console.log('开始初始化所有图表，学生数据数量:', examStudents.value.length)
+  // 确保DOM元素存在后再初始化图表
+  nextTick(() => {
+    try {
+      initScoreDistributionChart()
+      initQuestionTypeChart()
+      initPassRateChart()
+      initScoreRangeChart()
+      initCompletionChart()
+      console.log('所有图表初始化完成')
+    } catch (error) {
+      console.error('图表初始化失败:', error)
+    }
+  })
+  // 响应窗口大小变化
+  window.addEventListener('resize', () => {
+    if (scoreDistributionChart) scoreDistributionChart.resize()
+    if (questionTypeChart) questionTypeChart.resize()
+    if (passRateChart) passRateChart.resize()
+    if (scoreRangeChart) scoreRangeChart.resize()
+    if (completionChart) completionChart.resize()
   })
 }
 
@@ -548,30 +1177,67 @@ async function fetchExamInfo() {
 
     if (examInfo) {
       examTitle.value = examInfo.title || route.query.title || '考试成绩'
-      // 如果有课程信息，可以更新课程名称
-      if (examInfo.courseId && !route.query.courseName) {
-        // 这里可以调用courseAPI获取课程名称，但为了简化，暂时使用现有逻辑
+
+      // 保存课程ID
+      if (examInfo.courseId) {
+        courseId.value = examInfo.courseId
+      }
+
+      // 更新课程名称
+      if (examInfo.courseName) {
+        courseName.value = examInfo.courseName
+      } else if (examInfo.courseTitle) {
+        courseName.value = examInfo.courseTitle
+      } else if (examInfo.course && examInfo.course.name) {
+        courseName.value = examInfo.course.name
+      } else if (examInfo.course && examInfo.course.courseName) {
+        courseName.value = examInfo.course.courseName
+      } else if (route.query.courseName && route.query.courseName !== '未知课程') {
+        courseName.value = route.query.courseName
+      } else if (examInfo.courseId) {
+        // 如果有课程ID但没有课程名称，尝试获取课程信息
+        try {
+          const courseInfo = await courseAPI.getCourseById(examInfo.courseId)
+          if (courseInfo && (courseInfo.courseName || courseInfo.name)) {
+            courseName.value = courseInfo.courseName || courseInfo.name
+          }
+        } catch (courseError) {
+          console.warn('获取课程信息失败:', courseError)
+          // 保持默认的课程名称
+        }
+      }
+
+      // 最终检查，如果课程名称仍然是加载中或未知课程，设置一个默认值
+      if (courseName.value === '加载中...' || courseName.value === '未知课程') {
+        courseName.value = '智慧教育课程'
       }
     }
   } catch (error) {
-    console.error('获取考试信息失败:', error)
-    // 获取考试信息失败不影响主要功能，使用默认值
+    console.warn('getExamById API调用失败，使用路由参数:', error)
+    // 获取考试信息失败不影响主要功能，使用路由参数的默认值
+    examTitle.value = route.query.title || '考试成绩'
+    if (route.query.courseName && route.query.courseName !== '未知课程') {
+      courseName.value = route.query.courseName
+    } else {
+      courseName.value = '智慧教育课程'
+    }
   }
 }
 
 // 组件挂载时获取数据
 onMounted(async () => {
+  console.log('页面加载，开始获取考试数据')
+  console.log('考试ID:', examId)
+
   if (!examId) {
     ElMessage.error('考试ID不存在')
     goBack()
     return
   }
 
-  // 并行获取考试信息和学生成绩
-  await Promise.all([
-    fetchExamInfo(),
-    fetchExamStudents()
-  ])
+  // 先获取考试信息（包含courseId），再获取学生成绩
+  await fetchExamInfo()
+  await fetchExamStudents()
 })
 </script>
 
@@ -673,6 +1339,15 @@ onMounted(async () => {
   width: 100%;
 }
 
+.scores-body .el-table {
+  width: 100% !important;
+}
+
+.scores-body .el-table__header-wrapper,
+.scores-body .el-table__body-wrapper {
+  width: 100% !important;
+}
+
 .pagination-container {
   margin-top: 20px;
   display: flex;
@@ -738,6 +1413,59 @@ onMounted(async () => {
   padding: 20px;
   margin-bottom: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* 图表区域样式 */
+.charts-section {
+  margin-bottom: 20px;
+}
+
+.chart-container {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  height: 100%;
+}
+
+.chart-header {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 图表无数据状态样式 */
+.chart-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 16px;
+}
+
+.chart-no-data-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #ddd;
+}
+
+.chart-no-data-text {
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.chart-no-data-desc {
+  font-size: 14px;
+  color: #bbb;
 }
 
 .stat-title {
@@ -892,5 +1620,22 @@ onMounted(async () => {
 .score-excellent {
   color: #9B59B6;
   font-weight: bold;
+}
+
+/* 表格对齐样式 */
+:deep(.el-table .el-table__header-wrapper) {
+  text-align: center;
+}
+
+:deep(.el-table .el-table__body-wrapper) {
+  text-align: center;
+}
+
+:deep(.el-table th) {
+  text-align: center !important;
+}
+
+:deep(.el-table td) {
+  text-align: center !important;
 }
 </style> 
