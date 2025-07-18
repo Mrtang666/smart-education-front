@@ -11,6 +11,7 @@
  * - attendanceAPI: 获取课程考勤
  */ -->
  <!-- 学生端课程文档的下载接口有问题，待完善 -->
+  <!-- 学生端AI功能页面待写 -->
 <template>
   <div class="course-detail-container">
     <!-- 左侧导航栏 -->
@@ -46,6 +47,11 @@
       <div class="nav-item" :class="{ active: activeSection === 'document' }" @click="setActiveSection('document')">
         <i class="el-icon-document"></i>
         <span>文档</span>
+      </div>
+
+      <div class="nav-item" :class="{ active: activeSection === 'ai-assistant' }" @click="setActiveSection('ai-assistant')">
+        <i class="el-icon-chat-dot-round"></i>
+        <span>AI助手</span>
       </div>
     </div>
     
@@ -305,7 +311,7 @@
               />
             </div>
           </div>
-          
+
           <el-skeleton :loading="documentLoading" animated :rows="3">
             <template #default>
               <el-empty v-if="filteredDocuments.length === 0" description="暂无课程文档"></el-empty>
@@ -327,6 +333,11 @@
             </template>
           </el-skeleton>
         </div>
+
+        <!-- AI助手部分 -->
+        <div v-if="activeSection === 'ai-assistant'" class="ai-assistant-content">
+          <AIAssistant />
+        </div>
       </div>
     </div>
   </div>
@@ -335,9 +346,13 @@
 <script>
 import { knowledgeAPI, examAPI, attendanceAPI, docAPI } from '@/api/api';
 import { getUserInfo } from '@/utils/auth';
+import AIAssistant from '@/components/student/AIAssistant.vue';
 
 export default {
   name: 'StudentCourseDetail',
+  components: {
+    AIAssistant
+  },
   data() {
     return {
       courseId: null,
@@ -1167,6 +1182,12 @@ export default {
       
       return iconMap[extension] || 'el-icon-document';
     },
+  },
+  provide() {
+    return {
+      courseId: this.courseId,
+      courseName: this.courseName
+    }
   }
 }
 </script>
@@ -1714,5 +1735,11 @@ export default {
 
 .attendance-leave-row {
   background-color: #f9f0f0; /* 请假行背景 */
+}
+
+/* AI助手区样式 */
+.ai-assistant-content {
+  height: calc(100vh - 120px);
+  overflow: hidden;
 }
 </style>

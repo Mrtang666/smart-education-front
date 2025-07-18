@@ -42,12 +42,19 @@
                         <Close />
                     </el-icon>
                 </div>
-                <div class="ai-chat-body">
+                <div class="ai-chat-body" ref="chatBodyRef">
                     <div class="chat-message" v-for="(msg, idx) in chatMessages" :key="idx"
-                        :class="{ 'chat-message-user': msg.role === 'user', 'chat-message-ai': msg.role === 'ai' }">
+                        :class="{ 'chat-message-user': msg.role === 'user', 'chat-message-ai': msg.role === 'assistant' }">
                         <div class="chat-message-content">
-                            <span v-if="msg.role === 'ai'" class="chat-role">AI：</span>
+                            <span v-if="msg.role === 'assistant'" class="chat-role">AI：</span>
                             <span>{{ msg.content }}</span>
+                        </div>
+                    </div>
+                    <!-- 加载状态 -->
+                    <div v-if="isChatLoading" class="chat-message chat-message-ai">
+                        <div class="chat-message-content">
+                            <span class="chat-role">AI：</span>
+                            <span class="typing-indicator">正在思考中...</span>
                         </div>
                     </div>
                 </div>
@@ -78,7 +85,7 @@
 
 <script setup>
 import { getValidToken } from '@/utils/auth'
-import { ref, onUnmounted, provide, onMounted } from 'vue'
+import { ref, onUnmounted, provide, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElLoading } from 'element-plus'
 import AppHeader from '@/components/common/AppHeader.vue'
 import { useRouter } from 'vue-router'
@@ -95,7 +102,7 @@ import {
     HomeFilled
 } from '@element-plus/icons-vue'
 import { getUserInfo, clearAuth } from '@/utils/auth'
-import { courseSelectionAPI } from '@/api/api'
+import { courseSelectionAPI, studentAssistantAPI } from '@/api/api'
 
 const router = useRouter()
 const logoUrl = ref('@/assets/projectlogo.png') // 项目logo
@@ -105,8 +112,9 @@ const showAIChat = ref(false)
 const chatInput = ref('')
 const searchValue = ref('') // 搜索框的值
 const chatMessages = ref([
-    { role: 'ai', content: '你好，我是你的学习助手，有什么可以帮你？' }
+    { role: 'assistant', content: '你好，我是你的学习助手，有什么可以帮你？' }
 ])
+const isChatLoading = ref(false) // 聊天加载状态
 
 // 对话框宽度相关
 const chatWidth = ref(400) // 初始宽度
@@ -118,6 +126,9 @@ const startWidth = ref(0)
 
 // 用户信息相关状态
 const userInfo = ref(null)
+
+// 聊天体引用
+const chatBodyRef = ref(null)
 const isLoading = ref(true)
 
 // 提供用户信息给子组件
@@ -202,6 +213,12 @@ onMounted(() => {
     }
 })
 
+// 监听聊天框打开状态，打开时滚动到底部
+watch(showAIChat, (newValue) => {
+    if (newValue) {
+        scrollToBottom()
+    }
+})
 
 // 设置活动菜单的方法，供子组件调用
 const setActiveMenu = (menuName) => {
@@ -276,6 +293,15 @@ function handleAvatarChange(newAvatarUrl) {
     ElMessage.success('头像更新成功')
 }
 
+// 滚动到聊天底部
+function scrollToBottom() {
+    nextTick(() => {
+        if (chatBodyRef.value) {
+            chatBodyRef.value.scrollTop = chatBodyRef.value.scrollHeight
+        }
+    })
+}
+
 // 建议点击函数
 function suggestClick(suggest) {
     chatInput.value = suggest
@@ -293,15 +319,90 @@ function handleSearch(value) {
     // 这里可以添加实际的搜索逻辑
 }
 
-function sendChat() {
+async function sendChat() {
     if (!chatInput.value.trim()) return
-    const userMessage = chatInput.value
-    chatMessages.value.push({ role: 'user', content: userMessage })
-    // todo 这里接入AI接口，暂用模拟回复
-    setTimeout(() => {
-        chatMessages.value.push({ role: 'ai', content: '我已收到您的问题：' + userMessage + '。正在为您思考最佳答案...' })
-    }, 500)
+
+    const userMessage = chatInput.value.trim()
     chatInput.value = ''
+
+    // 添加用户消息到聊天记录
+    chatMessages.value.push({ role: 'user', content: userMessage })
+
+    // 滚动到底部
+    scrollToBottom()
+
+    // 设置加载状态
+    isChatLoading.value = true
+
+    try {
+        // 获取学生信息
+        const studentInfo = getUserInfo()
+        if (!studentInfo || !studentInfo.studentId || studentInfo.studentId === 'default-student-id') {
+            throw new Error('无法获取学生信息，请重新登录')
+        }
+
+        // 准备历史消息数据
+        const historyData = {
+            messages: chatMessages.value.map(msg => ({
+                role: msg.role,
+                content: msg.content
+            })),
+            valid: true
+        }
+
+        // 调用带历史的问答接口
+        const response = await studentAssistantAPI.askWithHistory(studentInfo.studentId, historyData)
+
+        // 添加AI回复到聊天记录
+        if (response && response.answer) {
+            chatMessages.value.push({
+                role: 'assistant',
+                content: response.answer
+            })
+            // 滚动到底部显示新消息
+            scrollToBottom()
+        } else {
+            throw new Error('AI回复格式错误')
+        }
+
+    } catch (error) {
+        console.error('AI聊天失败:', error)
+
+        // 根据错误类型提供不同的处理
+        let errorMessage = 'AI聊天服务暂时不可用'
+        let fallbackResponse = '抱歉，我现在无法回答您的问题。请稍后再试。'
+
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+            errorMessage = 'AI响应超时，请稍后重试'
+            fallbackResponse = '您的问题我收到了，但由于网络或服务繁忙，响应时间较长。请稍后重试，或者尝试简化您的问题。'
+        } else if (error.response?.status === 401) {
+            errorMessage = '登录已过期，请重新登录'
+            fallbackResponse = '您的登录状态已过期，请重新登录后继续使用AI助手。'
+        } else if (error.response?.status >= 500) {
+            errorMessage = '服务器暂时不可用'
+            fallbackResponse = '服务器正在维护中，请稍后再试。如果问题持续存在，请联系管理员。'
+        }
+
+        try {
+            // 添加友好的错误回复
+            chatMessages.value.push({
+                role: 'assistant',
+                content: fallbackResponse
+            })
+
+            // 滚动到底部
+            scrollToBottom()
+
+        } catch (fallbackError) {
+            console.error('添加错误回复失败:', fallbackError)
+        }
+
+        // 显示错误提示
+        ElMessage.error(errorMessage)
+    } finally {
+        // 关闭加载状态
+        isChatLoading.value = false
+    }
 }
 
 // 添加fetchStudentData函数实现
@@ -311,13 +412,14 @@ function fetchStudentData() {
     // 从localStorage获取学生信息
     const userInfo = getUserInfo();
 
-    // 如果没有用户信息，可以考虑重定向到登录页
-    if (!userInfo) {
-        console.warn('未找到用户信息，可能需要重新登录')
+    // 如果没有真实的用户信息（返回的是默认对象），可以考虑重定向到登录页
+    if (!userInfo || userInfo.studentId === 'default-student-id') {
+        console.warn('未找到真实用户信息，可能需要重新登录')
         // 清除localhost，退出登陆
         clearAuth();
         // 重定向到登录页
         router.push('/login')
+        return null
     }
 
     return userInfo
@@ -339,8 +441,8 @@ function handleJoinCourse(code) {
         background: 'rgba(0, 0, 0, 0.7)'
     })
     
-    // 调用API加入课程
-    courseSelectionAPI.selectCourse(userInfo.value.studentId, code)
+    // 调用API通过邀请码加入课程
+    courseSelectionAPI.joinByInviteCode(userInfo.value.studentId, code)
         .then(response => {
             loading.close()
             ElMessage.success('成功加入课程!')
@@ -711,6 +813,17 @@ function handleJoinCourse(code) {
     font-weight: bold;
     margin-right: 4px;
     color: #409eff;
+}
+
+.typing-indicator {
+    color: #909399;
+    font-style: italic;
+    animation: typing 1.5s infinite;
+}
+
+@keyframes typing {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.5; }
 }
 
 .chat-input-row {
