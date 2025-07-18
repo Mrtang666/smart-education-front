@@ -291,7 +291,7 @@ import {
   Refresh
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { teachingAssistantAPI, courseSelectionAPI } from '@/api/api'
+import { studentAssistantAPI, courseSelectionAPI } from '@/api/api'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -473,7 +473,7 @@ async function analyzeCourseProgress(student) {
     let response;
     try {
       // 尝试调用真实API
-      response = await teachingAssistantAPI.analyzeStudentCourseProgress(props.courseId, student.studentId);
+      response = await studentAssistantAPI.analyzeStudentCourseProgress(props.courseId, student.studentId);
       console.log('API分析结果:', response);
     } catch (apiError) {
       console.warn('API调用失败，使用模拟数据:', apiError);

@@ -409,7 +409,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Edit, Document } from '@element-plus/icons-vue'
 // 题目模块相关导入已注释：watch, nextTick, onUnmounted, ElMessageBox, Plus, DocumentRemove, Delete, echarts
-import { knowledgeAPI, teachingAssistantAPI } from '@/api/api'
+import { knowledgeAPI, studentAssistantAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -936,7 +936,7 @@ async function generateTeachingPlan() {
       try {
         console.log('生成教学方案，数据:', generateForm.value)
 
-        const response = await teachingAssistantAPI.generateLesson(generateForm.value)
+        const response = await studentAssistantAPI.generateLesson(generateForm.value)
         console.log('生成教学方案响应:', response)
 
         // 灵活处理响应格式，支持多种可能的字段名
@@ -988,7 +988,7 @@ async function improveTeachingPlan() {
       try {
         console.log('改进教学方案，数据:', improveForm.value)
 
-        const response = await teachingAssistantAPI.improveLesson(improveForm.value)
+        const response = await studentAssistantAPI.improveLesson(improveForm.value)
         console.log('改进教学方案响应:', response)
 
         // 灵活处理响应格式，支持多种可能的字段名

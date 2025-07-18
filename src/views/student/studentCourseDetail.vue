@@ -1,17 +1,16 @@
 <!-- /**
  * 学生首页组件
  * 
- * 该组件展示学生在该课程中的学习进度，课程知识点总览，课程考试和作业和课程考勤
+ * 该组件展示学生在该课程中的知识点总览，课程考试和作业和课程考勤
  * 所有数据均通过后端API获取，不使用模拟数据
  * 
  * API依赖:
- * - learningProgressAPI: 获取学生学习进度
+
  * - knowledgeAPI: 获取课程知识点总览
  * - examAPI: 获取课程考试和作业
  * - attendanceAPI: 获取课程考勤
  */ -->
  <!-- 学生端课程文档的下载接口有问题，待完善 -->
-  <!-- 学生端AI功能页面待写 -->
 <template>
   <div class="course-detail-container">
     <!-- 左侧导航栏 -->
@@ -48,11 +47,6 @@
         <i class="el-icon-document"></i>
         <span>文档</span>
       </div>
-
-      <div class="nav-item" :class="{ active: activeSection === 'ai-assistant' }" @click="setActiveSection('ai-assistant')">
-        <i class="el-icon-chat-dot-round"></i>
-        <span>AI助手</span>
-      </div>
     </div>
     
     <!-- 右侧内容区 -->
@@ -71,24 +65,6 @@
       <div class="section-content">
         <!-- 知识点部分 -->
         <div v-if="activeSection === 'knowledge'" class="knowledge-content">
-          <!-- 课程进度显示 -->
-          <div class="course-progress-section" v-loading="progressLoading">
-            <div class="progress-header">
-              <h3>课程学习进度</h3>
-              <div class="progress-stats">
-                <span class="progress-text">
-                  {{ courseProgress.completedKnowledge }} / {{ courseProgress.totalKnowledge }} 个知识点已完成
-                </span>
-                <span class="progress-percentage">{{ courseProgress.progressPercentage }}%</span>
-              </div>
-            </div>
-            <el-progress
-              :percentage="courseProgress.progressPercentage"
-              :stroke-width="12"
-              :show-text="false"
-              class="course-progress-bar"
-            />
-          </div>
 
           <el-skeleton :loading="knowledgePointsLoading" animated>
             <template #template>
@@ -119,19 +95,6 @@
                   <div class="knowledge-card-content">
                     <h4 class="knowledge-card-title">{{ point.name }}</h4>
                     <p class="knowledge-card-desc">{{ point.description || '暂无描述' }}</p>
-                    <!-- 学习进度显示 -->
-                    <div class="knowledge-progress" v-if="getKnowledgeProgress(point.id)">
-                      <div class="progress-info">
-                        <span class="progress-label">掌握程度:</span>
-                        <span class="progress-score">{{ getKnowledgeProgress(point.id).masteryLevel || 0 }}%</span>
-                      </div>
-                      <el-progress
-                        :percentage="getKnowledgeProgress(point.id).masteryLevel || 0"
-                        :stroke-width="6"
-                        :show-text="false"
-                        size="small"
-                      />
-                    </div>
                   </div>
                   <div class="knowledge-card-footer">
                     <el-button
@@ -422,7 +385,7 @@
               />
             </div>
           </div>
-
+          
           <el-skeleton :loading="documentLoading" animated :rows="3">
             <template #default>
               <el-empty v-if="filteredDocuments.length === 0" description="暂无课程文档"></el-empty>
@@ -444,26 +407,17 @@
             </template>
           </el-skeleton>
         </div>
-
-        <!-- AI助手部分 -->
-        <div v-if="activeSection === 'ai-assistant'" class="ai-assistant-content">
-          <AIAssistant />
-        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { knowledgeAPI, examAPI, attendanceAPI, docAPI, learningProgressAPI, assignmentAPI } from '@/api/api';
+import { knowledgeAPI, examAPI, attendanceAPI, docAPI, assignmentAPI } from '@/api/api';
 import { getUserInfo } from '@/utils/auth';
-import AIAssistant from '@/components/student/AIAssistant.vue';
 
 export default {
   name: 'StudentCourseDetail',
-  components: {
-    AIAssistant
-  },
   data() {
     return {
       courseId: null,
@@ -516,15 +470,6 @@ export default {
       documents: [],
       documentLoading: false,
       documentSearchKeyword: '',
-
-      // 学习进度数据
-      courseProgress: {
-        totalKnowledge: 0,
-        completedKnowledge: 0,
-        progressPercentage: 0
-      },
-      knowledgeProgressMap: new Map(), // 存储每个知识点的学习进度
-      progressLoading: false,
     }
   },
   computed: {
@@ -650,10 +595,7 @@ export default {
       });
     },
 
-    // 获取知识点学习进度
-    getKnowledgeProgress(knowledgeId) {
-      return this.knowledgeProgressMap.get(knowledgeId);
-    },
+
 
     // 标记知识点为已完成
     async markAsCompleted(point) {
@@ -667,43 +609,9 @@ export default {
           return;
         }
 
-        try {
-          // 尝试调用API更新掌握程度为100%
-          await learningProgressAPI.updateMasteryLevel(
-            userInfo.studentId,
-            point.knowledgeId || point.id,
-            100
-          );
-
-          console.log('学习进度已成功保存到数据库');
-          this.$message.success('知识点已标记为完成！');
-
-        } catch (apiError) {
-          console.warn('API保存学习进度失败，使用本地模式:', apiError);
-
-          if (apiError.response && apiError.response.status === 404) {
-            console.log('学习进度API接口暂不可用，使用本地存储模式');
-            this.$message.success('知识点已标记为完成！（本地保存）');
-          } else {
-            console.log('使用本地存储作为备用方案');
-            this.$message.success('知识点已标记为完成！（本地保存）');
-          }
-        }
-
-        // 无论API调用是否成功，都更新本地状态
+        // 更新本地状态
         point.completed = true;
-
-        // 更新进度映射
-        const currentProgress = this.knowledgeProgressMap.get(point.knowledgeId || point.id) || {};
-        this.knowledgeProgressMap.set(point.knowledgeId || point.id, {
-          ...currentProgress,
-          masteryLevel: 100,
-          mastered: true,
-          learningStatus: 'completed'
-        });
-
-        // 重新计算课程进度
-        this.updateCourseProgress();
+        this.$message.success('知识点已标记为完成！');
 
       } catch (error) {
         console.error('标记完成失败:', error);
@@ -838,8 +746,6 @@ export default {
       // 这里将通过API获取实际数据
       // 获取知识点
       this.fetchKnowledgePoints();
-      // 获取学习进度
-      this.fetchLearningProgress();
       // 获取考勤记录
       this.fetchAttendanceRecords();
       // 获取作业
@@ -879,19 +785,12 @@ export default {
 
       // 直接使用API返回的知识点列表，不再按章节分组
       this.knowledgePoints = knowledgeList.map(item => {
-        const knowledgeId = item.knowledgeId || item.id;
-        const progress = this.knowledgeProgressMap.get(knowledgeId);
-
         return {
           ...item,
-          // 根据学习进度设置完成状态
-          completed: progress ? progress.mastered || progress.masteryLevel >= 80 : false,
+          completed: false, // 默认未完成
           updating: false // 用于按钮加载状态
         };
       });
-
-      // 更新课程进度
-      this.updateCourseProgress();
     },
     
     // 获取考勤记录
@@ -1468,97 +1367,6 @@ export default {
       return iconMap[extension] || 'el-icon-document';
     },
 
-    // 获取学习进度
-    async fetchLearningProgress() {
-      try {
-        this.progressLoading = true;
-
-        const userInfo = getUserInfo();
-        if (!userInfo || !userInfo.studentId) {
-          console.warn('无法获取学生信息，跳过学习进度获取');
-          return;
-        }
-
-        try {
-          // 尝试获取课程学习进度
-          const progressData = await learningProgressAPI.getStudentCourseProgress(
-            userInfo.studentId,
-            this.courseId
-          );
-
-          console.log('成功从数据库获取课程学习进度:', progressData);
-
-          // 处理进度数据
-          if (Array.isArray(progressData)) {
-            // 清空现有进度映射
-            this.knowledgeProgressMap.clear();
-
-            // 将进度数据存储到映射中
-            progressData.forEach(progress => {
-              const knowledgeId = progress.knowledgeId;
-              this.knowledgeProgressMap.set(knowledgeId, progress);
-            });
-          }
-
-          // 如果知识点已经加载，更新完成状态
-          if (this.knowledgePoints.length > 0) {
-            this.updateKnowledgePointsStatus();
-          }
-
-        } catch (apiError) {
-          console.warn('获取学习进度API失败:', apiError);
-
-          if (apiError.response && apiError.response.status === 404) {
-            console.log('学习进度API接口暂不可用，跳过进度加载');
-          } else {
-            console.log('API调用失败，跳过进度加载');
-          }
-
-          // 不显示错误消息，因为这不是关键功能
-          // 如果API不可用，知识点仍然可以正常显示，只是没有进度信息
-        }
-
-      } catch (error) {
-        console.error('获取学习进度失败:', error);
-        // 不显示错误消息，因为这不是关键功能
-      } finally {
-        this.progressLoading = false;
-      }
-    },
-
-    // 更新知识点完成状态
-    updateKnowledgePointsStatus() {
-      this.knowledgePoints.forEach(point => {
-        const knowledgeId = point.knowledgeId || point.id;
-        const progress = this.knowledgeProgressMap.get(knowledgeId);
-
-        if (progress) {
-          point.completed = progress.mastered || progress.masteryLevel >= 80;
-        }
-      });
-
-      // 更新课程进度
-      this.updateCourseProgress();
-    },
-
-    // 更新课程进度统计
-    updateCourseProgress() {
-      const totalKnowledge = this.knowledgePoints.length;
-      const completedKnowledge = this.knowledgePoints.filter(point => point.completed).length;
-      const progressPercentage = totalKnowledge > 0 ? Math.round((completedKnowledge / totalKnowledge) * 100) : 0;
-
-      this.courseProgress = {
-        totalKnowledge,
-        completedKnowledge,
-        progressPercentage
-      };
-    },
-  },
-  provide() {
-    return {
-      courseId: this.courseId,
-      courseName: this.courseName
-    }
   }
 }
 </script>
@@ -1834,74 +1642,7 @@ export default {
   margin-right: 5px;
 }
 
-/* 课程进度样式 */
-.course-progress-section {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
 
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.progress-header h3 {
-  margin: 0;
-  color: #303133;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.progress-stats {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.progress-text {
-  color: #606266;
-  font-size: 14px;
-}
-
-.progress-percentage {
-  color: #409EFF;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.course-progress-bar {
-  margin-top: 10px;
-}
-
-/* 知识点进度样式 */
-.knowledge-progress {
-  margin-top: 10px;
-  padding: 8px 0;
-  border-top: 1px solid #f0f0f0;
-}
-
-.progress-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 5px;
-}
-
-.progress-label {
-  font-size: 12px;
-  color: #909399;
-}
-
-.progress-score {
-  font-size: 12px;
-  color: #409EFF;
-  font-weight: 600;
-}
 
 /* 知识点样式 */
 .knowledge-grid {

@@ -485,7 +485,7 @@ export default {
 
         // 显示提交成功提示
         this.$message.success('答案已提交');
-        
+
         // 自动前进到下一题
         this.nextQuestion();
       } catch (error) {
