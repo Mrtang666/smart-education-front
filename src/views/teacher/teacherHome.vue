@@ -173,14 +173,13 @@
           <template #header>
             <div class="card-header">
               <h3>近期作业</h3>
-              <el-button text @click="navigateTo('/teacher/homework')">查看全部</el-button>
             </div>
           </template>
           <div class="recent-list">
             <div v-if="loading" class="loading-container">
               <el-skeleton :rows="3" animated />
             </div>
-            <div v-else-if="exams.filter(item => item.type === 'homework').length === 0" class="empty-tip">
+            <div v-else-if="recentHomeworks.length === 0" class="empty-tip">
               <el-empty description="暂无作业" :image-size="60"></el-empty>
             </div>
             <div v-else>
@@ -222,7 +221,7 @@ import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Reading, EditPen, Document, User, Timer } from '@element-plus/icons-vue'
-import { courseAPI, examAPI, knowledgeAPI } from '@/api/api'
+import { courseAPI, examAPI, knowledgeAPI, assignmentAPI, problemAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
 // 配置ElMessage默认选项
@@ -339,9 +338,10 @@ const loading = ref(true)
 const courses = ref([])
 const exams = ref([])
 const knowledgePoints = ref([])
-const homeworks = ref([])
+// const homeworks = ref([])
 const currentDate = ref('')
 const currentTime = ref('')
+const recentHomeworks = ref([])
 
 // 记录API错误状态，避免重复提示
 const apiErrorShown = {
@@ -389,21 +389,7 @@ const recentExams = computed(() => {
   return sortedExams.slice(0, 3)
 })
 
-// 按更新时间排序的最近作业（最多3个）
-const recentHomeworks = computed(() => {
-  // 复制数组以避免修改原始数据，并只筛选类型为homework的数据
-  const sortedHomeworks = [...exams.value].filter(item => item.type === 'homework')
-  
-  // 根据updateTime字段排序，最新的排在前面
-  sortedHomeworks.sort((a, b) => {
-    const timeA = a.updateTime ? new Date(a.updateTime).getTime() : 0
-    const timeB = b.updateTime ? new Date(b.updateTime).getTime() : 0
-    return timeB - timeA // 降序排列
-  })
-  
-  // 只返回前3个
-  return sortedHomeworks.slice(0, 3)
-})
+// 删除 computed 版本，保留 ref 版本 recentHomeworks
 
 // 颜色列表，用于课程卡片
 const colors = [
@@ -553,7 +539,7 @@ function manageExam(exam) {
 // 管理作业
 function manageHomework(homework) {
   // 确保作业ID是有效的数字
-  if (!homework || !homework.examId || isNaN(Number(homework.examId))) {
+  if (!homework || !homework.assignmentId || isNaN(Number(homework.assignmentId))) {
     showMessage('error', '无效的作业ID，无法访问作业详情')
     return
   }
@@ -564,7 +550,7 @@ function manageHomework(homework) {
   }
   
   // 使用教师专用路由
-  router.push(`/teacher/homework/${homework.examId}`)
+  router.push(`/teacher/homework/${homework.assignmentId}`)
   showMessage('success', `正在管理作业: ${homework.title}`)
 }
 
@@ -803,6 +789,50 @@ function getHomeworkStatusType(homework) {
   return 'info'
 }
 
+// 获取近期作业（按更新时间排序取前三）
+async function fetchRecentHomeworks() {
+  if (!userInfo.value || !userInfo.value.teacherId) {
+    recentHomeworks.value = []
+    return
+  }
+  try {
+    const res = await assignmentAPI.getAssignmentsByCreatorId(userInfo.value.teacherId)
+    if (Array.isArray(res)) {
+      // 取最近3个作业
+      const sorted = res
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        .slice(0, 3)
+      // 并发获取每个作业的题目分数总和
+      const homeworksWithScore = await Promise.all(sorted.map(async hw => {
+        let totalScore = '--'
+        try {
+          const problems = await problemAPI.getProblemsByAssignment(hw.assignmentId)
+          if (Array.isArray(problems)) {
+            totalScore = problems.reduce((sum, p) => sum + (Number(p.score) || 0), 0)
+          }
+        } catch (e) {
+          console.error('获取作业题目失败', e)
+        }
+        return {
+          assignmentId: hw.assignmentId,
+          title: hw.title || '未命名作业',
+          courseName: hw.courseName || hw.courseId || '未知课程',
+          description: hw.description || '',
+          status: hw.status || '',
+          totalScore,
+          updatedAt: hw.updatedAt,
+        }
+      }))
+      recentHomeworks.value = homeworksWithScore
+    } else {
+      recentHomeworks.value = []
+    }
+  } catch (e) {
+    console.error('获取近期作业失败', e)
+    recentHomeworks.value = []
+  }
+}
+
 // 获取数据函数
 function fetchData() {
   // 重置加载状态
@@ -853,6 +883,10 @@ function fetchData() {
     fetchKnowledgePoints().catch(err => {
       console.error('知识点数据加载错误:', err)
       knowledgePoints.value = [] // 使用空数组
+    }),
+    fetchRecentHomeworks().catch(err => {
+      console.error('作业数据加载错误:', err)
+      recentHomeworks.value = []
     })
   ]).catch(error => {
     console.error('数据加载过程中发生错误:', error)
@@ -860,7 +894,7 @@ function fetchData() {
     courses.value = courses.value.length ? courses.value : []
     exams.value = exams.value.length ? exams.value : []
     knowledgePoints.value = knowledgePoints.value.length ? knowledgePoints.value : []
-    homeworks.value = []
+    recentHomeworks.value = []
   }).finally(() => {
     loading.value = false // 无论如何都结束加载状态
   })

@@ -178,6 +178,7 @@ import { ref, onMounted, inject, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { Search, Edit, DataAnalysis, Timer, Calendar, Loading, WarningFilled } from '@element-plus/icons-vue'
+import { studentExamAPI } from '@/api/api'
 
 // 注入setActiveMenu方法
 // const setActiveMenu = inject('setActiveMenu')
@@ -203,6 +204,9 @@ const currentPage = ref(1)
 // 考试详情抽屉
 const drawerVisible = ref(false)
 const selectedExam = ref(null)
+
+// 全部考试数据
+const allExams = ref([])
 
 // 定时器，用于定期更新考试状态
 let statusUpdateTimer = null
@@ -258,89 +262,26 @@ async function fetchCourseList() {
 async function fetchExamList() {
   loading.value = true
   try {
-    // 实际项目中应该调用API获取考试列表
-    // 这里使用模拟数据
-    setTimeout(() => {
-      const mockExams = [
-        {
-          examId: '1',
-          title: '高等数学期中考试',
-          courseName: '高等数学',
-          courseId: '1',
-          totalScore: 100,
-          durationMinutes: 120,
-          startTime: '2023-11-15 14:00:00',
-          endTime: '2023-11-15 16:00:00',
-          status: '未开始',
-          score: null,
-          description: '本次考试包含选择题、填空题和计算题，请带好计算器和草稿纸。'
-        },
-        {
-          examId: '2',
-          title: '数据结构实验考核',
-          courseName: '数据结构与算法',
-          courseId: '2',
-          totalScore: 100,
-          durationMinutes: 90,
-          startTime: '2023-11-18 10:00:00',
-          endTime: '2023-11-18 11:30:00',
-          status: '未开始',
-          score: null,
-          description: '本次考试为上机实验，请带好学生证。'
-        },
-        {
-          examId: '3',
-          title: '计算机网络在线测验',
-          courseName: '计算机网络',
-          courseId: '3',
-          totalScore: 50,
-          durationMinutes: 60,
-          startTime: '2023-10-10 20:00:00',
-          endTime: '2023-10-10 21:00:00',
-          status: '已结束',
-          score: 45,
-          description: '本次测验为在线闭卷测验，请独立完成。'
-        },
-        {
-          examId: '4',
-          title: '操作系统期末考试',
-          courseName: '操作系统',
-          courseId: '4',
-          totalScore: 100,
-          durationMinutes: 120,
-          startTime: '2023-12-25 09:00:00',
-          endTime: '2023-12-25 11:00:00',
-          status: '未开始',
-          score: null,
-          description: '本次考试为闭卷考试，请带好文具。'
-        },
-        {
-          examId: '5',
-          title: '高等数学期末考试',
-          courseName: '高等数学',
-          courseId: '1',
-          totalScore: 100,
-          durationMinutes: 120,
-          startTime: '2023-01-15 14:00:00',
-          endTime: '2023-01-15 16:00:00',
-          status: '已结束',
-          score: 85,
-          description: '本次考试包含选择题、填空题和计算题。'
-        }
-      ]
-      
-      // 过滤考试列表
-      examList.value = filterExams(mockExams)
-      total.value = mockExams.length
-      
-      // 更新考试状态
-      updateExamsStatus()
-      
-      loading.value = false
-    }, 500)
+    let exams = []
+    const sid = typeof studentId.value === 'number' ? studentId.value : String(studentId.value)
+    if (searchKeyword.value) {
+      exams = await studentExamAPI.searchStudentExamScores(sid, searchKeyword.value)
+    } else {
+      exams = await studentExamAPI.getStudentExamScores(sid)
+    }
+    // 前端课程和状态筛选
+    const filtered = filterExams(exams)
+    allExams.value = filtered
+    total.value = filtered.length
+    // 分页
+    const start = (currentPage.value - 1) * pageSize.value
+    const end = start + pageSize.value
+    examList.value = filtered.slice(start, end)
+    updateExamsStatus()
   } catch (error) {
     console.error('获取考试列表失败:', error)
     ElMessage.error('获取考试列表失败')
+  } finally {
     loading.value = false
   }
 }
@@ -349,23 +290,20 @@ async function fetchExamList() {
 function filterExams(exams) {
   return exams.filter(exam => {
     // 根据课程筛选
-    if (selectedCourseId.value && exam.courseId !== selectedCourseId.value) {
+    if (selectedCourseId.value && String(exam.courseId) !== String(selectedCourseId.value)) {
       return false
     }
-    
     // 根据状态筛选
     if (selectedStatus.value && exam.status !== selectedStatus.value) {
       return false
     }
-    
-    // 根据关键词搜索
+    // 根据关键词搜索（已在接口层处理，这里冗余防御）
     if (searchKeyword.value) {
       const keyword = searchKeyword.value.toLowerCase()
-      return exam.title.toLowerCase().includes(keyword) || 
-             exam.courseName.toLowerCase().includes(keyword) ||
+      return (exam.title && exam.title.toLowerCase().includes(keyword)) ||
+             (exam.courseName && exam.courseName.toLowerCase().includes(keyword)) ||
              (exam.description && exam.description.toLowerCase().includes(keyword))
     }
-    
     return true
   })
 }
@@ -430,7 +368,9 @@ function handleSearch() {
 // 处理分页
 function handlePageChange(page) {
   currentPage.value = page
-  fetchExamList()
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  examList.value = allExams.value.slice(start, end)
 }
 
 // 查看考试详情

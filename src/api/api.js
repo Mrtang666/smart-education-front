@@ -2970,6 +2970,18 @@ export const studentExamAPI = {
         const axios = createStudentAuthorizedAxios();
         const response = await axios.get(`/api/student-exam/answer/${answerId}/evaluate`);
         return response.data;
+    },
+
+    /**
+     * 20.检查学生是否已作答某场考试（需要token）
+     * @param {number|string} studentId 学生ID
+     * @param {number|string} examId 考试ID
+     * @returns {Promise<boolean>} 是否已作答
+     */
+    async checkIfExamAnswered(studentId, examId) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.get(`/api/student-exam/student/${studentId}/exam/${examId}/if-answered`);
+        return response.data;
     }
 };
 

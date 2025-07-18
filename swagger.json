@@ -32,12 +32,20 @@
       "description": "教师智能备课API"
     },
     {
+      "name": "problem",
+      "description": "题目管理API"
+    },
+    {
+      "name": "assignment",
+      "description": "作业相关API"
+    },
+    {
       "name": "course-selection",
       "description": "学生选课相关API"
     },
     {
-      "name": "course-file",
-      "description": "课程文件相关API"
+      "name": "student-answer",
+      "description": "学生答题管理API"
     },
     {
       "name": "exam",
@@ -45,6 +53,55 @@
     }
   ],
   "paths": {
+    "/api/teacher/{id}/change-username/{username}": {
+      "put": {
+        "tags": [
+          "teacher"
+        ],
+        "summary": "更改教师用户名",
+        "description": "进行该操作前，请先提前使用/auth/check-available-username检查可用用户名",
+        "operationId": "changeTeacherUsername",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/teacher/update": {
       "put": {
         "tags": [
@@ -68,6 +125,93 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/TeacherBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student/{id}/change-username/{username}": {
+      "put": {
+        "tags": [
+          "student-controller"
+        ],
+        "summary": "修改学生用户名",
+        "description": "执行该操作前，请先使用/auth/check-available-username检查可用用户名",
+        "operationId": "changeUsername",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student/update": {
+      "put": {
+        "tags": [
+          "student-controller"
+        ],
+        "operationId": "updateStudent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentBO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
                 }
               }
             }
@@ -444,11 +588,53 @@
         ]
       }
     },
+    "/api/teaching-assistant/lesson/improve": {
+      "post": {
+        "tags": [
+          "teachingAssistant"
+        ],
+        "summary": "在已有教学方案的基础上进行改进",
+        "description": "一般场景为：AI生成教案之后，用户自行输入改进建议，重新生成",
+        "operationId": "improveLesson",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LessonImproveDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/teaching-assistant/lesson/generate": {
       "post": {
         "tags": [
           "teachingAssistant"
         ],
+        "summary": "生成教学方案",
+        "description": "subjectType: 学科类型/课程名称；courseOutline: 知识点名称/知识点内容大纲",
         "operationId": "generateTeachingPlan",
         "requestBody": {
           "content": {
@@ -460,6 +646,55 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/teaching-assistant/analytics/course/{courseId}/student/{studentId}": {
+      "post": {
+        "tags": [
+          "teachingAssistant"
+        ],
+        "summary": "分析学生课程学习情况",
+        "operationId": "analyzeCourseLearning",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -517,44 +752,6 @@
         ]
       }
     },
-    "/api/student/save": {
-      "post": {
-        "tags": [
-          "student-controller"
-        ],
-        "operationId": "saveOrUpdateStudent",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StudentBO"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/student/register": {
       "post": {
         "tags": [
@@ -577,7 +774,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudentBO"
+                  "$ref": "#/components/schemas/TokenResponse"
                 }
               }
             }
@@ -669,126 +866,12 @@
         ]
       }
     },
-    "/api/student-assistant/student/{studentId}/submit-answers": {
-      "post": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "submitExerciseAnswers",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "exerciseId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/student-assistant/student/{studentId}/hint": {
-      "post": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "getRealTimeHint",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "questionId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "partialAnswer",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/student-assistant/student/{studentId}/ask": {
       "post": {
         "tags": [
           "student-assistant-controller"
         ],
+        "summary": "无历史非流式一次性问答",
         "operationId": "askQuestion",
         "parameters": [
           {
@@ -840,12 +923,13 @@
         ]
       }
     },
-    "/api/student-assistant/student/{studentId}/ask/by-knowledge": {
+    "/api/student-assistant/student/{studentId}/ask/history": {
       "post": {
         "tags": [
           "student-assistant-controller"
         ],
-        "operationId": "askQuestionByKnowledgeName",
+        "summary": "带历史非流式问答",
+        "operationId": "askQuestionWithHistory",
         "parameters": [
           {
             "name": "studentId",
@@ -855,24 +939,18 @@
               "type": "integer",
               "format": "int64"
             }
-          },
-          {
-            "name": "question",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "knowledgeName",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatHistoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -895,16 +973,55 @@
         ]
       }
     },
-    "/api/student-assistant/student/{studentId}/ask/by-course-name": {
+    "/api/student-assistant/stream/chat-history": {
       "post": {
         "tags": [
           "student-assistant-controller"
         ],
-        "operationId": "askQuestionByCourseName",
+        "summary": "带历史流式问答",
+        "operationId": "streamChat",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatHistoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/submit": {
+      "post": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "submitAnswer_1",
         "parameters": [
           {
             "name": "studentId",
-            "in": "path",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "integer",
@@ -912,15 +1029,16 @@
             }
           },
           {
-            "name": "question",
+            "name": "problemId",
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
             }
           },
           {
-            "name": "courseName",
+            "name": "answer",
             "in": "query",
             "required": true,
             "schema": {
@@ -934,10 +1052,52 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
+                  "$ref": "#/components/schemas/StudentProblemAnswerBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/grade": {
+      "post": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "gradeAnswer",
+        "parameters": [
+          {
+            "name": "answerId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "score",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProblemAnswerBO"
                 }
               }
             }
@@ -975,6 +1135,76 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/QuestionBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/update": {
+      "post": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "updateProblem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemBO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/save": {
+      "post": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "saveProblem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemBO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemBO"
                 }
               }
             }
@@ -1463,39 +1693,70 @@
         ]
       }
     },
-    "/api/course-file/upload/courseId/{courseId}": {
+    "/api/course-selection/join-by-invite-code": {
       "post": {
         "tags": [
-          "course-file"
+          "course-selection"
         ],
-        "operationId": "uploadCourseFile",
+        "summary": "根据邀请码加入课程",
+        "operationId": "joinCourseByInviteCode",
         "parameters": [
           {
-            "name": "courseId",
-            "in": "path",
+            "name": "studentId",
+            "in": "query",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
+            }
+          },
+          {
+            "name": "inviteCode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
                   }
                 }
               }
             }
-          },
-          "required": true
+          }
         },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/course-selection/generate-invite-code": {
+      "post": {
+        "tags": [
+          "course-selection"
+        ],
+        "summary": "生成邀请码",
+        "operationId": "generateInviteCode",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1645,6 +1906,76 @@
                   "additionalProperties": {
                     "type": "object"
                   }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/update": {
+      "post": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "updateAssignment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentBO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/save": {
+      "post": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "saveAssignment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentBO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentBO"
                 }
               }
             }
@@ -2985,316 +3316,12 @@
         ]
       }
     },
-    "/api/student-assistant/student/{studentId}/search-questions": {
-      "get": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "searchQuestionHistory",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "keywords",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/student-assistant/student/{studentId}/resources": {
-      "get": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "searchLearningResources",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "keywords",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "resourceType",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 10
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/student-assistant/student/{studentId}/question-history": {
-      "get": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "getQuestionHistory",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/student-assistant/student/{studentId}/generate-exercise": {
-      "get": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "generateExercise",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "courseId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "knowledgeIds",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          },
-          {
-            "name": "difficultyLevel",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "questionCount",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/student-assistant/student/{studentId}/generate-exercise/weak-points": {
-      "get": {
-        "tags": [
-          "student-assistant-controller"
-        ],
-        "operationId": "generateWeakPointsExercise",
-        "parameters": [
-          {
-            "name": "studentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "questionCount",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/student-assistant/student/{studentId}/generate-exercise/by-knowledge": {
       "get": {
         "tags": [
           "student-assistant-controller"
         ],
+        "summary": "基于知识点名称生成练习",
         "operationId": "generateExerciseByKnowledgeNames",
         "parameters": [
           {
@@ -3326,7 +3353,7 @@
             }
           },
           {
-            "name": "questionCount",
+            "name": "problemCount",
             "in": "query",
             "required": true,
             "schema": {
@@ -3362,6 +3389,7 @@
         "tags": [
           "student-assistant-controller"
         ],
+        "summary": "基于课程名称生成练习",
         "operationId": "generateExerciseByCourseName",
         "parameters": [
           {
@@ -3390,12 +3418,263 @@
             }
           },
           {
-            "name": "questionCount",
+            "name": "problemCount",
             "in": "query",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/problem/{problemId}": {
+      "get": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "getAnswersByProblem",
+        "parameters": [
+          {
+            "name": "problemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudentProblemAnswerBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/final-scores/assignment/{assignmentId}": {
+      "get": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "getFinalScoresByAssignmentId",
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "format": "double"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/final-score/{answerId}": {
+      "get": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "getFinalScoreByAnswerId",
+        "parameters": [
+          {
+            "name": "answerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "number",
+                  "format": "double"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/completion-rate": {
+      "get": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "getCompletionRate",
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "assignmentId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/assignment/{assignmentId}": {
+      "get": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "getAnswersByAssignment",
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StudentProblemAnswerBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/accuracy-rate": {
+      "get": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "getAccuracyRate",
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "assignmentId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
@@ -3648,6 +3927,45 @@
         ]
       }
     },
+    "/api/question/exam/{examId}": {
+      "get": {
+        "tags": [
+          "question"
+        ],
+        "operationId": "getQuestionsByExam",
+        "parameters": [
+          {
+            "name": "examId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QuestionBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/question/difficulty/{difficulty}": {
       "get": {
         "tags": [
@@ -3673,6 +3991,166 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/QuestionBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/{problemId}": {
+      "get": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "getProblemById",
+        "parameters": [
+          {
+            "name": "problemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/type/{type}": {
+      "get": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "getProblemsByType",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProblemBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/assignment/{assignmentId}": {
+      "get": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "getProblemsByAssignmentId",
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProblemBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/assignment/{assignmentId}/type/{type}": {
+      "get": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "getProblemsByAssignmentIdAndType",
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProblemBO"
                   }
                 }
               }
@@ -5772,82 +6250,6 @@
         ]
       }
     },
-    "/api/course-file/download/fileId/{fileId}": {
-      "get": {
-        "tags": [
-          "course-file"
-        ],
-        "operationId": "downloadFile",
-        "parameters": [
-          {
-            "name": "fileId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/course-file/courseId/{courseId}": {
-      "get": {
-        "tags": [
-          "course-file"
-        ],
-        "operationId": "getCourseFiles",
-        "parameters": [
-          {
-            "name": "courseId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/FileInfoDTO"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/api/auth/check-available-username": {
       "get": {
         "tags": [
@@ -6362,6 +6764,252 @@
         ]
       }
     },
+    "/api/assignment/{assignmentId}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "getAssignmentById",
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentBO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/creatorId/{creatorId}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "getAssignmentsByCreatorId",
+        "parameters": [
+          {
+            "name": "creatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/creatorId/{creatorId}/type/{type}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "getAssignmentsByCreatorIdAndType",
+        "parameters": [
+          {
+            "name": "creatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/course/{courseId}/type/{type}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "getAssignmentsInCourseByType",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/course/{courseId}/creatorId/{creatorId}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "getAssignmentsInCourseByCreatorId",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "creatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/student-answer/{answerId}": {
+      "delete": {
+        "tags": [
+          "student-answer"
+        ],
+        "operationId": "deleteAnswer",
+        "parameters": [
+          {
+            "name": "answerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/question/{id}": {
       "delete": {
         "tags": [
@@ -6379,6 +7027,45 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/problem/delete": {
+      "delete": {
+        "tags": [
+          "problem"
+        ],
+        "operationId": "deleteProblem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -6757,15 +7444,16 @@
         ]
       }
     },
-    "/api/course-file/fileId/{fileId}": {
+    "/api/attendance/{attendanceId}": {
       "delete": {
         "tags": [
-          "course-file"
+          "attendance-controller"
         ],
-        "operationId": "deleteFile",
+        "summary": "根据考勤ID删除考勤实体",
+        "operationId": "deleteAttendance",
         "parameters": [
           {
-            "name": "fileId",
+            "name": "attendanceId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6795,12 +7483,109 @@
           }
         ]
       }
+    },
+    "/api/attendance/batch": {
+      "delete": {
+        "tags": [
+          "attendance-controller"
+        ],
+        "summary": "批量删除考勤实体",
+        "operationId": "batchDeleteAttendance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/delete": {
+      "delete": {
+        "tags": [
+          "assignment"
+        ],
+        "operationId": "deleteAssignment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
       "UpdateTeacherDTO": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "teacherId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          }
+        }
       },
       "TeacherBO": {
         "type": "object",
@@ -6822,6 +7607,44 @@
             "type": "string"
           },
           "phone": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StudentBO": {
+        "type": "object",
+        "properties": {
+          "studentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "className": {
             "type": "string"
           },
           "createdAt": {
@@ -7041,6 +7864,17 @@
           }
         }
       },
+      "LessonImproveDTO": {
+        "type": "object",
+        "properties": {
+          "teachingPlan": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      },
       "LessonRequestDTO": {
         "type": "object",
         "properties": {
@@ -7049,12 +7883,6 @@
           },
           "courseOutline": {
             "type": "string"
-          },
-          "courseDocuments": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           },
           "duration": {
             "type": "integer",
@@ -7085,44 +7913,6 @@
           },
           "phone": {
             "type": "string"
-          }
-        }
-      },
-      "StudentBO": {
-        "type": "object",
-        "properties": {
-          "studentId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "username": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "grade": {
-            "type": "string"
-          },
-          "className": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -7188,6 +7978,161 @@
           },
           "graded": {
             "type": "boolean"
+          }
+        }
+      },
+      "ChatHistoryRequest": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "StudentProblemAnswerBO": {
+        "type": "object",
+        "properties": {
+          "answerId": {
+            "type": "integer",
+            "description": "答案ID",
+            "format": "int64"
+          },
+          "studentId": {
+            "type": "integer",
+            "description": "学生ID",
+            "format": "int64"
+          },
+          "assignmentId": {
+            "type": "integer",
+            "description": "作业ID",
+            "format": "int64"
+          },
+          "problemId": {
+            "type": "integer",
+            "description": "题目ID",
+            "format": "int64"
+          },
+          "answer": {
+            "type": "string",
+            "description": "学生答案"
+          },
+          "isAutoGraded": {
+            "type": "boolean",
+            "description": "是否自动批改（仅对选填判断生效）"
+          },
+          "autoScore": {
+            "type": "number",
+            "description": "自动批改得分",
+            "format": "double"
+          },
+          "manualScore": {
+            "type": "number",
+            "description": "人工批改得分",
+            "format": "double"
+          },
+          "attemptNumber": {
+            "type": "integer",
+            "description": "尝试次数，初次作答时默认为1",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "回答状态 (NOT_SUBMITTED/未提交, SUBMITTED/已提交, SAVED/已保存)"
+          },
+          "gradingStatus": {
+            "type": "string",
+            "description": "批改状态 (PENDING/待批改, GRADED/已批改, REVIEWED/已复核)初次作答默认PENDING"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "更新时间",
+            "format": "date-time"
+          },
+          "finalScore": {
+            "type": "number",
+            "description": "最终得分,由数据库自动计算，优先取人工批改得分",
+            "format": "double"
+          }
+        }
+      },
+      "ProblemBO": {
+        "type": "object",
+        "properties": {
+          "problemId": {
+            "type": "integer",
+            "description": "题目ID",
+            "format": "int64"
+          },
+          "assignmentId": {
+            "type": "integer",
+            "description": "所属作业ID",
+            "format": "int64"
+          },
+          "originType": {
+            "type": "string",
+            "description": "题目来源类型（学生上传:STUDENT_UPLOAD/教师布置:TEACHER_ASSIGNED）"
+          },
+          "title": {
+            "type": "string",
+            "description": "题目标题"
+          },
+          "content": {
+            "type": "string",
+            "description": "题目内容（题干）"
+          },
+          "type": {
+            "type": "string",
+            "description": "题目类型（单选题:SINGLE_CHOICE/多选题:MULTI_CHOICE/填空题:FILL_BLANK/简答题:ESSAY_QUESTION/判断题:TRUE_FALSE）"
+          },
+          "autoGrading": {
+            "type": "boolean",
+            "description": "是否自动判分"
+          },
+          "expectedAnswer": {
+            "type": "string",
+            "description": "标准答案"
+          },
+          "score": {
+            "type": "number",
+            "description": "题目分值",
+            "format": "double"
+          },
+          "sequence": {
+            "type": "integer",
+            "description": "题目序号",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间（默认为当前时间）",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "更新时间（默认为当前时间）",
+            "format": "date-time"
           }
         }
       },
@@ -7394,15 +8339,76 @@
           }
         }
       },
-      "FileInfoDTO": {
+      "AssignmentBO": {
         "type": "object",
         "properties": {
-          "fileId": {
+          "assignmentId": {
             "type": "integer",
+            "description": "作业ID",
             "format": "int64"
           },
-          "originalName": {
-            "type": "string"
+          "type": {
+            "type": "string",
+            "description": "作业类型（学生上传:STUDENT_UPLOAD/教师布置:TEACHER_ASSIGNED）"
+          },
+          "creatorId": {
+            "type": "integer",
+            "description": "创建者ID",
+            "format": "int64"
+          },
+          "courseId": {
+            "type": "integer",
+            "description": "所属课程ID",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string",
+            "description": "作业标题"
+          },
+          "description": {
+            "type": "string",
+            "description": "作业描述"
+          },
+          "isAnswerPublic": {
+            "type": "boolean",
+            "description": "是否公开答案解析"
+          },
+          "isScoreVisible": {
+            "type": "boolean",
+            "description": "是否允许查看分数"
+          },
+          "isRedoAllowed": {
+            "type": "boolean",
+            "description": "是否允许重做"
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "description": "最大重做次数",
+            "format": "int32"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "开始时间",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "截止时间",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "作业状态（草稿:DRAFT/已发布:PUBLISHED/已结束:ENDED）"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "更新时间",
+            "format": "date-time"
           }
         }
       }

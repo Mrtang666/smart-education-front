@@ -131,10 +131,10 @@ const routes = [
         path: "center",
         component: () => import("@/views/student/studentHome.vue"),
       },
-      {
-        path: "homework",
-        component: () => import("@/views/student/studentHomework.vue"),
-      },
+      // {
+      //   path: "homework",
+      //   component: () => import("@/views/student/studentHomework.vue"),
+      // },
       {
         path: "exam",
         component: () => import("@/views/student/studentExam.vue"),

@@ -1,16 +1,14 @@
-/**
+<!-- /**
  * 学生首页组件
  * 
- * 该组件展示学生的个人信息、课程、作业、考试和学习计划等数据
+ * 该组件展示学生的个人信息、课程、考试和学习计划等数据
  * 所有数据均通过后端API获取，不使用模拟数据
- * 
+ *
  * API依赖:
  * - courseSelectionAPI: 获取学生已选课程
  * - studentExamAPI: 获取学生考试信息
  * - learningPlanAPI: 获取学生学习计划
- * 
- * 注意: 作业相关API尚未实现，目前显示为空
- */
+ */ -->
 <template>
   <div class="student-home">
     <!-- 欢迎区域 -->
@@ -43,34 +41,6 @@
         </div>
       </div>
 
-      <!-- 未完成作业方块 -->
-      <div class="feature-card" @click="navigateTo('assignment')">
-        <div class="card-icon orange">
-          <el-icon :size="32">
-            <Notebook />
-          </el-icon>
-        </div>
-        <div class="card-content">
-          <h3 class="card-title">未完成作业</h3>
-          <div class="card-value">{{ assignmentCount }}</div>
-          <p class="card-desc">点击查看所有作业</p>
-        </div>
-      </div>
-
-      <!-- 近期考试方块 -->
-      <div class="feature-card" @click="navigateTo('exam')">
-        <div class="card-icon purple">
-          <el-icon :size="32">
-            <Document />
-          </el-icon>
-        </div>
-        <div class="card-content">
-          <h3 class="card-title">近期考试</h3>
-          <div class="card-value">{{ examCount }}</div>
-          <p class="card-desc">点击查看所有考试</p>
-        </div>
-      </div>
-
       <!-- 学习计划方块 -->
       <div class="feature-card" @click="navigateTo('plan')">
         <div class="card-icon green">
@@ -84,9 +54,41 @@
           <p class="card-desc">点击查看学习计划</p>
         </div>
       </div>
+
+      <!-- 新增：未完成作业方块 -->
+      <div class="feature-card">
+        <div class="card-icon orange">
+          <el-icon :size="32">
+            <EditPen />
+          </el-icon>
+        </div>
+        <div class="card-content">
+          <h3 class="card-title">未完成作业</h3>
+          <div class="card-value">{{ unfinishedAssignmentCount }}</div>
+          <p class="card-desc">待完成的作业数量</p>
+        </div>
+      </div>
+
+      <!-- 新增：待参加考试方块 -->
+      <div class="feature-card">
+        <div class="card-icon purple">
+          <el-icon :size="32">
+            <Document />
+          </el-icon>
+        </div>
+        <div class="card-content">
+          <h3 class="card-title">待参加考试</h3>
+          <div class="card-value">
+            <el-skeleton :loading="ongoingExamLoading" :rows="1" style="width: 40px; display: inline-block;"
+              v-if="ongoingExamLoading" />
+            <span v-else>{{ ongoingExamCount }}</span>
+          </div>
+          <p class="card-desc">正在进行且未作答的考试数量</p>
+        </div>
+      </div>
     </div>
 
-    <!-- 最近的课程和作业 -->
+    <!-- 最近的课程 -->
     <div class="recent-section">
       <!-- 最近的课程 -->
       <el-card shadow="hover" class="recent-card">
@@ -100,7 +102,7 @@
           <div v-if="loading" class="loading-container">
             <el-skeleton :rows="3" animated />
           </div>
-          <div v-else-if="courses.length === 0" class="empty-tip">
+          <div v-else-if="(courses || []).length === 0" class="empty-tip">
             <el-empty description="暂无课程" :image-size="60"></el-empty>
             <el-button type="primary" size="small" class="add-course-btn" @click="showInviteCodeInput">
               添加课程
@@ -116,34 +118,27 @@
               <div class="item-content">
                 <div class="item-title">
                   {{ course.name }}
-                  <el-tag size="small" effect="plain" class="course-code-tag" v-if="course.code && course.code !== 'string'">
+                  <el-tag size="small" effect="plain" class="course-code-tag"
+                    v-if="course.code && course.code !== 'string'">
                     {{ course.code }}
                   </el-tag>
                 </div>
                 <div class="item-subtitle">
                   <span class="course-info">
-                    <el-icon><Collection /></el-icon>
+                    <el-icon>
+                      <Collection />
+                    </el-icon>
                     {{ course.category === 'string' ? '未分类' : course.category }} · {{ course.credit }}学分
                   </span>
                 </div>
                 <div v-if="course.description && course.description !== 'string'" class="course-description-container">
-                  <div class="course-tags" v-if="getDescriptionTags(course.description).length > 0">
-                    <el-tag 
-                      v-for="(tag, tagIndex) in getDescriptionTags(course.description)" 
-                      :key="tagIndex"
-                      size="small"
-                      type="info"
-                      effect="plain"
-                      class="tag-item"
-                    >
+                  <div class="course-tags" v-if="(getDescriptionTags(course.description) || []).length > 0">
+                    <el-tag v-for="(tag, tagIndex) in getDescriptionTags(course.description)" :key="tagIndex"
+                      size="small" type="info" effect="plain" class="tag-item">
                       {{ tag }}
                     </el-tag>
                   </div>
-                  <el-tooltip
-                    :content="processDescription(course.description).text"
-                    placement="top"
-                    :show-after="500"
-                  >
+                  <el-tooltip :content="processDescription(course.description).text" placement="top" :show-after="500">
                     <div class="course-description">
                       {{ getShortDescription(course.description) }}
                     </div>
@@ -157,48 +152,57 @@
           </div>
         </div>
       </el-card>
-
-      <!-- 最近的作业 -->
-      <el-card shadow="hover" class="recent-card">
-        <template #header>
-          <div class="card-header">
-            <h3>近期作业</h3>
-            <el-button text @click="navigateTo('assignment')">查看全部</el-button>
-          </div>
-        </template>
-        <div class="recent-list">
-          <div v-if="loading" class="loading-container">
-            <el-skeleton :rows="3" animated />
-          </div>
-          <div v-else-if="assignments.length === 0" class="empty-tip">
-            <el-empty description="暂无作业" :image-size="60"></el-empty>
-          </div>
-          <div v-else>
-            <div v-for="(assignment, index) in recentAssignments" :key="index" class="recent-item"
-              @click="startAssignment(assignment)">
-              <div class="item-icon orange">
-                <el-icon>
-                  <Notebook />
-                </el-icon>
+    </div>
+    <!-- 右下角固定任务区块 -->
+    <div class="fixed-task-block">
+      <el-collapse v-model="activeTaskPanel" accordion>
+        <!-- 未完成作业 -->
+        <el-collapse-item name="assignments">
+          <template #title>
+            <div class="block-header">
+              <span>未完成作业</span>
+              <span class="block-brief" v-if="activeTaskPanel !== 'assignments'">
+                {{ (unfinishedAssignments || []).length ? unfinishedAssignments[0].title : '暂无' }}
+                <span v-if="(unfinishedAssignments || []).length > 1">等{{ unfinishedAssignments.length }}项</span>
+              </span>
+            </div>
+          </template>
+          <div v-if="(unfinishedAssignments || []).length === 0" class="block-empty">暂无未完成作业</div>
+          <div v-else class="block-list-scroll">
+            <div v-for="item in unfinishedAssignments" :key="item.id" class="block-list-item">
+              <div class="block-title">{{ item.title }}</div>
+              <div class="block-meta">
+                <span>截止：{{ item.endTime || '--' }}</span>
+                <el-tag size="small" :type="getAssignmentTagType(item.status)">{{ item.status }}</el-tag>
               </div>
-              <div class="item-content">
-                <div class="item-title">{{ assignment.title }}</div>
-                <div class="item-subtitle">
-                  <span class="deadline-info">
-                    <el-icon><Timer /></el-icon>
-                    {{ assignment.courseName }} · 截止: {{ formatDate(assignment.deadline) }}
-                  </span>
-                </div>
-              </div>
-              <div class="item-status">
-                <el-tag :type="getAssignmentStatusType(assignment.daysLeft)" size="small" class="status-tag">
-                  {{ getAssignmentStatusText(assignment.daysLeft) }}
-                </el-tag>
-              </div>
+              <div class="block-desc">{{ item.description || '' }}</div>
             </div>
           </div>
-        </div>
-      </el-card>
+        </el-collapse-item>
+        <!-- 待参加考试 -->
+        <el-collapse-item name="exams">
+          <template #title>
+            <div class="block-header">
+              <span>待参加考试</span>
+              <span class="block-brief" v-if="activeTaskPanel !== 'exams'">
+                {{ (ongoingExamDetails || []).length ? ongoingExamDetails[0].title : '暂无' }}
+                <span v-if="(ongoingExamDetails || []).length > 1">等{{ ongoingExamDetails.length }}项</span>
+              </span>
+            </div>
+          </template>
+          <div v-if="(ongoingExamDetails || []).length === 0" class="block-empty">暂无待参加考试</div>
+          <div v-else class="block-list-scroll">
+            <div v-for="item in ongoingExamDetails" :key="item.id" class="block-list-item">
+              <div class="block-title">{{ item.title }}</div>
+              <div class="block-meta">
+                <span>时间：{{ item.examTime || '--' }}</span>
+                <el-tag size="small" type="warning">进行中</el-tag>
+              </div>
+              <div class="block-desc">{{ item.courseName || '' }}</div>
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
     </div>
   </div>
 </template>
@@ -207,7 +211,7 @@
 import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Reading, Notebook, Document, Calendar, Timer, Collection } from '@element-plus/icons-vue'
+import { Reading, /*Document,*/ Calendar, Collection, EditPen, Document } from '@element-plus/icons-vue'
 import { courseSelectionAPI, studentExamAPI, learningPlanAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
@@ -238,27 +242,27 @@ const errorState = {
 // 增强showMessage函数，确保在任何情况下都能显示消息
 const showMessage = (type, message) => {
   if (!message) return
-  
+
   // 对于错误消息进行防抖处理
   if (type === 'error') {
     const now = Date.now()
-    
+
     // 如果已经显示过错误且在防抖时间内，则不再显示
     if (errorState.hasShownError && (now - errorState.lastErrorTime < errorState.errorDebounceTime)) {
       console.log('错误消息已显示，忽略重复错误:', message)
       return
     }
-    
+
     // 更新错误状态
     errorState.hasShownError = true
     errorState.lastErrorTime = now
   }
-  
+
   try {
     // 防止多个错误消息堆积
     ElMessage.closeAll()
-    
-    switch(type) {
+
+    switch (type) {
       case 'success':
         ElMessage({
           message,
@@ -300,7 +304,7 @@ const showMessage = (type, message) => {
   } catch (err) {
     // 如果Element Plus消息组件出错，降级为console输出
     console.log(`[${type}] ${message}`)
-    
+
     // 尝试使用原生alert作为最后的降级方案(仅用于错误消息)
     if (type === 'error') {
       setTimeout(() => {
@@ -338,12 +342,47 @@ const apiErrorShown = {
 }
 
 // 计算属性
-const courseCount = computed(() => courses.value.length)
-const assignmentCount = computed(() => assignments.value.length)
-const examCount = computed(() => exams.value.length)
-const planCount = computed(() => plans.value.length)
-const recentCourses = computed(() => courses.value.slice(0, 3))
-const recentAssignments = computed(() => assignments.value.slice(0, 3))
+const courseCount = computed(() => (courses.value || []).length)
+// const assignmentCount = computed(() => assignments.value.length)
+// const examCount = computed(() => exams.value.length)
+const planCount = computed(() => (plans.value || []).length)
+const recentCourses = computed(() => (courses.value || []).slice(0, 3))
+// 新增：未完成作业和待参加考试数量
+const unfinishedAssignmentCount = computed(() => (assignments.value || []).filter(a => a.status !== '已提交').length)
+const ongoingExamCount = ref(0)
+const ongoingExamLoading = ref(false)
+
+// 添加缺失的计算属性
+const unfinishedAssignments = computed(() => (assignments.value || []).filter(a => a.status !== '已提交'))
+const ongoingExamDetails = computed(() => (exams.value || []).filter(e => e.status === '进行中'))
+
+// 统计待参加考试数量（进行中且未作答）
+async function updateOngoingExamCount() {
+  if (!userInfo.value || !userInfo.value.studentId) {
+    ongoingExamCount.value = 0
+    return
+  }
+  const ongoingExams = (exams.value || []).filter(e => e.status === '进行中')
+  if (ongoingExams.length === 0) {
+    ongoingExamCount.value = 0
+    return
+  }
+  ongoingExamLoading.value = true
+  try {
+    const results = await Promise.all(
+      ongoingExams.map(e =>
+        studentExamAPI.checkIfExamAnswered(userInfo.value.studentId, e.id)
+          .then(answered => !answered)
+          .catch(() => false)
+      )
+    )
+    ongoingExamCount.value = results.filter(Boolean).length
+  } catch (e) {
+    ongoingExamCount.value = 0
+  } finally {
+    ongoingExamLoading.value = false
+  }
+}
 
 // 颜色列表，用于课程卡片
 const colors = [
@@ -360,21 +399,21 @@ function getRandomColor(index) {
 // 处理课程描述中的标签
 function processDescription(description) {
   if (!description || description === 'string') return { text: '', tags: [] };
-  
+
   // 提取所有 #标签# 格式的标签
   const tagRegex = /#([^#]+)#/g;
   const tags = [];
   let match;
   let processedDesc = description;
-  
+
   // 收集所有标签
   while ((match = tagRegex.exec(description)) !== null) {
     tags.push(match[1]);
   }
-  
+
   // 从描述中移除所有标签
   processedDesc = processedDesc.replace(tagRegex, '').trim();
-  
+
   return {
     text: processedDesc,
     tags: tags
@@ -393,10 +432,20 @@ function getDescriptionTags(description) {
   return processDescription(description).tags;
 }
 
-// 格式化日期
-function formatDate(dateString) {
-  const date = new Date(dateString)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+// 获取作业状态标签类型
+function getAssignmentTagType(status) {
+  switch (status) {
+    case '待提交':
+      return 'info';
+    case '已提交':
+      return 'success';
+    case '已批改':
+      return 'warning';
+    case '已过期':
+      return 'danger';
+    default:
+      return 'info';
+  }
 }
 
 // 更新当前时间
@@ -413,21 +462,7 @@ function updateCurrentTime() {
   currentTime.value = `${hours}:${minutes}:${seconds}`
 }
 
-// 获取作业状态类型
-function getAssignmentStatusType(daysLeft) {
-  if (daysLeft < 0) return 'danger'
-  if (daysLeft <= 1) return 'warning'
-  if (daysLeft <= 3) return 'info'
-  return 'success'
-}
 
-// 获取作业状态文本
-function getAssignmentStatusText(daysLeft) {
-  if (daysLeft < 0) return '已逾期'
-  if (daysLeft === 0) return '今日截止'
-  if (daysLeft === 1) return '明日截止'
-  return `剩余${daysLeft}天`
-}
 
 // 导航到不同页面
 function navigateTo(page) {
@@ -437,9 +472,7 @@ function navigateTo(page) {
       case 'course':
         setActiveMenu('课程')
         break
-      case 'assignment':
-        setActiveMenu('作业')
-        break
+
       case 'exam':
         setActiveMenu('考试')
         break
@@ -456,9 +489,7 @@ function navigateTo(page) {
     case 'course':
       router.push('/student/course')
       break
-    case 'assignment':
-      router.push('/student/homework')
-      break
+
     case 'exam':
       router.push('/student/exam')
       break
@@ -476,21 +507,12 @@ function enterCourse(course) {
   if (setActiveMenu) {
     setActiveMenu('课程')
   }
-  
+
   router.push(`/student/course/${course.id}`)
   showMessage('success', `正在进入课程: ${course.name}`)
 }
 
-// 开始作业
-function startAssignment(assignment) {
-  // 更新左侧导航栏选中状态
-  if (setActiveMenu) {
-    setActiveMenu('作业')
-  }
-  
-  router.push(`/student/assignment/${assignment.id}`)
-  showMessage('success', `开始完成作业: ${assignment.title}`)
-}
+
 
 // 显示邀请码输入框
 function showInviteCodeInput() {
@@ -511,14 +533,14 @@ async function fetchStudentCourses(isRetry = false) {
       courseSelectionAPI.getStudentCourses(userInfo.value.studentId),
       new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 5000))
     ])
-    
+
     // 处理服务器返回空数据的情况
     if (!response || !Array.isArray(response) || response.length === 0) {
       console.warn('服务器返回的课程数据为空或格式不正确:', response)
       courses.value = []
       return
     }
-    
+
     courses.value = response.map(course => {
       return {
         id: course.id,
@@ -533,17 +555,17 @@ async function fetchStudentCourses(isRetry = false) {
         teacherName: course.teacherName || '未知教师'
       };
     })
-    
+
     // 重置错误状态
     apiErrorShown.courses = false
   } catch (error) {
     console.error('获取学生课程失败:', error)
     courses.value = []
-    
+
     // 只在首次错误时显示提示，避免重试时重复提示
     if (!isRetry && !apiErrorShown.courses) {
       apiErrorShown.courses = true
-      
+
       // 只有在401/403错误时才提示用户重新登录
       if (error.response && (error.response.status === 401 || error.response.status === 403)) {
         showMessage('error', '登录已过期，请重新登录')
@@ -560,63 +582,14 @@ async function fetchStudentCourses(isRetry = false) {
   }
 }
 
-// 获取未完成作业数据
-async function fetchAssignments(isRetry = false) {
-  if (!userInfo.value || !userInfo.value.studentId) {
-    console.warn('未找到学生ID，无法获取作业数据')
-    assignments.value = []
-    return
-  }
 
-  try {
-    // 这里应该调用作业相关API，但目前API中没有直接获取作业的方法
-    // 暂时设置为空数组
-    assignments.value = []
-    
-    // 当后端提供作业API后，可以使用类似以下代码：
-    // const response = await Promise.race([
-    //   homeworkAPI.getUnfinishedHomework(userInfo.value.studentId),
-    //   new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 5000))
-    // ])
-    // assignments.value = response.map(hw => ({
-    //   id: hw.id,
-    //   title: hw.title,
-    //   courseName: hw.courseName,
-    //   deadline: hw.deadline,
-    //   daysLeft: calculateDaysLeft(hw.deadline)
-    // }))
-    
-    // 重置错误状态
-    apiErrorShown.assignments = false
-  } catch (error) {
-    console.error('获取作业数据失败:', error)
-    assignments.value = []
-    
-    // 只在首次错误时显示提示
-    if (!isRetry && !apiErrorShown.assignments) {
-      apiErrorShown.assignments = true
-      
-      // 只有在401/403错误时才提示用户重新登录
-      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-        showMessage('error', '登录已过期，请重新登录')
-        setTimeout(() => {
-          router.push('/login')
-        }, 1000)
-      } else {
-        // 显示通用错误消息，但避免重复显示
-        if (!errorState.hasShownError) {
-          showMessage('error', '服务器错误，请稍后再试')
-        }
-      }
-    }
-  }
-}
 
 // 获取近期考试数据
 async function fetchExams(isRetry = false) {
   if (!userInfo.value || !userInfo.value.studentId) {
     console.warn('未找到学生ID，无法获取考试数据')
     exams.value = []
+    updateOngoingExamCount()
     return
   }
 
@@ -625,36 +598,40 @@ async function fetchExams(isRetry = false) {
       studentExamAPI.getStudentExamScores(userInfo.value.studentId, ""),
       new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 5000))
     ])
-    
+
     // 处理服务器返回空数据的情况
     if (!response || (Array.isArray(response) && response.length === 0)) {
       console.warn('服务器返回的考试数据为空')
       exams.value = []
+      updateOngoingExamCount()
       return
     }
-    
+
     // 确保response是数组
     const examData = Array.isArray(response) ? response : [response].filter(Boolean)
-    
+
     // 处理API返回的数据
     exams.value = examData.map(exam => ({
       id: exam.examId,
       title: exam.examTitle || exam.title || '未命名考试',
       courseName: exam.courseName || '未知课程',
       examTime: exam.examTime || exam.startTime,
-      daysLeft: calculateDaysLeft(exam.examTime || exam.startTime)
+      daysLeft: calculateDaysLeft(exam.examTime || exam.startTime),
+      status: exam.status || '',
     }))
-    
+
     // 重置错误状态
     apiErrorShown.exams = false
+    await updateOngoingExamCount()
   } catch (error) {
     console.error('获取考试数据失败:', error)
     exams.value = []
-    
+    updateOngoingExamCount()
+
     // 只在首次错误时显示提示
     if (!isRetry && !apiErrorShown.exams) {
       apiErrorShown.exams = true
-      
+
       // 只有在401/403错误时才提示用户重新登录
       if (error.response && (error.response.status === 401 || error.response.status === 403)) {
         showMessage('error', '登录已过期，请重新登录')
@@ -684,23 +661,23 @@ async function fetchPlans(isRetry = false) {
       learningPlanAPI.getCurrentLearningPlan(userInfo.value.studentId),
       new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 5000))
     ])
-    
+
     // 处理服务器返回空数据的情况
     if (!response) {
       console.warn('服务器返回的学习计划数据为空')
       plans.value = []
       return
     }
-    
+
     // 如果返回的是单个计划对象，将其转换为数组
     const plansData = Array.isArray(response) ? response : [response].filter(Boolean)
-    
+
     // 如果返回的数组为空，设置为空数组
     if (plansData.length === 0) {
       plans.value = []
       return
     }
-    
+
     // 处理API返回的数据
     plans.value = plansData.map(plan => ({
       id: plan.planId,
@@ -708,17 +685,17 @@ async function fetchPlans(isRetry = false) {
       courseName: plan.courseName || '未知课程',
       completionRate: plan.completionRate || plan.progress || 0
     })).filter(plan => plan.id) // 过滤掉无效的计划
-    
+
     // 重置错误状态
     apiErrorShown.plans = false
   } catch (error) {
     console.error('获取学习计划数据失败:', error)
     plans.value = []
-    
+
     // 只在首次错误时显示提示
     if (!isRetry && !apiErrorShown.plans) {
       apiErrorShown.plans = true
-      
+
       // 只有在401/403错误时才提示用户重新登录
       if (error.response && (error.response.status === 401 || error.response.status === 403)) {
         showMessage('error', '登录已过期，请重新登录')
@@ -739,15 +716,15 @@ async function fetchPlans(isRetry = false) {
 function calculateDaysLeft(dateString) {
   const targetDate = new Date(dateString)
   const today = new Date()
-  
+
   // 重置时间部分以便准确计算天数差异
   today.setHours(0, 0, 0, 0)
   targetDate.setHours(0, 0, 0, 0)
-  
+
   // 计算毫秒差并转换为天数
   const diffTime = targetDate - today
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  
+
   return diffDays
 }
 
@@ -761,7 +738,7 @@ onMounted(() => {
     console.error('全局错误:', event.error)
     // 不显示弹窗，只记录错误
   })
-  
+
   // 捕获未处理的Promise错误
   window.addEventListener('unhandledrejection', (event) => {
     console.error('未处理的Promise错误:', event.reason)
@@ -784,22 +761,19 @@ onMounted(() => {
       }, 1000)
       return
     }
-    
+
     console.log('获取到用户信息:', userInfo.value)
 
     // 重置错误状态
     errorState.hasShownError = false
-    
+
     // 获取数据 - 使用Promise.all并添加错误处理
     Promise.all([
       fetchStudentCourses().catch(err => {
         console.error('课程数据加载错误:', err)
         courses.value = [] // 使用空数组
       }),
-      fetchAssignments().catch(err => {
-        console.error('作业数据加载错误:', err)
-        assignments.value = [] // 使用空数组
-      }),
+
       fetchExams().catch(err => {
         console.error('考试数据加载错误:', err)
         exams.value = [] // 使用空数组
@@ -811,17 +785,17 @@ onMounted(() => {
     ]).catch(error => {
       console.error('数据加载过程中发生错误:', error)
       // 确保所有数据都有默认值
-      courses.value = courses.value.length ? courses.value : []
-      assignments.value = assignments.value.length ? assignments.value : []
-      exams.value = exams.value.length ? exams.value : []
-      plans.value = plans.value.length ? plans.value : []
+      courses.value = (courses.value && courses.value.length) ? courses.value : []
+      assignments.value = (assignments.value && assignments.value.length) ? assignments.value : []
+      exams.value = (exams.value && exams.value.length) ? exams.value : []
+      plans.value = (plans.value && plans.value.length) ? plans.value : []
     }).finally(() => {
       loading.value = false // 无论如何都结束加载状态
     })
   } catch (error) {
     console.error('组件挂载过程中发生错误:', error)
     loading.value = false // 确保加载状态结束
-    
+
     // 确保所有数据都有默认值
     courses.value = []
     assignments.value = []
@@ -849,8 +823,10 @@ onUnmounted(() => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  max-height: 100vh; /* 限制最大高度为视口高度 */
-  overflow-y: auto; /* 添加滚动条 */
+  max-height: 100vh;
+  /* 限制最大高度为视口高度 */
+  overflow-y: auto;
+  /* 添加滚动条 */
 }
 
 /* 欢迎区域样式 */
@@ -858,13 +834,15 @@ onUnmounted(() => {
   display: flex;
   background: linear-gradient(135deg, #4B8DE6, #6A5ACD);
   border-radius: 12px;
-  padding: 24px 32px; /* 减少内边距 */
+  padding: 24px 32px;
+  /* 减少内边距 */
   margin-bottom: 20px;
   color: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   position: relative;
-  flex-shrink: 0; /* 防止被压缩 */
+  flex-shrink: 0;
+  /* 防止被压缩 */
 }
 
 .welcome-content {
@@ -909,9 +887,11 @@ onUnmounted(() => {
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px; /* 减少间距 */
+  gap: 16px;
+  /* 减少间距 */
   margin-bottom: 20px;
-  flex-shrink: 0; /* 防止被压缩 */
+  flex-shrink: 0;
+  /* 防止被压缩 */
 }
 
 .feature-card {
@@ -987,8 +967,10 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
-  height: auto; /* 改为自适应高度 */
-  margin-bottom: 20px; /* 确保底部有足够空间 */
+  height: auto;
+  /* 改为自适应高度 */
+  margin-bottom: 20px;
+  /* 确保底部有足够空间 */
 }
 
 .recent-card {
@@ -996,15 +978,18 @@ onUnmounted(() => {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  height: auto; /* 改为自适应高度 */
-  max-height: 450px; /* 设置最大高度 */
+  height: auto;
+  /* 改为自适应高度 */
+  max-height: 450px;
+  /* 设置最大高度 */
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-shrink: 0; /* 防止头部被压缩 */
+  flex-shrink: 0;
+  /* 防止头部被压缩 */
 }
 
 .card-header h3 {
@@ -1033,14 +1018,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 350px; /* 减小最大高度 */
-  padding-right: 4px; /* 为滚动条留出空间 */
+  max-height: 350px;
+  /* 减小最大高度 */
+  padding-right: 4px;
+  /* 为滚动条留出空间 */
 }
 
 .recent-item {
   display: flex;
   align-items: center;
-  padding: 10px 0; /* 减少上下内边距 */
+  padding: 10px 0;
+  /* 减少上下内边距 */
   border-bottom: 1px solid #EBEEF5;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -1055,26 +1043,31 @@ onUnmounted(() => {
 }
 
 .item-icon {
-  width: 36px; /* 减小图标尺寸 */
-  height: 36px; /* 减小图标尺寸 */
+  width: 36px;
+  /* 减小图标尺寸 */
+  height: 36px;
+  /* 减小图标尺寸 */
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px; /* 减小右边距 */
+  margin-right: 12px;
+  /* 减小右边距 */
   color: white;
   flex-shrink: 0;
 }
 
 .item-content {
   flex: 1;
-  overflow: hidden; /* 防止内容溢出 */
+  overflow: hidden;
+  /* 防止内容溢出 */
 }
 
 .item-title {
   font-size: 16px;
   color: #606266;
-  margin: 0 0 6px 0; /* 减小下边距 */
+  margin: 0 0 6px 0;
+  /* 减小下边距 */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1094,10 +1087,13 @@ onUnmounted(() => {
 .item-subtitle {
   font-size: 12px;
   color: #909399;
-  margin-bottom: 3px; /* 减小下边距 */
+  margin-bottom: 3px;
+  /* 减小下边距 */
 }
 
-.course-info, .teacher-info, .time-info {
+.course-info,
+.teacher-info,
+.time-info {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1159,17 +1155,20 @@ onUnmounted(() => {
   .feature-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .recent-section {
-    height: auto; /* 小屏幕上取消固定高度 */
+    height: auto;
+    /* 小屏幕上取消固定高度 */
   }
-  
+
   .recent-list {
-    max-height: 300px; /* 小屏幕上减小列表高度 */
+    max-height: 300px;
+    /* 小屏幕上减小列表高度 */
   }
 }
 
 @media (max-width: 768px) {
+
   .feature-grid,
   .recent-section {
     grid-template-columns: 1fr;
@@ -1179,9 +1178,10 @@ onUnmounted(() => {
   .recent-card {
     margin-bottom: 20px;
   }
-  
+
   .recent-list {
-    max-height: 250px; /* 手机屏幕上进一步减小列表高度 */
+    max-height: 250px;
+    /* 手机屏幕上进一步减小列表高度 */
   }
 
   .welcome-section {
@@ -1237,6 +1237,132 @@ onUnmounted(() => {
   scrollbar-width: thin;
   scrollbar-color: #ccc #f1f1f1;
 }
+
+.task-float-card {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 2000;
+  width: 340px;
+  max-height: 60vh;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  border-radius: 12px;
+  background: #fff;
+}
+.task-float-inner-card {
+  padding-bottom: 32px;
+}
+.task-list-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.task-list-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.task-title {
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+.task-meta {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 2px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.task-desc {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 2px;
+}
+.task-float-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+.task-float-open {
+  position: fixed;
+  right: 40px;
+  bottom: 40px;
+  z-index: 2001;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.fixed-task-block {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  width: 340px;
+  height: 340px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 0 0 0;
+}
+.block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  font-size: 15px;
+  padding: 0 8px;
+}
+.block-brief {
+  color: #888;
+  font-size: 13px;
+  font-weight: normal;
+  margin-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.block-list-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0 8px 0 16px;
+}
+.block-list-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.block-title {
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+.block-meta {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 2px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.block-desc {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 2px;
+}
+.block-empty {
+  color: #aaa;
+  text-align: center;
+  padding: 24px 0;
+}
 </style>
 
 <style>
@@ -1271,9 +1397,20 @@ onUnmounted(() => {
 
 /* 消息淡入淡出动画 */
 @keyframes fadeInOut {
-  0% { opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 </style>

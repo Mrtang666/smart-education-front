@@ -199,12 +199,14 @@
 
 <script>
 import { studentExamAPI } from '@/api/api';
+import { getUserInfo } from '@/utils/auth';
 
 export default {
   name: 'StudentExamDetail',
   data() {
     return {
       // 考试信息
+      studentId: getUserInfo().studentId,
       examId: null,
       examInfo: {},
       questions: [],
@@ -307,15 +309,15 @@ export default {
       this.loading = true;
       
       try {
-        // 确保ID是字符串类型
-        const examIdStr = String(this.examId);
+        const sid = String(this.studentId);
+        const eid = String(this.examId);
         
         // 获取考试信息
-        const examInfo = await studentExamAPI.getExamDetailByTitle(this.$store.state.user.userId, examIdStr);
+        const examInfo = await studentExamAPI.getExamDetail(sid, eid);
         this.examInfo = examInfo;
         
-        // 获取考试题目
-        const answers = await studentExamAPI.getStudentExamAnswers(this.$store.state.user.userId, examIdStr);
+        // 获取考试题目和作答
+        const answers = await studentExamAPI.getStudentExamAnswers(sid, eid);
         
         // 处理题目和答案
         if (Array.isArray(answers)) {
@@ -466,18 +468,16 @@ export default {
       }
       
       try {
-        // 准备提交数据
         const answerData = {
-          examId: this.examId,
-          questionId: questionId,
-          studentId: this.$store.state.user.userId,
+          examId: String(this.examId),
+          questionId: String(questionId),
+          studentId: String(this.studentId),
           studentAnswer: question.questionType === 'MULTIPLE_CHOICE' ? answer.join(',') : answer,
           examTitle: this.examInfo.title,
           questionContent: question.content,
           questionType: question.questionType
         };
         
-        // 提交答案
         await studentExamAPI.submitAnswer(answerData);
 
         // 标记为已答题
@@ -518,9 +518,9 @@ export default {
           const answer = this.userAnswers[questionId];
           
           return {
-            examId: this.examId,
-            questionId: questionId,
-            studentId: this.$store.state.user.userId,
+            examId: String(this.examId),
+            questionId: String(questionId),
+            studentId: String(this.studentId),
             studentAnswer: question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer) ? answer.join(',') : (answer || ''),
             examTitle: this.examInfo.title,
             questionContent: question.content,

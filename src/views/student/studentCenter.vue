@@ -94,9 +94,14 @@ import {
     Close,
     Position,
     Reading,
-    Document,
+    // Document,
     DataAnalysis,
+<<<<<<< Updated upstream
     Notebook,
+=======
+    // Notebook,
+    Calendar,
+>>>>>>> Stashed changes
     Setting,
     HomeFilled
 } from '@element-plus/icons-vue'
@@ -183,8 +188,12 @@ const chatSuggestions = ref([
 const menuList = [
     { name: '首页', icon: HomeFilled },
     { name: '课程', icon: Reading },
+<<<<<<< Updated upstream
     { name: '作业', icon: Notebook },
     { name: '考试', icon: Document },
+=======
+    { name: '日程', icon: Calendar },
+>>>>>>> Stashed changes
     { name: '计划', icon: DataAnalysis },
     { name: '设置', icon: Setting }
 ]
@@ -244,11 +253,16 @@ function handleMenuClick(menu) {
         case '课程':
             router.push('/student/course')
             break
+<<<<<<< Updated upstream
         case '作业':
             router.push('/student/homework')
             break
         case '考试':
             router.push('/student/exam')
+=======
+        case '日程':
+            router.push('/student/schedule')
+>>>>>>> Stashed changes
             break
         case '计划':
             router.push('/student/plan')

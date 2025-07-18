@@ -62,13 +62,25 @@
       </el-tab-pane>
       
       <el-tab-pane label="创建学习计划" name="create">
-        <el-form ref="planForm" :model="newPlan" label-width="120px" class="plan-form">
-          <el-form-item label="学习目标" prop="targetGoal" required>
-            <el-input v-model="newPlan.targetGoal" type="textarea" placeholder="请输入您的学习目标"></el-input>
+        <el-form ref="planForm" :model="newPlan" :rules="planFormRules" label-width="120px" class="plan-form">
+          <el-form-item label="学习目标" prop="targetGoal">
+            <el-input
+              v-model="newPlan.targetGoal"
+              type="textarea"
+              placeholder="请输入您的学习目标（10-200字符）"
+              :rows="3"
+              maxlength="200"
+              show-word-limit
+            ></el-input>
           </el-form-item>
-          
-          <el-form-item label="时间范围(天)" prop="timeFrame" required>
-            <el-input-number v-model="newPlan.timeFrame" :min="1" :max="90"></el-input-number>
+
+          <el-form-item label="时间范围(天)" prop="timeFrame">
+            <el-input-number
+              v-model="newPlan.timeFrame"
+              :min="1"
+              :max="90"
+              placeholder="请选择学习时间范围"
+            ></el-input-number>
           </el-form-item>
           
           <el-form-item label="选择课程">
@@ -198,23 +210,67 @@ export default {
     const knowledgePoints = ref([]);
     const loading = ref(false);
     const knowledgeLoading = ref(false);
+
+    // 细粒度加载状态
+    const loadingStates = reactive({
+      currentPlan: false,
+      resources: false,
+      history: false,
+      search: false,
+      courses: false
+    });
     
     // 从认证信息中获取当前学生ID
     const userInfo = getUserInfo();
     const studentId = ref(userInfo.studentId);
+
+    // 错误重试机制
+    const retryFetch = async (fetchFunction, maxRetries = 3, retryDelay = 1000) => {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await fetchFunction();
+        } catch (error) {
+          console.warn(`第${i + 1}次尝试失败:`, error.message);
+
+          if (i === maxRetries - 1) {
+            // 最后一次尝试失败，抛出错误
+            throw error;
+          }
+
+          // 等待后重试，每次等待时间递增
+          await new Promise(resolve => setTimeout(resolve, retryDelay * (i + 1)));
+        }
+      }
+    };
     
     const searchKeyword = ref('');
     const searchResults = ref([]);
     const planDetailsVisible = ref(false);
     const selectedPlan = ref(null);
     
-    // 当前是计划的第几天
-    const currentDay = ref(1);
-    
+    // 计算当前是计划的第几天
+    const currentDay = computed(() => {
+      if (!currentPlan.value || !currentPlan.value.createdAt) return 1;
+
+      const startDate = new Date(currentPlan.value.createdAt);
+      const today = new Date();
+
+      // 重置时间到当天开始，避免时间差异
+      startDate.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - startDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 因为第一天是第1天
+
+      // 确保天数在合理范围内
+      const maxDays = currentPlan.value.timeFrame || 30;
+      return Math.max(1, Math.min(diffDays, maxDays));
+    });
+
     // 计算今日活动
     const todayActivities = computed(() => {
       if (!currentPlan.value || !currentPlan.value.dailyActivities) return [];
-      
+
       // 查找当前天的活动
       const todayPlan = currentPlan.value.dailyActivities.find(day => day.day === currentDay.value);
       return todayPlan ? todayPlan.activities : [];
@@ -227,20 +283,38 @@ export default {
       knowledgeNames: [],
       selectedCourseIds: []
     });
+
+    // 表单验证规则
+    const planFormRules = reactive({
+      targetGoal: [
+        { required: true, message: '请输入学习目标', trigger: 'blur' },
+        { min: 10, max: 200, message: '学习目标长度应在10-200字符之间', trigger: 'blur' }
+      ],
+      timeFrame: [
+        { required: true, message: '请选择时间范围', trigger: 'change' },
+        { type: 'number', min: 1, max: 90, message: '时间范围应在1-90天之间', trigger: 'change' }
+      ]
+    });
     
     // 获取当前学习计划
     const fetchCurrentPlan = async () => {
+      loadingStates.currentPlan = true;
       try {
-        const response = await learningPlanAPI.getCurrentLearningPlan(studentId.value);
+        const response = await retryFetch(
+          () => learningPlanAPI.getCurrentLearningPlan(studentId.value)
+        );
+
         currentPlan.value = response;
-        
+
         if (currentPlan.value) {
           // 获取推荐资源
           fetchRecommendedResources();
         }
       } catch (error) {
         console.error('获取当前学习计划失败:', error);
-        ElMessage.error('获取当前学习计划失败');
+        ElMessage.error('获取当前学习计划失败，请检查网络连接后重试');
+      } finally {
+        loadingStates.currentPlan = false;
       }
     };
     
@@ -342,11 +416,32 @@ export default {
     
     // 生成学习计划
     const generatePlan = async () => {
-      if (!newPlan.targetGoal || !newPlan.timeFrame) {
-        ElMessage.warning('请填写学习目标和时间范围');
+      // 表单验证
+      const planFormRef = document.querySelector('.plan-form');
+      if (planFormRef) {
+        try {
+          const isValid = await planFormRef.validate();
+          if (!isValid) {
+            ElMessage.warning('请检查表单填写是否正确');
+            return;
+          }
+        } catch (error) {
+          ElMessage.warning('请完善表单信息');
+          return;
+        }
+      }
+
+      // 基础验证
+      if (!newPlan.targetGoal || newPlan.targetGoal.trim().length < 10) {
+        ElMessage.warning('学习目标至少需要10个字符');
         return;
       }
-      
+
+      if (!newPlan.timeFrame || newPlan.timeFrame < 1 || newPlan.timeFrame > 90) {
+        ElMessage.warning('时间范围应在1-90天之间');
+        return;
+      }
+
       if (!studentId.value) {
         ElMessage.error('无法获取学生ID，请重新登录');
         return;
@@ -400,6 +495,34 @@ export default {
       }
     };
     
+    // 重新计算学习计划进度
+    const recalculateProgress = () => {
+      if (!currentPlan.value?.dailyActivities) return;
+
+      let totalActivities = 0;
+      let completedActivities = 0;
+
+      currentPlan.value.dailyActivities.forEach(day => {
+        if (day.activities && Array.isArray(day.activities)) {
+          day.activities.forEach(activity => {
+            totalActivities++;
+            if (activity.status === 'completed') {
+              completedActivities++;
+            }
+          });
+        }
+      });
+
+      const newProgress = totalActivities > 0
+        ? Math.round((completedActivities / totalActivities) * 100)
+        : 0;
+
+      if (currentPlan.value.progress !== newProgress) {
+        currentPlan.value.progress = newProgress;
+        console.log(`进度已更新: ${newProgress}% (${completedActivities}/${totalActivities})`);
+      }
+    };
+
     // 重置表单
     const resetForm = () => {
       newPlan.targetGoal = '';
@@ -408,6 +531,12 @@ export default {
       newPlan.knowledgeNames = [];
       newPlan.selectedCourseIds = [];
       knowledgePoints.value = [];
+
+      // 清除表单验证状态
+      const planFormRef = document.querySelector('.plan-form');
+      if (planFormRef && planFormRef.clearValidate) {
+        planFormRef.clearValidate();
+      }
     };
     
     // 更新活动状态
@@ -426,40 +555,43 @@ export default {
         
         // 处理后端返回的响应数据
         if (response) {
-          // 更新计划的完成进度
-          if (response.newCompletionRate !== undefined) {
-            currentPlan.value.progress = response.newCompletionRate;
-          }
-          
           // 更新活动状态
           if (currentPlan.value.dailyActivities) {
             currentPlan.value.dailyActivities.forEach(dayPlan => {
               const activity = dayPlan.activities.find(act => act.activityId === activityId);
               if (activity) {
                 activity.status = response.status || status;
-                activity.updatedAt = response.updatedAt;
+                activity.updatedAt = response.updatedAt || new Date().toISOString();
               }
             });
           }
-          
+
+          // 重新计算进度
+          recalculateProgress();
+
+          // 如果后端返回了新的完成率，使用后端数据
+          if (response.newCompletionRate !== undefined) {
+            currentPlan.value.progress = response.newCompletionRate;
+          }
+
           // 显示成功消息，包含最新的完成率
-          ElMessage.success(`活动状态更新成功，当前完成进度: ${response.newCompletionRate || currentPlan.value.progress || 0}%`);
+          ElMessage.success(`活动状态更新成功，当前完成进度: ${currentPlan.value.progress || 0}%`);
         } else {
           // 如果没有响应数据，仍然尝试更新本地状态
-          ElMessage.success('活动状态已更新');
-          
-          // 尝试在本地更新活动状态
           if (currentPlan.value.dailyActivities) {
             currentPlan.value.dailyActivities.forEach(dayPlan => {
               const activity = dayPlan.activities.find(act => act.activityId === activityId);
               if (activity) {
                 activity.status = status;
+                activity.updatedAt = new Date().toISOString();
               }
             });
           }
-          
-          // 刷新当前计划以获取最新数据
-          fetchCurrentPlan();
+
+          // 重新计算进度
+          recalculateProgress();
+
+          ElMessage.success(`活动状态已更新，当前完成进度: ${currentPlan.value.progress || 0}%`);
         }
       } catch (error) {
         console.error('更新活动状态失败:', error);
@@ -626,8 +758,10 @@ export default {
       courses,
       knowledgePoints,
       newPlan,
+      planFormRules,
       loading,
       knowledgeLoading,
+      loadingStates,
       searchKeyword,
       searchResults,
       planDetailsVisible,
@@ -704,15 +838,15 @@ export default {
 }
 
 .resources-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 20px;
   margin-top: 20px;
   margin-bottom: 60px;
 }
 
 .resource-card {
-  height: 100%;
+  width: 100%;
   text-align: left;
 }
 
@@ -722,13 +856,14 @@ export default {
 }
 
 .history-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 20px;
   margin-top: 20px;
 }
 
 .history-card {
+  width: 100%;
   text-align: left;
 }
 
@@ -741,8 +876,8 @@ export default {
 }
 
 .search-results {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
