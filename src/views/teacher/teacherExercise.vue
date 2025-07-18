@@ -15,8 +15,8 @@
                     <el-select v-if="selectedCourseId" v-model="selectedHomeworkId" placeholder="选择作业"
                         @change="handleHomeworkSelect" class="homework-select">
                         <el-option label="全部作业" value="" />
-                        <el-option v-for="homework in courseHomeworks" :key="homework.examId" :label="homework.title"
-                            :value="homework.examId" />
+                        <el-option v-for="homework in courseHomeworks" :key="homework.assignmentId" :label="homework.title"
+                            :value="homework.assignmentId" />
                     </el-select>
                     <el-input v-model="searchKeyword" placeholder="搜索作业" class="search-input" @input="handleSearch">
                         <template #suffix>
@@ -84,20 +84,10 @@
             </el-descriptions>
 
             <div class="detail-actions">
-                <el-button type="primary" @click="editHomework(selectedHomework)">
+                <el-button type="primary" @click.stop="editHomework(selectedHomework)">
                     <el-icon>
-                        <Edit />
-                    </el-icon>编辑作业
-                </el-button>
-                <el-button type="success" @click="viewSubmissions(selectedHomework)">
-                    <el-icon>
-                        <DataAnalysis />
-                    </el-icon>查看提交
-                </el-button>
-                <el-button type="danger" @click="confirmDeleteHomework(selectedHomework)">
-                    <el-icon>
-                        <Delete />
-                    </el-icon>删除作业
+                        <View />
+                    </el-icon>查看详情
                 </el-button>
             </div>
         </div>
@@ -149,22 +139,12 @@
                             </el-tag>
                         </template>
                     </el-table-column>
-                    <el-table-column label="操作" width="220" fixed="right">
+                    <el-table-column label="操作" width="100" fixed="right">
                         <template #default="scope">
-                            <el-button type="primary" link @click="editHomework(scope.row)">
+                            <el-button type="primary" link @click.stop="editHomework(scope.row)">
                                 <el-icon>
-                                    <Edit />
-                                </el-icon>编辑
-                            </el-button>
-                            <el-button type="success" link @click="viewSubmissions(scope.row)">
-                                <el-icon>
-                                    <DataAnalysis />
-                                </el-icon>提交
-                            </el-button>
-                            <el-button type="danger" link @click="confirmDeleteHomework(scope.row)">
-                                <el-icon>
-                                    <Delete />
-                                </el-icon>删除
+                                    <View />
+                                </el-icon>查看详情
                             </el-button>
                         </template>
                     </el-table-column>
@@ -252,9 +232,9 @@
 
 <script setup>
 import { ref, onMounted, nextTick, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { examAPI, courseAPI } from '@/api/api'
-import { Plus, Edit, Delete, Search, DataAnalysis, Timer, Calendar, Loading } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { assignmentAPI, courseAPI } from '@/api/api'
+import { Plus, Search, Timer, Calendar, Loading, View } from '@element-plus/icons-vue'
 import { getUserInfo } from '@/utils/auth'
 import { useRouter } from 'vue-router'
 import { formatDateTime } from '@/utils/examManager'
@@ -264,7 +244,7 @@ const router = useRouter()
 
 // 用户信息
 const userInfo = getUserInfo()
-const teacherId = userInfo ? userInfo.teacherId : null
+const teacherId = userInfo ? (userInfo.teacherId || userInfo.studentId || userInfo.id) : null
 
 // 课程和作业列表
 const courseList = ref([])
@@ -432,28 +412,82 @@ const loadCourses = async () => {
 const loadHomeworks = async () => {
     loading.value = true
     try {
+        console.log('=== 开始加载作业列表 ===')
+        console.log('用户信息:', userInfo)
+        console.log('教师ID:', teacherId)
+
+        // 检查token
+        const token = localStorage.getItem('token')
+        console.log('Token存在:', !!token)
+        console.log('Token长度:', token ? token.length : 0)
+        if (token) {
+            console.log('Token前10位:', token.substring(0, 10))
+        }
+
         // 确保teacherId是有效的
         if (!teacherId) {
             console.error('教师ID不存在')
+            console.error('完整用户信息:', JSON.stringify(userInfo, null, 2))
             ElMessage.error('无法获取教师信息，请重新登录')
             loading.value = false
             return
         }
 
-        console.log('正在获取教师作业，教师ID:', teacherId)
-        
-        // 使用getExamsByTeacher接口获取所有考试/作业数据
-        let res = await examAPI.getExamsByTeacher(teacherId)
-        console.log('获取到的教师所有考试/作业数据:', res)
-        
-        // 在前端筛选出type为'homework'的作业数据
-        if (Array.isArray(res)) {
-            res = res.filter(item => item.type === 'homework')
-            console.log('筛选后的作业数据:', res)
-        } else {
-            console.warn('API返回的数据不是数组格式:', res)
+        console.log('正在获取教师作业，教师ID:', teacherId, '类型: homework')
+
+        // 先尝试获取所有作业（不限类型）
+        console.log('尝试获取所有作业（不限类型）...')
+        let allAssignments = await assignmentAPI.getAssignmentsByCreatorId(teacherId)
+        console.log('获取到的所有作业数据:', allAssignments)
+
+        // 根据用户状态决定type参数
+        // 教师状态使用 TEACHER_ASSIGNED，学生状态使用 ASSIGNMENT_UPLOAD
+        const assignmentType = 'TEACHER_ASSIGNED' // 教师页面使用教师分配类型
+        console.log('尝试获取指定类型作业，类型:', assignmentType)
+        let res = await assignmentAPI.getAssignmentsByCreatorIdAndType(teacherId, assignmentType)
+        console.log('获取到的指定类型作业数据:', res)
+
+        // 如果指定类型作业为空，使用所有作业并过滤
+        if (!Array.isArray(res) || res.length === 0) {
+            console.log('指定类型作业为空，使用所有作业数据')
+            res = allAssignments || []
+
+            // 手动过滤教师分配的作业类型
+            if (Array.isArray(res)) {
+                res = res.filter(assignment =>
+                    assignment.type === 'TEACHER_ASSIGNED' ||
+                    assignment.type === 'homework' ||
+                    assignment.type === 'assignment' ||
+                    (assignment.type && assignment.type.includes('TEACHER_ASSIGNED')) ||
+                    !assignment.type // 如果没有type字段，也包含进来
+                )
+                console.log('过滤后的作业数据:', res)
+            }
+        }
+
+        // 确保返回数组格式
+        if (!Array.isArray(res)) {
+            console.log('作业数据格式异常，使用空数组')
             res = []
         }
+
+        console.log('最终作业数据数量:', res.length)
+
+        // 字段映射：将assignmentAPI的字段映射为页面期望的字段
+        res = res.map(assignment => ({
+            ...assignment,
+            // 确保ID字段统一 - 作业管理页面使用assignmentId
+            assignmentId: assignment.assignmentId || assignment.id,
+            // 确保其他必要字段存在
+            title: assignment.title || assignment.name || '未命名作业',
+            description: assignment.description || '',
+            totalScore: assignment.totalScore || assignment.score || 0,
+            endTime: assignment.endTime || assignment.deadline,
+            courseId: assignment.courseId || assignment.course_id,
+            teacherId: assignment.creatorId || assignment.teacherId,
+            // 保持原有字段
+            type: assignment.type || 'TEACHER_ASSIGNED' // 使用原始类型或默认为教师分配类型
+        }))
 
         // 存储所有作业供下拉框使用
         allHomeworks.value = res
@@ -503,8 +537,32 @@ const loadHomeworks = async () => {
             initCharts()
         })
     } catch (error) {
-        console.error('加载作业失败:', error)
-        ElMessage.error('加载作业列表失败')
+        console.error('=== 加载作业失败详细信息 ===')
+        console.error('错误对象:', error)
+        console.error('错误消息:', error.message)
+
+        if (error.response) {
+            console.error('HTTP状态码:', error.response.status)
+            console.error('响应数据:', error.response.data)
+            console.error('响应头:', error.response.headers)
+
+            if (error.response.status === 401) {
+                ElMessage.error('认证失败，请重新登录')
+                // 可以在这里跳转到登录页
+            } else if (error.response.status === 403) {
+                ElMessage.error('权限不足，无法访问作业数据')
+            } else if (error.response.status === 404) {
+                ElMessage.error('API接口不存在')
+            } else {
+                ElMessage.error(`加载作业列表失败: ${error.response.data?.message || error.message}`)
+            }
+        } else if (error.request) {
+            console.error('请求对象:', error.request)
+            ElMessage.error('网络请求失败，请检查网络连接')
+        } else {
+            ElMessage.error(`加载作业列表失败: ${error.message}`)
+        }
+
         homeworkList.value = []
     } finally {
         loading.value = false
@@ -805,39 +863,25 @@ const showCreateDialog = () => {
     dialogVisible.value = true
 }
 
-// 编辑作业
+// 编辑作业 - 跳转到作业详情页面
 const editHomework = (homework) => {
-    homeworkFormTitle.value = '编辑作业'
-    isEdit.value = true
-    
-    // 处理截止日期格式
-    let formattedDeadline = homework.endTime;
-    if (formattedDeadline && formattedDeadline.includes('T')) {
-        // 将ISO格式转换为YYYY-MM-DD HH:mm:ss格式
-        formattedDeadline = formattedDeadline.replace('T', ' ').substring(0, 19);
+    console.log('编辑作业被点击，跳转到详情页面:', homework)
+
+    if (!homework.assignmentId) {
+        console.error('作业ID不存在，无法跳转')
+        ElMessage.error('作业ID不存在，无法跳转到详情页面')
+        return
     }
-    
-    homeworkForm.value = {
-        examId: homework.examId,
-        title: homework.title,
-        description: homework.description || '',
-        courseId: homework.courseId,
-        teacherId: homework.teacherId,
-        totalScore: homework.totalScore,
-        endTime: formattedDeadline,
-        status: homework.status || '未开始',
-        type: 'homework' // 确保type字段设置为作业类型
-    }
-    
-    // 如果有附件，加载附件列表
-    homeworkFileList.value = homework.attachments ? homework.attachments.map(attachment => ({
-        name: attachment.fileName,
-        url: attachment.fileUrl,
-        size: attachment.fileSize,
-        type: attachment.fileType
-    })) : []
-    
-    dialogVisible.value = true
+
+    // 跳转到作业详情页面
+    router.push({
+        path: `/teacher/homework/${homework.assignmentId}`,
+        query: {
+            title: homework.title,
+            courseId: homework.courseId,
+            from: 'exercise' // 标记来源页面
+        }
+    })
 }
 
 // 提交作业表单
@@ -847,10 +891,14 @@ const submitHomework = async () => {
     await homeworkFormRef.value.validate(async (valid) => {
         if (valid) {
             try {
-                // 准备提交数据
+                // 准备提交数据，确保字段名符合assignmentAPI的期望
                 const submitData = {
                     ...homeworkForm.value,
-                    type: 'homework' // 确保type字段设置为作业类型
+                    // 确保使用正确的ID字段
+                    assignmentId: homeworkForm.value.assignmentId,
+                    // 确保其他字段正确
+                    creatorId: homeworkForm.value.teacherId, // assignmentAPI使用creatorId字段
+                    type: homeworkForm.value.type || 'TEACHER_ASSIGNED' // 确保type字段正确
                 }
                 
                 // 处理截止日期 - 确保数据格式正确
@@ -903,10 +951,10 @@ const submitHomework = async () => {
                 // 发送API请求
                 let response;
                 if (isEdit.value) {
-                    response = await examAPI.updateExam(submitData);
+                    response = await assignmentAPI.updateAssignment(submitData);
                     ElMessage.success('作业更新成功');
                 } else {
-                    response = await examAPI.saveExam(submitData);
+                    response = await assignmentAPI.saveAssignment(submitData);
                     ElMessage.success('作业创建成功');
                 }
                 
@@ -946,57 +994,7 @@ const submitHomework = async () => {
     });
 }
 
-// 确认删除作业
-const confirmDeleteHomework = (homework) => {
-    ElMessageBox.confirm(`确定要删除作业 "${homework.title}" 吗?`, '删除确认', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-    }).then(async () => {
-        try {
-            await examAPI.deleteExamById(homework.examId)
-            ElMessage.success('删除成功')
-            
-            // 如果当前有选中课程，且删除的作业是这个课程的，重新加载该课程作业
-            if (selectedCourseId.value && selectedCourseId.value === homework.courseId) {
-                // 如果删除的就是当前选中的作业，重置选中状态
-                if (selectedHomeworkId.value === homework.examId) {
-                    selectedHomeworkId.value = ''
-                    selectedHomework.value = null
-                }
-                handleCourseSelect()
-            } else {
-                // 否则重新加载所有作业
-                loadHomeworks()
-            }
-        } catch (error) {
-            console.error('删除作业失败:', error)
-            ElMessage.error('删除作业失败: ' + (error.response?.data?.message || error.message))
-        }
-    }).catch(() => {
-        // 用户取消删除
-    })
-}
 
-// 查看作业提交情况
-const viewSubmissions = (homework) => {
-    // 如果作业状态是未开始，提示未开始
-    if (homework.status === '未开始') {
-        ElMessage.warning('作业尚未开始，暂无提交数据')
-        return
-    }
-    
-    // 跳转到作业提交页面
-    router.push({
-        path: `/teacher/homework/submissions/${homework.examId}`,
-        query: {
-            title: homework.title,
-            courseId: homework.courseId,
-            courseName: getCourseNameById(homework.courseId),
-            type: 'homework' // 确保传递type参数
-        }
-    })
-}
 
 // 格式化日期时间
 const formatDateTimeLocal = (dateTimeStr) => {
@@ -1025,7 +1023,7 @@ const getStatusType = (status) => {
 const handleHomeworkSelect = () => {
     if (selectedHomeworkId.value) {
         // 从已加载的作业中查找选中的作业
-        selectedHomework.value = courseHomeworks.value.find(homework => homework.examId === selectedHomeworkId.value)
+        selectedHomework.value = courseHomeworks.value.find(homework => homework.assignmentId === selectedHomeworkId.value)
 
         // 如果找不到，可能需要重新加载
         if (!selectedHomework.value) {
@@ -1049,18 +1047,33 @@ const handleCourseSelect = async () => {
             loading.value = true
             console.log('加载课程作业，课程ID:', selectedCourseId.value)
             
-            // 使用getExamsInCourse接口获取所有考试/作业数据
-            let res = await examAPI.getExamsInCourse(selectedCourseId.value)
-            console.log('获取到的课程所有考试/作业数据:', res)
-            
-            // 在前端筛选出type为'homework'的作业数据
-            if (Array.isArray(res)) {
-                res = res.filter(item => item.type === 'homework')
-                console.log('筛选后的课程作业数据:', res)
-            } else {
-                console.warn('API返回的课程作业数据不是数组格式:', res)
+            // 使用assignmentAPI获取课程的所有作业数据
+            // 教师状态使用 TEACHER_ASSIGNED 类型
+            const assignmentType = 'TEACHER_ASSIGNED'
+            let res = await assignmentAPI.getAssignmentsByCourseIdAndType(selectedCourseId.value, assignmentType)
+            console.log('获取到的课程作业数据，类型:', assignmentType, '数据:', res)
+
+            // assignmentAPI直接返回作业数据，无需筛选
+            if (!Array.isArray(res)) {
                 res = []
+                console.log('课程作业数据格式异常，使用空数组')
             }
+
+            // 字段映射：将assignmentAPI的字段映射为页面期望的字段
+            res = res.map(assignment => ({
+                ...assignment,
+                // 确保ID字段统一 - 作业管理页面使用assignmentId
+                assignmentId: assignment.assignmentId || assignment.id,
+                // 确保其他必要字段存在
+                title: assignment.title || assignment.name || '未命名作业',
+                description: assignment.description || '',
+                totalScore: assignment.totalScore || assignment.score || 0,
+                endTime: assignment.endTime || assignment.deadline,
+                courseId: assignment.courseId || assignment.course_id,
+                teacherId: assignment.creatorId || assignment.teacherId,
+                // 保持原有字段
+                type: assignment.type || 'TEACHER_ASSIGNED' // 使用原始类型或默认为教师分配类型
+            }))
             
             // 存储该课程的作业列表
             courseHomeworks.value = res

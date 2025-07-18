@@ -64,10 +64,7 @@
                     <el-icon><Delete /></el-icon>
                     批量删除 ({{ selectedProblems.length }})
                   </el-button>
-                  <el-button @click="refreshProblemStatistics">
-                    <el-icon><Refresh /></el-icon>
-                    刷新统计
-                  </el-button>
+
                 </div>
               </div>
 
@@ -85,6 +82,38 @@
                   </el-col>
                   <el-col :span="6">
                     <el-statistic title="题目类型" :value="Object.keys(problemStatistics.typeStatistics || {}).length" suffix="种" />
+                  </el-col>
+                </el-row>
+              </div>
+
+              <!-- 题型统计图表 -->
+              <div class="problem-charts" v-if="problemStatistics && Object.keys(problemStatistics.typeStatistics || {}).length > 0">
+                <el-row :gutter="20">
+                  <el-col :span="12">
+                    <el-card class="chart-card">
+                      <template #header>
+                        <div class="chart-header">
+                          <span>题型数量分布</span>
+                          <el-tooltip content="显示各题型的题目数量分布" placement="top">
+                            <el-icon><QuestionFilled /></el-icon>
+                          </el-tooltip>
+                        </div>
+                      </template>
+                      <div ref="typeCountChart" class="chart-container"></div>
+                    </el-card>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-card class="chart-card">
+                      <template #header>
+                        <div class="chart-header">
+                          <span>题型分值分布</span>
+                          <el-tooltip content="显示各题型的分值占比分布" placement="top">
+                            <el-icon><QuestionFilled /></el-icon>
+                          </el-tooltip>
+                        </div>
+                      </template>
+                      <div ref="typeScoreChart" class="chart-container"></div>
+                    </el-card>
                   </el-col>
                 </el-row>
               </div>
@@ -388,10 +417,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled, ArrowLeft, /* Edit, */ Check, Upload, Refresh, Plus, Download, Delete, Search } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
 import { assignmentAPI, problemAPI, courseSelectionAPI, studentAnswerAPI, studentExamAPI } from '@/api/api'
 
 // 组件引用
@@ -480,6 +510,12 @@ const submissions = ref([])
 
 // 课程学生总数
 const totalStudentsCount = ref(0)
+
+// 图表相关
+const typeCountChart = ref(null)          // 题型数量图表DOM引用
+const typeScoreChart = ref(null)          // 题型分值图表DOM引用
+let typeCountChartInstance = null         // 题型数量图表实例
+let typeScoreChartInstance = null         // 题型分值图表实例
 
 // 对话框控制
 const analysisDialogVisible = ref(false)
@@ -699,10 +735,20 @@ async function refreshProblemStatistics() {
     const stats = await problemAPI.getProblemStatistics(homeworkId.value)
     problemStatistics.value = stats
     console.log('题目统计信息:', stats)
+
+    // 更新图表
+    nextTick(() => {
+      updateCharts()
+    })
   } catch (error) {
     console.error('获取题目统计失败:', error)
     // 如果API不存在，使用本地计算
     calculateLocalStatistics()
+
+    // 更新图表
+    nextTick(() => {
+      updateCharts()
+    })
   }
 }
 
@@ -1072,6 +1118,416 @@ function getScorePercentage() {
   return Math.min(Math.round((score / 100) * 100), 100)
 }
 
+// ==================== 图表相关功能 ====================
+
+// 题型文本映射
+const problemTypeMap = {
+  'SINGLE_CHOICE': '单选题',
+  'MULTI_CHOICE': '多选题',
+  'FILL_BLANK': '填空题',
+  'ESSAY_QUESTION': '简答题',
+  'TRUE_FALSE': '判断题'
+}
+
+// 初始化图表
+function initCharts() {
+  console.log('开始初始化图表...')
+
+  nextTick(() => {
+    // 等待DOM完全渲染和CSS样式应用
+    setTimeout(() => {
+      console.log('DOM元素检查:')
+      console.log('typeCountChart:', typeCountChart.value)
+      console.log('typeScoreChart:', typeScoreChart.value)
+
+      if (typeCountChart.value) {
+        try {
+          if (typeCountChartInstance) {
+            typeCountChartInstance.dispose()
+            typeCountChartInstance = null
+          }
+
+          // 检查容器尺寸
+          const containerWidth = typeCountChart.value.offsetWidth
+          const containerHeight = typeCountChart.value.offsetHeight
+          console.log('题型数量图表容器尺寸:', { width: containerWidth, height: containerHeight })
+
+          // 如果容器尺寸为0，等待更长时间
+          if (containerWidth === 0 || containerHeight === 0) {
+            console.log('容器尺寸为0，延迟初始化...')
+            setTimeout(() => initCharts(), 500)
+            return
+          }
+
+          console.log('创建题型数量图表实例...')
+          typeCountChartInstance = echarts.init(typeCountChart.value)
+          console.log('题型数量图表实例创建成功')
+
+        } catch (error) {
+          console.error('创建题型数量图表失败:', error)
+        }
+      } else {
+        console.error('typeCountChart DOM元素不存在')
+      }
+
+      if (typeScoreChart.value) {
+        try {
+          if (typeScoreChartInstance) {
+            typeScoreChartInstance.dispose()
+            typeScoreChartInstance = null
+          }
+
+          // 检查容器尺寸
+          const containerWidth = typeScoreChart.value.offsetWidth
+          const containerHeight = typeScoreChart.value.offsetHeight
+          console.log('题型分值图表容器尺寸:', { width: containerWidth, height: containerHeight })
+
+          // 如果容器尺寸为0，等待更长时间
+          if (containerWidth === 0 || containerHeight === 0) {
+            console.log('容器尺寸为0，延迟初始化...')
+            setTimeout(() => initCharts(), 500)
+            return
+          }
+
+          console.log('创建题型分值图表实例...')
+          typeScoreChartInstance = echarts.init(typeScoreChart.value)
+          console.log('题型分值图表实例创建成功')
+
+        } catch (error) {
+          console.error('创建题型分值图表失败:', error)
+        }
+      } else {
+        console.error('typeScoreChart DOM元素不存在')
+      }
+
+      // 延迟更新真实数据并强制resize
+      setTimeout(() => {
+        console.log('开始更新真实图表数据...')
+        updateCharts()
+
+        // 设置容器尺寸观察器
+        setupResizeObserver()
+
+        // 多次resize确保图表正确显示
+        setTimeout(() => {
+          if (typeCountChartInstance) {
+            typeCountChartInstance.resize()
+            console.log('题型数量图表已resize')
+          }
+          if (typeScoreChartInstance) {
+            typeScoreChartInstance.resize()
+            console.log('题型分值图表已resize')
+          }
+        }, 100)
+
+        // 再次resize确保万无一失
+        setTimeout(() => {
+          if (typeCountChartInstance) {
+            typeCountChartInstance.resize()
+          }
+          if (typeScoreChartInstance) {
+            typeScoreChartInstance.resize()
+          }
+        }, 500)
+
+        // 最后一次resize，确保图表完全正确显示
+        setTimeout(() => {
+          if (typeCountChartInstance) {
+            typeCountChartInstance.resize()
+          }
+          if (typeScoreChartInstance) {
+            typeScoreChartInstance.resize()
+          }
+          console.log('图表最终resize完成')
+        }, 1000)
+
+      }, 300)
+
+    }, 500) // 增加延迟时间，确保CSS样式完全应用
+  })
+}
+
+// 更新图表数据
+function updateCharts() {
+  console.log('=== 开始更新图表数据 ===')
+  console.log('图表实例状态:')
+  console.log('typeCountChartInstance:', typeCountChartInstance)
+  console.log('typeScoreChartInstance:', typeScoreChartInstance)
+  console.log('problemStatistics:', problemStatistics.value)
+  console.log('problems:', problems.value)
+
+  // 检查图表实例是否存在
+  if (!typeCountChartInstance || !typeScoreChartInstance) {
+    console.log('图表实例不存在，跳过更新')
+    return
+  }
+
+  // 准备题型数量数据
+  let typeCountData = []
+
+  // 如果有统计数据，使用统计数据
+  if (problemStatistics.value && problemStatistics.value.typeStatistics) {
+    typeCountData = Object.entries(problemStatistics.value.typeStatistics).map(([type, count]) => ({
+      name: problemTypeMap[type] || type,
+      value: count
+    }))
+    console.log('使用统计数据:', typeCountData)
+  }
+  // 否则从题目列表计算
+  else if (problems.value && problems.value.length > 0) {
+    const typeCountMap = {}
+    problems.value.forEach(problem => {
+      const type = problem.type || 'UNKNOWN'
+      typeCountMap[type] = (typeCountMap[type] || 0) + 1
+    })
+    typeCountData = Object.entries(typeCountMap).map(([type, count]) => ({
+      name: problemTypeMap[type] || type,
+      value: count
+    }))
+    console.log('从题目列表计算:', typeCountData)
+  }
+  // 如果没有数据，使用测试数据
+  else {
+    typeCountData = [
+      { name: '单选题', value: 2 },
+      { name: '多选题', value: 1 }
+    ]
+    console.log('使用测试数据:', typeCountData)
+  }
+
+  // 计算题型分值数据
+  const typeScoreData = calculateTypeScoreData()
+
+  console.log('最终题型数量数据:', typeCountData)
+  console.log('最终题型分值数据:', typeScoreData)
+
+  // 更新题型数量图表
+  if (typeCountChartInstance && typeCountData.length > 0) {
+    try {
+      console.log('开始设置题型数量图表...')
+      const countOption = {
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c}道题 ({d}%)'
+        },
+        legend: {
+          orient: 'horizontal',
+          bottom: '10%',
+          left: 'center'
+        },
+        series: [
+          {
+            name: '题目数量',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['50%', '50%'],
+            data: typeCountData,
+            label: {
+              show: true,
+              formatter: '{b}: {c}道'
+            },
+            itemStyle: {
+              borderRadius: 5,
+              borderColor: '#fff',
+              borderWidth: 2
+            }
+          }
+        ],
+        color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de']
+      }
+
+      typeCountChartInstance.setOption(countOption, true)
+      console.log('题型数量图表设置成功')
+
+      // 立即resize
+      typeCountChartInstance.resize()
+
+      // 延迟resize确保正确显示
+      setTimeout(() => {
+        typeCountChartInstance.resize()
+        console.log('题型数量图表延迟resize完成')
+      }, 100)
+
+      // 再次延迟resize
+      setTimeout(() => {
+        typeCountChartInstance.resize()
+      }, 300)
+
+    } catch (error) {
+      console.error('设置题型数量图表失败:', error)
+    }
+  } else {
+    console.log('跳过题型数量图表更新:', {
+      hasInstance: !!typeCountChartInstance,
+      hasData: typeCountData.length > 0,
+      data: typeCountData
+    })
+  }
+
+  // 更新题型分值图表
+  if (typeScoreChartInstance) {
+    try {
+      console.log('开始设置题型分值图表...')
+
+      // 如果没有分值数据，使用测试数据
+      let finalScoreData = typeScoreData
+      if (!finalScoreData || finalScoreData.length === 0) {
+        finalScoreData = [
+          { name: '单选题', value: 20 },
+          { name: '多选题', value: 15 }
+        ]
+        console.log('使用分值测试数据:', finalScoreData)
+      }
+
+      const scoreOption = {
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c}分 ({d}%)'
+        },
+        legend: {
+          orient: 'horizontal',
+          bottom: '10%',
+          left: 'center'
+        },
+        series: [
+          {
+            name: '分值分布',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['50%', '50%'],
+            data: finalScoreData,
+            label: {
+              show: true,
+              formatter: '{b}: {c}分'
+            },
+            itemStyle: {
+              borderRadius: 5,
+              borderColor: '#fff',
+              borderWidth: 2
+            }
+          }
+        ],
+        color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de']
+      }
+
+      typeScoreChartInstance.setOption(scoreOption, true)
+      console.log('题型分值图表设置成功')
+
+      // 立即resize
+      typeScoreChartInstance.resize()
+
+      // 延迟resize确保正确显示
+      setTimeout(() => {
+        typeScoreChartInstance.resize()
+        console.log('题型分值图表延迟resize完成')
+      }, 100)
+
+      // 再次延迟resize
+      setTimeout(() => {
+        typeScoreChartInstance.resize()
+      }, 300)
+
+    } catch (error) {
+      console.error('设置题型分值图表失败:', error)
+    }
+  } else {
+    console.log('跳过题型分值图表更新:', {
+      hasInstance: !!typeScoreChartInstance
+    })
+  }
+}
+
+// 计算题型分值数据
+function calculateTypeScoreData() {
+  if (!problems.value || problems.value.length === 0) {
+    return []
+  }
+
+  const typeScoreMap = {}
+
+  problems.value.forEach(problem => {
+    const type = problem.type || 'UNKNOWN'
+    const score = problem.score || 0
+
+    if (!typeScoreMap[type]) {
+      typeScoreMap[type] = 0
+    }
+    typeScoreMap[type] += score
+  })
+
+  return Object.entries(typeScoreMap).map(([type, totalScore]) => ({
+    name: problemTypeMap[type] || type,
+    value: totalScore
+  }))
+}
+
+// 窗口大小变化时重新调整图表
+function handleResize() {
+  console.log('窗口大小变化，调整图表尺寸...')
+  if (typeCountChartInstance) {
+    typeCountChartInstance.resize()
+  }
+  if (typeScoreChartInstance) {
+    typeScoreChartInstance.resize()
+  }
+}
+
+// 设置容器尺寸观察器
+function setupResizeObserver() {
+  if (typeof ResizeObserver !== 'undefined') {
+    // 观察题型数量图表容器
+    if (typeCountChart.value) {
+      const resizeObserver1 = new ResizeObserver(() => {
+        console.log('题型数量图表容器尺寸变化')
+        if (typeCountChartInstance) {
+          setTimeout(() => {
+            typeCountChartInstance.resize()
+          }, 50)
+        }
+      })
+      resizeObserver1.observe(typeCountChart.value)
+    }
+
+    // 观察题型分值图表容器
+    if (typeScoreChart.value) {
+      const resizeObserver2 = new ResizeObserver(() => {
+        console.log('题型分值图表容器尺寸变化')
+        if (typeScoreChartInstance) {
+          setTimeout(() => {
+            typeScoreChartInstance.resize()
+          }, 50)
+        }
+      })
+      resizeObserver2.observe(typeScoreChart.value)
+    }
+  }
+}
+
+// 调试函数：检查图表状态
+function debugChartStatus() {
+  console.log('=== 图表调试信息 ===')
+  console.log('typeCountChart DOM:', typeCountChart.value)
+  console.log('typeScoreChart DOM:', typeScoreChart.value)
+  console.log('typeCountChartInstance:', typeCountChartInstance)
+  console.log('typeScoreChartInstance:', typeScoreChartInstance)
+  console.log('problemStatistics:', problemStatistics.value)
+  console.log('problems:', problems.value)
+  console.log('problems length:', problems.value?.length)
+
+  if (problems.value && problems.value.length > 0) {
+    const typeCount = {}
+    const typeScore = {}
+    problems.value.forEach(p => {
+      const type = p.type || 'UNKNOWN'
+      typeCount[type] = (typeCount[type] || 0) + 1
+      typeScore[type] = (typeScore[type] || 0) + (p.score || 0)
+    })
+    console.log('计算的题型数量:', typeCount)
+    console.log('计算的题型分值:', typeScore)
+  }
+  console.log('==================')
+}
+
 // 获取作业详情
 async function fetchHomeworkDetail() {
   try {
@@ -1133,9 +1589,14 @@ async function fetchProblems() {
   try {
     const assignmentIdStr = homeworkId.value ? String(homeworkId.value) : ''
     if (!assignmentIdStr) return
-    
+
     const response = await problemAPI.getProblemsByAssignment(assignmentIdStr)
     problems.value = Array.isArray(response) ? response : []
+
+    // 获取题目后更新图表
+    nextTick(() => {
+      updateCharts()
+    })
   } catch (error) {
     console.error('获取题目列表失败:', error)
     ElMessage.error(`获取题目列表失败: ${error.message || '请稍后重试'}`)
@@ -1428,8 +1889,39 @@ async function saveProblem(problemData) {
 }
 
 // 页面加载时获取数据
-onMounted(() => {
-  fetchHomeworkDetail()
+onMounted(async () => {
+  try {
+    await fetchHomeworkDetail()
+
+    // 初始化图表
+    nextTick(() => {
+      initCharts()
+      // 添加窗口大小变化监听
+      window.addEventListener('resize', handleResize)
+
+      // 调试信息
+      setTimeout(() => {
+        debugChartStatus()
+      }, 1000)
+    })
+  } catch (error) {
+    console.error('页面初始化失败:', error)
+  }
+})
+
+// 组件卸载时清理图表资源
+onUnmounted(() => {
+  if (typeCountChartInstance) {
+    typeCountChartInstance.dispose()
+    typeCountChartInstance = null
+  }
+  if (typeScoreChartInstance) {
+    typeScoreChartInstance.dispose()
+    typeScoreChartInstance = null
+  }
+
+  // 移除窗口大小变化监听
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
@@ -1746,6 +2238,74 @@ onMounted(() => {
 
 .el-upload .el-upload-dragger {
   width: 100%;
+}
+
+/* 图表相关样式 */
+.problem-charts {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-card {
+  height: 500px;
+  overflow: hidden;
+}
+
+.chart-card .el-card__body {
+  height: calc(100% - 60px);
+  padding: 20px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #303133;
+  font-size: 16px;
+}
+
+.chart-header .el-icon {
+  color: #909399;
+  cursor: help;
+  font-size: 16px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 400px;
+  min-height: 400px;
+}
+
+/* 响应式图表 */
+@media (max-width: 1200px) {
+  .chart-card {
+    height: 450px;
+  }
+
+  .chart-container {
+    height: 350px;
+    min-height: 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .problem-charts .el-col {
+    margin-bottom: 20px;
+  }
+
+  .chart-card {
+    height: 400px;
+  }
+
+  .chart-container {
+    height: 300px;
+    min-height: 300px;
+  }
+
+  .chart-header {
+    font-size: 14px;
+  }
 }
 </style>
 

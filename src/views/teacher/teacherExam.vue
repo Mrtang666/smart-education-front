@@ -84,20 +84,10 @@
             </el-descriptions>
 
             <div class="detail-actions">
-                <el-button type="primary" @click="editExam(selectedExam)">
+                <el-button type="primary" @click.stop="viewExamDetail(selectedExam)">
                     <el-icon>
-                        <Edit />
-                    </el-icon>编辑考试
-                </el-button>
-                <el-button type="success" @click="viewResults(selectedExam)">
-                    <el-icon>
-                        <DataAnalysis />
-                    </el-icon>查看成绩
-                </el-button>
-                <el-button type="danger" @click="confirmDeleteExam(selectedExam)">
-                    <el-icon>
-                        <Delete />
-                    </el-icon>删除考试
+                        <View />
+                    </el-icon>查看详情
                 </el-button>
             </div>
         </div>
@@ -150,22 +140,12 @@
                             </el-tag>
                         </template>
                     </el-table-column>
-                    <el-table-column label="操作" width="220" fixed="right">
+                    <el-table-column label="操作" width="100" fixed="right">
                         <template #default="scope">
-                            <el-button type="primary" link @click="editExam(scope.row)">
+                            <el-button type="primary" link @click.stop="viewExamDetail(scope.row)">
                                 <el-icon>
-                                    <Edit />
-                                </el-icon>编辑
-                            </el-button>
-                            <el-button type="success" link @click="viewResults(scope.row)">
-                                <el-icon>
-                                    <DataAnalysis />
-                                </el-icon>成绩
-                            </el-button>
-                            <el-button type="danger" link @click="confirmDeleteExam(scope.row)">
-                                <el-icon>
-                                    <Delete />
-                                </el-icon>删除
+                                    <View />
+                                </el-icon>查看详情
                             </el-button>
                         </template>
                     </el-table-column>
@@ -230,9 +210,9 @@
 
 <script setup>
 import { ref, onMounted, nextTick, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { examAPI, courseAPI, knowledgeAPI } from '@/api/api'
-import { Plus, Edit, Delete, Search, DataAnalysis, Timer, Calendar, Loading } from '@element-plus/icons-vue'
+import { Plus, Search, Timer, Calendar, Loading, View } from '@element-plus/icons-vue'
 import { getUserInfo } from '@/utils/auth'
 import { useRouter } from 'vue-router'
 import { getExamStatusType, updateExamsStatus, formatDateTime } from '@/utils/examManager'
@@ -656,21 +636,25 @@ const showCreateDialog = () => {
     dialogVisible.value = true
 }
 
-// 编辑考试
-const editExam = (exam) => {
-    isEdit.value = true
-    examForm.value = {
-        examId: exam.examId,
-        title: exam.title,
-        description: exam.description || '',
-        courseId: exam.courseId,
-        teacherId: exam.teacherId,
-        totalScore: exam.totalScore,
-        durationMinutes: exam.durationMinutes,
-        examTime: [exam.startTime, exam.endTime],
-        type: 'exam'
+// 查看考试详情 - 跳转到考试成绩页面
+const viewExamDetail = (exam) => {
+    console.log('查看考试详情被点击，跳转到成绩页面:', exam)
+
+    if (!exam.examId) {
+        console.error('考试ID不存在，无法跳转')
+        ElMessage.error('考试ID不存在，无法跳转到详情页面')
+        return
     }
-    dialogVisible.value = true
+
+    // 跳转到考试成绩页面作为详情页面
+    router.push({
+        path: `/teacher/exam/scores/${exam.examId}`,
+        query: {
+            title: exam.title,
+            courseId: exam.courseId,
+            from: 'exam' // 标记来源页面
+        }
+    })
 }
 
 // 禁用过去的日期
@@ -721,45 +705,7 @@ const submitExam = async () => {
     })
 }
 
-// 确认删除考试
-const confirmDeleteExam = (exam) => {
-    ElMessageBox.confirm(`确定要删除考试 "${exam.title}" 吗?`, '删除确认', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-    }).then(async () => {
-        try {
-            await examAPI.deleteExamById(exam.examId)
-            ElMessage.success('删除成功')
-            loadExams()
-        } catch (error) {
-            console.error('删除考试失败:', error)
-            ElMessage.error('删除考试失败')
-        }
-    }).catch(() => {
-        // 用户取消删除
-    })
-}
 
-// 查看考试成绩
-const viewResults = (exam) => {
-    // 如果考试状态是未开始，提示未开始
-    if (exam.status === '未开始') {
-        ElMessage.warning('考试尚未开始，暂无成绩数据')
-        return
-    }
-    
-    // 跳转到考试成绩页面
-    router.push({
-        path: `/teacher/exam/scores/${exam.examId}`,
-        query: {
-            title: exam.title,
-            courseId: exam.courseId,
-            courseName: getCourseNameById(exam.courseId),
-            type: 'exam'
-        }
-    })
-}
 
 // 格式化日期时间
 const formatDateTimeLocal = (dateTimeStr) => {

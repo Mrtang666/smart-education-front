@@ -729,212 +729,6 @@ export const teacherAPI = {
         return response.data;
     }
 };
-// 教学助手相关 API
-export const teachingAssistantAPI = {
-    /**
-     * 在已有教学方案的基础上进行改进（需要token）
-     * @param {Object} improveData 改进数据
-     * @param {string} improveData.teachingPlan 教学方案
-     * @param {string} improveData.suggestion 改进建议
-     * @returns {Promise<Object>} 改进后的教学方案
-     */
-    async improveLesson(improveData) {
-        const axios = createTeacherAuthorizedAxios();
-        try {
-            console.log('改进教学方案数据:', improveData);
-            // 设置较长的超时时间，因为AI改进需要更多时间
-            const response = await axios.post('/api/teaching-assistant/lesson/improve', improveData, {
-                timeout: 60000 // 60秒超时
-            });
-            return response.data;
-        } catch (error) {
-            console.error('改进教学方案失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
-     * 分析学生课程学习情况（需要token）
-     * @param {string|number} courseId 课程ID
-     * @param {string|number} studentId 学生ID
-     * @returns {Promise<Object>} 学生学习情况分析
-     */
-    async analyzeStudentCourseProgress(courseId, studentId) {
-        const axios = createTeacherAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const courseIdStr = String(courseId);
-            const studentIdStr = String(studentId);
-
-            console.log(`分析学生课程学习情况，课程ID: ${courseIdStr}, 学生ID: ${studentIdStr}`);
-
-            // 设置较长的超时时间，因为AI分析需要更多时间
-            const response = await axios.post(`/api/teaching-assistant/analytics/course/${courseIdStr}/student/${studentIdStr}`, {}, {
-                timeout: 120000 // 120秒超时
-            });
-            return response.data;
-        } catch (error) {
-            console.error('分析学生课程学习情况失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
-     * 生成教学方案（需要token）
-     * @param {Object} generateData 生成数据
-     * @param {string} generateData.subjectType 学科类型/课程名称
-     * @param {string} generateData.courseOutline 知识点名称/知识点内容大纲
-     * @param {number} generateData.duration 时长
-     * @param {string} generateData.difficultyLevel 难度等级
-     * @param {string} generateData.teachingStyle 教学风格
-     * @returns {Promise<Object>} 生成的教学方案
-     */
-    async generateLesson(generateData) {
-        const axios = createTeacherAuthorizedAxios();
-        try {
-            console.log('生成教学方案数据:', generateData);
-            // 设置较长的超时时间，因为AI生成需要更多时间
-            const response = await axios.post('/api/teaching-assistant/lesson/generate', generateData, {
-                timeout: 60000 // 60秒超时
-            });
-            return response.data;
-        } catch (error) {
-            console.error('生成教学方案失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    }
-};
-
-// 学生助手相关 API
-export const studentAssistantAPI = {
-    /**
-     * 无历史非流式一次问答（需要token）
-     * @param {string|number} studentId 学生ID
-     * @param {Object} askData 问答数据
-     * @param {string} askData.question 问题
-     * @param {string|number} [askData.courseId] 课程ID（可选）
-     * @returns {Promise<Object>} 问答响应
-     */
-    async askQuestion(studentId, askData) {
-        const axios = createStudentAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const studentIdStr = String(studentId);
-
-            console.log(`学生问答，学生ID: ${studentIdStr}，问题:`, askData.question);
-
-            const response = await axios.post(`/api/student-assistant/student/${studentIdStr}/ask`, askData);
-            return response.data;
-        } catch (error) {
-            console.error('学生问答失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
-     * 带历史非流式问答（需要token）
-     * @param {string|number} studentId 学生ID
-     * @param {Object} historyData 历史问答数据
-     * @param {Array<Object>} historyData.messages 消息历史
-     * @param {string} historyData.messages[].role 角色（user/assistant）
-     * @param {string} historyData.messages[].content 消息内容
-     * @param {boolean} historyData.valid 是否有效
-     * @returns {Promise<Object>} 问答响应
-     */
-    async askWithHistory(studentId, historyData) {
-        const axios = createStudentAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const studentIdStr = String(studentId);
-
-            console.log(`学生带历史问答，学生ID: ${studentIdStr}，消息数量:`, historyData.messages?.length || 0);
-
-            const response = await axios.post(`/api/student-assistant/student/${studentIdStr}/ask/history`, historyData);
-            return response.data;
-        } catch (error) {
-            console.error('学生带历史问答失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
-     * 带历史流式问答（需要token）
-     * @param {Object} streamData 流式问答数据
-     * @param {Array<Object>} streamData.messages 消息历史
-     * @param {string} streamData.messages[].role 角色（user/assistant）
-     * @param {string} streamData.messages[].content 消息内容
-     * @param {boolean} streamData.valid 是否有效
-     * @returns {Promise<ReadableStream>} 流式响应
-     */
-    async streamChatWithHistory(streamData) {
-        const axios = createStudentAuthorizedAxios();
-        try {
-            console.log('学生流式问答，消息数量:', streamData.messages?.length || 0);
-
-            const response = await axios.post('/api/student-assistant/stream/chat-history', streamData, {
-                responseType: 'stream'
-            });
-            return response.data;
-        } catch (error) {
-            console.error('学生流式问答失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
-     * 基于知识点名称生成练习（需要token）
-     * @param {string|number} studentId 学生ID
-     * @param {Object} params 查询参数
-     * @param {Array<string>} params.knowledgeNames 知识点名称数组
-     * @param {string} [params.difficultyLevel] 难度等级（可选）
-     * @param {number} params.problemCount 题目数量
-     * @returns {Promise<Object>} 生成的练习
-     */
-    async generateExerciseByKnowledge(studentId, params) {
-        const axios = createStudentAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const studentIdStr = String(studentId);
-
-            console.log(`基于知识点生成练习，学生ID: ${studentIdStr}，知识点:`, params.knowledgeNames);
-
-            const response = await axios.get(`/api/student-assistant/student/${studentIdStr}/generate-exercise/by-knowledge`, {
-                params
-            });
-            return response.data;
-        } catch (error) {
-            console.error('基于知识点生成练习失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    },
-
-    /**
-     * 基于课程名称生成练习（需要token）
-     * @param {string|number} studentId 学生ID
-     * @param {Object} params 查询参数
-     * @param {string} params.courseName 课程名称
-     * @param {string} [params.difficultyLevel] 难度等级（可选）
-     * @param {number} params.problemCount 题目数量
-     * @returns {Promise<Object>} 生成的练习
-     */
-    async generateExerciseByCourse(studentId, params) {
-        const axios = createStudentAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const studentIdStr = String(studentId);
-
-            console.log(`基于课程生成练习，学生ID: ${studentIdStr}，课程:`, params.courseName);
-
-            const response = await axios.get(`/api/student-assistant/student/${studentIdStr}/generate-exercise/by-course`, {
-                params
-            });
-            return response.data;
-        } catch (error) {
-            console.error('基于课程生成练习失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    }
-};
 
 // 学习进度api模块（代讨论）
 export const learningProgressAPI = {
@@ -2296,19 +2090,110 @@ export const examAPI = {
         try {
             // 确保ID是字符串类型
             const examIdStr = String(examId);
-            
+
             console.log(`获取参加考试的学生列表，考试ID: ${examIdStr}`);
-            
+
             const response = await axios.get(`/api/student-exam/exam/${examIdStr}/students`);
-            
+
             // 确保返回的所有ID都是字符串类型，避免精度丢失
             if (Array.isArray(response.data)) {
                 return response.data.map(id => String(id));
             }
-            
+
             return response.data;
         } catch (error) {
             console.error('获取参加考试的学生列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 9.获取考试的学生成绩列表（教师视角）
+     * @param {string|number} examId 考试ID
+     * @returns {Promise<Array<Object>>} 学生成绩列表
+     * 返回字段：
+     * - studentId: 学生ID
+     * - fullName: 学生姓名
+     * - score: 考试分数
+     * - submitTime: 提交时间
+     * - status: 考试状态（已完成/未完成等）
+     */
+    async getExamStudentScores(examId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const examIdStr = String(examId);
+            console.log(`获取考试学生成绩列表，考试ID: ${examIdStr}`);
+
+            const response = await axios.get(`/api/student-exam/exam/${examIdStr}/scores`);
+
+            // 确保返回的学生ID都是字符串类型
+            if (Array.isArray(response.data)) {
+                return response.data.map(student => ({
+                    ...student,
+                    studentId: String(student.studentId)
+                }));
+            }
+
+            return response.data;
+        } catch (error) {
+            console.error('获取考试学生成绩列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 10.获取学生在特定考试中的答题详情（教师视角）
+     * @param {string|number} examId 考试ID
+     * @param {string|number} studentId 学生ID
+     * @returns {Promise<Array<Object>>} 学生答题详情列表
+     * 返回字段：
+     * - answerId: 答案ID
+     * - questionId: 题目ID
+     * - questionContent: 题目内容
+     * - answerContent: 学生答案
+     * - score: 得分
+     * - totalScore: 总分
+     * - questionType: 题目类型
+     */
+    async getStudentExamAnswers(examId, studentId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const examIdStr = String(examId);
+            const studentIdStr = String(studentId);
+            console.log(`获取学生答题详情，考试ID: ${examIdStr}, 学生ID: ${studentIdStr}`);
+
+            const response = await axios.get(`/api/student-exam/exam/${examIdStr}/student/${studentIdStr}/answers`);
+
+            return response.data;
+        } catch (error) {
+            console.error('获取学生答题详情失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 11.获取考试统计信息（教师视角）
+     * @param {string|number} examId 考试ID
+     * @returns {Promise<Object>} 考试统计信息
+     * 返回字段：
+     * - totalStudents: 总学生数
+     * - submittedStudents: 已提交学生数
+     * - averageScore: 平均分
+     * - maxScore: 最高分
+     * - minScore: 最低分
+     * - scoreDistribution: 分数分布
+     */
+    async getExamStatistics(examId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const examIdStr = String(examId);
+            console.log(`获取考试统计信息，考试ID: ${examIdStr}`);
+
+            const response = await axios.get(`/api/student-exam/exam/${examIdStr}/statistics`);
+
+            return response.data;
+        } catch (error) {
+            console.error('获取考试统计信息失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     }
@@ -3114,7 +2999,184 @@ export const studentExamAPI = {
     }
 };
 
+// 学生智能助理相关 API（代后端完善后写）
+export const studentAssistantAPI = {
+    /**
+     * 提交练习答案（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} exerciseId 练习ID
+     * @param {Object} answers 答案对象，key为题目ID，value为答案字符串
+     *   - 例如: { "questionId1": "答案1", "questionId2": "答案2" }
+     * @returns {Promise<Object>} 提交结果，由后端返回
+     */
+    async submitExerciseAnswers(studentId, exerciseId, answers) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.post(`/api/student-assistant/student/${studentId}/submit-answers`, answers, { params: { exerciseId } });
+        return response.data;
+    },
 
+    /**
+     * 获取实时答题提示（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} questionId 题目ID
+     * @param {string} partialAnswer 当前作答内容
+     * @returns {Promise<Object>} 提示信息，由后端返回
+     */
+    async getRealTimeHint(studentId, questionId, partialAnswer) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.post(`/api/student-assistant/student/${studentId}/hint`, null, { params: { questionId, partialAnswer } });
+        return response.data;
+    },
+
+    /**
+     * 向智能助理提问（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} question 问题内容
+     * @param {number} [courseId] 课程ID（可选）
+     * @returns {Promise<Object>} 答复，由后端返回
+     */
+    async askQuestion(studentId, question, courseId) {
+        const axios = createStudentAuthorizedAxios();
+        const params = { question };
+        if (courseId !== undefined) params.courseId = courseId;
+        const response = await axios.post(`/api/student-assistant/student/${studentId}/ask`, null, { params });
+        return response.data;
+    },
+
+    /**
+     * 按知识点名称向智能助理提问（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} question 问题内容
+     * @param {string} knowledgeName 知识点名称
+     * @returns {Promise<Object>} 答复，由后端返回
+     */
+    async askQuestionByKnowledgeName(studentId, question, knowledgeName) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.post(`/api/student-assistant/student/${studentId}/ask/by-knowledge`, null, { params: { question, knowledgeName } });
+        return response.data;
+    },
+
+    /**
+     * 按课程名称向智能助理提问（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} question 问题内容
+     * @param {string} courseName 课程名称
+     * @returns {Promise<Object>} 答复，由后端返回
+     */
+    async askQuestionByCourseName(studentId, question, courseName) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.post(`/api/student-assistant/student/${studentId}/ask/by-course-name`, null, { params: { question, courseName } });
+        return response.data;
+    },
+
+    /**
+     * 搜索历史提问（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} keywords 关键词
+     * @param {number} [limit=20] 返回条数（可选，默认20）
+     * @returns {Promise<Array<Object>>} 历史问题列表
+     */
+    async searchQuestionHistory(studentId, keywords, limit = 20) {
+        const axios = createStudentAuthorizedAxios();
+        const params = { keywords };
+        if (limit) params.limit = limit;
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/search-questions`, { params });
+        return response.data;
+    },
+
+    /**
+     * 获取推荐学习资源（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} keywords 关键词
+     * @param {string} [resourceType] 资源类型（可选）
+     * @param {number} [limit=10] 返回条数（可选，默认10）
+     * @returns {Promise<Array<Object>>} 资源列表
+     */
+    async searchLearningResources(studentId, keywords, resourceType, limit = 10) {
+        const axios = createStudentAuthorizedAxios();
+        const params = { keywords };
+        if (resourceType) params.resourceType = resourceType;
+        if (limit) params.limit = limit;
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/resources`, { params });
+        return response.data;
+    },
+
+    /**
+     * 获取历史提问记录（需要token）
+     * @param {number} studentId 学生ID
+     * @param {number} [limit=20] 返回条数（可选，默认20）
+     * @returns {Promise<Array<Object>>} 历史问题列表
+     */
+    async getQuestionHistory(studentId, limit = 20) {
+        const axios = createStudentAuthorizedAxios();
+        const params = {};
+        if (limit) params.limit = limit;
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/question-history`, { params });
+        return response.data;
+    },
+
+    /**
+     * 生成智能练习（需要token）
+     * @param {number} studentId 学生ID
+     * @param {number} courseId 课程ID
+     * @param {Array<number>} [knowledgeIds] 知识点ID数组（可选）
+     * @param {string} [difficultyLevel] 难度等级（可选）
+     * @param {number} questionCount 题目数量
+     * @returns {Promise<Object>} 练习生成结果
+     */
+    async generateExercise(studentId, courseId, knowledgeIds, difficultyLevel, questionCount) {
+        const axios = createStudentAuthorizedAxios();
+        const params = { courseId, questionCount };
+        if (knowledgeIds) params.knowledgeIds = knowledgeIds;
+        if (difficultyLevel) params.difficultyLevel = difficultyLevel;
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise`, { params });
+        return response.data;
+    },
+
+    /**
+     * 针对薄弱知识点生成练习（需要token）
+     * @param {number} studentId 学生ID
+     * @param {number} questionCount 题目数量
+     * @returns {Promise<Object>} 练习生成结果
+     */
+    async generateWeakPointsExercise(studentId, questionCount) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/weak-points`, { params: { questionCount } });
+        return response.data;
+    },
+
+    /**
+     * 按知识点名称生成练习（需要token）
+     * @param {number} studentId 学生ID
+     * @param {Array<string>} knowledgeNames 知识点名称数组
+     * @param {string} [difficultyLevel] 难度等级（可选）
+     * @param {number} questionCount 题目数量
+     * @returns {Promise<Object>} 练习生成结果
+     */
+    async generateExerciseByKnowledgeNames(studentId, knowledgeNames, difficultyLevel, questionCount) {
+        const axios = createStudentAuthorizedAxios();
+        const params = { knowledgeNames, questionCount };
+        if (difficultyLevel) params.difficultyLevel = difficultyLevel;
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-knowledge`, { params });
+        return response.data;
+    },
+
+    /**
+     * 按课程名称生成练习（需要token）
+     * @param {number} studentId 学生ID
+     * @param {string} courseName 课程名称
+     * @param {string} [difficultyLevel] 难度等级（可选）
+     * @param {number} questionCount 题目数量
+     * @returns {Promise<Object>} 练习生成结果
+     */
+    async generateExerciseByCourseName(studentId, courseName, difficultyLevel, questionCount) {
+        const axios = createStudentAuthorizedAxios();
+        const params = { courseName, questionCount };
+        if (difficultyLevel) params.difficultyLevel = difficultyLevel;
+        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-course`, { params });
+        return response.data;
+    }
+};
 
 // 课程选择相关API（代完善具体页面）
 export const courseSelectionAPI = {
@@ -3750,10 +3812,7 @@ export const problemAPI = {
     async getProblemsByType(type) {
         const axios = createStudentAuthorizedAxios();
         try {
-            // 使用POST请求体方式
-            const response = await axios.post('/api/problem/getByType', {
-                type: type
-            });
+            const response = await axios.get(`/api/problem/type/${type}`);
             
             // 确保返回的所有ID字段都是字符串类型
             if (Array.isArray(response.data)) {
@@ -3840,44 +3899,26 @@ export const problemAPI = {
      */
     async deleteProblem(problemId) {
         const axios = createTeacherAuthorizedAxios();
-        try {
-            // 确保ID是数字类型，后端期望Long类型
-            const problemIdNum = Number(problemId);
-
-            if (isNaN(problemIdNum)) {
-                throw new Error('无效的题目ID');
-            }
-
-            console.log(`删除题目，ID: ${problemIdNum}`);
-
-            const response = await axios.delete('/api/problem/delete', {
-                data: problemIdNum
-            });
-
-            // 处理返回数据，确保返回格式一致
-            const result = {
-                success: true,
-                message: '题目删除成功',
-                deletedProblemId: problemIdNum,
-                ...response.data
-            };
-
-            console.log('删除题目成功:', result);
-            return result;
-        } catch (error) {
-            console.error('删除问题失败:', error.response ? error.response.data : error.message);
-
-            // 提供更详细的错误信息
-            if (error.response && error.response.status === 400) {
-                throw new Error('请求参数错误，请检查题目ID是否有效');
-            } else if (error.response && error.response.status === 404) {
-                throw new Error('题目不存在或已被删除');
-            } else if (error.response && error.response.status === 403) {
-                throw new Error('没有权限删除此题目');
-            }
-
-            throw error;
+        // 直接使用字符串类型，避免精度丢失
+        const problemIdStr = String(problemId);
+        if (!problemIdStr || isNaN(Number(problemIdStr))) {
+            throw new Error('无效的题目ID');
         }
+
+        const response = await axios.delete('/api/problem/delete', {
+            data: problemIdStr,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        // 处理返回数据，确保返回格式一致
+        const result = {
+            success: true,
+            message: '题目删除成功',
+            deletedProblemId: problemIdStr,
+            ...response.data
+        };
+
+        return result;
     }
 };
 
@@ -4087,7 +4128,7 @@ export const assignmentAPI = {
      * 每项字段：同updateAssignment返回字段
      */
     async getAssignmentsByCourseIdAndType(courseId, type) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
@@ -4118,7 +4159,7 @@ export const assignmentAPI = {
      * 每项字段：同updateAssignment返回字段
      */
     async getAssignmentsByCourseIdAndCreatorId(courseId, creatorId) {
-        const axios = createStudentAuthorizedAxios();
+        const axios = createTeacherAuthorizedAxios();
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
@@ -4153,19 +4194,21 @@ export const assignmentAPI = {
      */
     async deleteAssignment(assignmentId) {
         const axios = createTeacherAuthorizedAxios();
-        try {
-            // 确保ID是字符串类型
-            const assignmentIdStr = String(assignmentId);
-            
-            const response = await axios.delete('/api/assignment/delete', { 
-                data: assignmentIdStr 
-            });
-            
-            return response.data;
-        } catch (error) {
-            console.error('删除作业失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
+        // 直接使用字符串类型，避免精度丢失
+        const assignmentIdStr = String(assignmentId);
+        if (!assignmentIdStr || isNaN(Number(assignmentIdStr))) throw new Error('assignmentId 必须为数字字符串');
+        const response = await axios.delete('/api/assignment/delete', {
+            data: assignmentIdStr,
+            headers: { 'Content-Type': 'application/json' }
+        });
+        // 返回时也用字符串
+        const result = {
+            success: true,
+            message: '作业删除成功',
+            deletedAssignmentId: assignmentIdStr,
+            ...response.data
+        };
+        return result;
     }
 };
 

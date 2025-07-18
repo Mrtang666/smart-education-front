@@ -15,6 +15,32 @@
     </div>
 
     <div class="page-content">
+      <!-- 考试统计信息 -->
+      <div class="statistics-container" v-if="examStatistics.totalStudents > 0">
+        <div class="statistics-cards">
+          <div class="stat-card">
+            <div class="stat-value">{{ examStatistics.totalStudents }}</div>
+            <div class="stat-label">总学生数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ examStatistics.submittedStudents }}</div>
+            <div class="stat-label">已提交</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ examStatistics.averageScore.toFixed(1) }}</div>
+            <div class="stat-label">平均分</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ examStatistics.maxScore }}</div>
+            <div class="stat-label">最高分</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ examStatistics.minScore }}</div>
+            <div class="stat-label">最低分</div>
+          </div>
+        </div>
+      </div>
+
       <div class="scores-container">
         <div class="scores-header">
           <div class="header-left">
@@ -206,6 +232,16 @@ const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 
+// 考试统计信息
+const examStatistics = ref({
+  totalStudents: 0,
+  submittedStudents: 0,
+  averageScore: 0,
+  maxScore: 0,
+  minScore: 0,
+  scoreDistribution: []
+})
+
 // 学生详情
 const studentDetailVisible = ref(false)
 const currentStudent = ref(null)
@@ -257,27 +293,35 @@ const passRate = computed(() => {
   return ((passedStudents.length / completedStudents.length) * 100).toFixed(1)
 })
 
-// 获取考试学生列表
+// 获取考试学生列表和成绩
 async function fetchExamStudents() {
   try {
     isLoading.value = true
-    
+
     // 确保examId是字符串形式
     const examIdStr = examId ? new BigNumber(examId).toString() : examId.toString()
-    
-    const response = await examAPI.getExamStudents(examIdStr)
-    console.log('获取到的考试学生数据:', response)
-    
+
+    // 获取考试学生成绩列表（包含完整信息）
+    const response = await examAPI.getExamStudentScores(examIdStr)
+    console.log('获取到的考试学生成绩数据:', response)
+
     if (Array.isArray(response)) {
-      // 确保所有ID都是字符串形式
+      // 确保所有ID都是字符串形式，并处理数据格式
       examStudents.value = response.map(student => ({
         ...student,
-        studentId: student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
+        studentId: student.studentId ? new BigNumber(student.studentId).toString() : String(student.studentId),
+        score: student.score || 0,
+        submitTime: student.submitTime || null,
+        status: student.status || '未参加',
+        fullName: student.fullName || student.name || '未知学生'
       }))
     } else {
       examStudents.value = []
     }
-    
+
+    // 获取考试统计信息
+    await fetchExamStatistics(examIdStr)
+
     // 初始化图表
     nextTick(() => {
       initScoreChart()
@@ -291,55 +335,59 @@ async function fetchExamStudents() {
   }
 }
 
+// 获取考试统计信息
+async function fetchExamStatistics(examIdStr) {
+  try {
+    const statistics = await examAPI.getExamStatistics(examIdStr)
+    console.log('获取到的考试统计信息:', statistics)
+
+    // 可以将统计信息存储到响应式变量中，用于显示
+    examStatistics.value = statistics
+  } catch (error) {
+    console.error('获取考试统计信息失败:', error)
+    // 统计信息获取失败不影响主要功能，只记录错误
+  }
+}
+
 // 查看学生详情
 async function viewStudentDetail(student) {
   currentStudent.value = student
   studentDetailVisible.value = true
   studentAnswers.value = []
-  
+
   try {
     isLoadingDetail.value = true
-    
-    // 模拟数据
-    setTimeout(() => {
-      studentAnswers.value = [
-        {
-          answerId: '1',
-          questionId: '101',
-          questionContent: '简述Java语言的特点',
-          answerContent: 'Java是一种面向对象的编程语言，具有跨平台性、安全性、多线程等特点',
-          score: 8,
-          totalScore: 10
-        },
-        {
-          answerId: '2',
-          questionId: '102',
-          questionContent: '什么是多态？请举例说明',
-          answerContent: '多态是指同一个方法调用由于对象不同可能会有不同的行为。例如，动物类中的"叫"方法，猫和狗的实现是不同的',
-          score: 9,
-          totalScore: 10
-        },
-        {
-          answerId: '3',
-          questionId: '103',
-          questionContent: '解释什么是线程安全',
-          answerContent: '线程安全是指在多线程环境下，代码能够正确地处理多个线程同时访问共享资源的情况，不会出现数据不一致或者其他并发问题',
-          score: 7,
-          totalScore: 10
-        }
-      ]
-      isLoadingDetail.value = false
-    }, 1000)
-    
-    // 实际API调用应该类似于：
-    // const studentIdStr = student.studentId ? new BigNumber(student.studentId).toString() : student.studentId
-    // const examIdStr = examId ? new BigNumber(examId).toString() : examId.toString()
-    // const response = await examAPI.getStudentExamDetail(studentIdStr, examIdStr)
-    // studentAnswers.value = response
-    
+
+    // 确保ID是字符串形式
+    const studentIdStr = student.studentId ? new BigNumber(student.studentId).toString() : String(student.studentId)
+    const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
+
+    console.log('获取学生答题详情，学生ID:', studentIdStr, '考试ID:', examIdStr)
+
+    // 调用API获取学生答题详情
+    const response = await examAPI.getStudentExamAnswers(examIdStr, studentIdStr)
+    console.log('获取到的学生答题详情:', response)
+
+    if (Array.isArray(response)) {
+      studentAnswers.value = response.map(answer => ({
+        ...answer,
+        answerId: String(answer.answerId || answer.id),
+        questionId: String(answer.questionId),
+        questionContent: answer.questionContent || answer.question || '题目内容',
+        answerContent: answer.answerContent || answer.answer || '未作答',
+        score: answer.score || 0,
+        totalScore: answer.totalScore || answer.maxScore || 0,
+        questionType: answer.questionType || 'unknown'
+      }))
+    } else {
+      studentAnswers.value = []
+    }
+
   } catch (error) {
     console.error('获取学生答题详情失败:', error)
     ElMessage.error('获取学生答题详情失败，请稍后重试')
+    studentAnswers.value = []
+  } finally {
     isLoadingDetail.value = false
   }
 }
@@ -491,6 +539,26 @@ function goBack() {
   router.go(-1)
 }
 
+// 获取考试基本信息
+async function fetchExamInfo() {
+  try {
+    const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
+    const examInfo = await examAPI.getExamById(examIdStr)
+    console.log('获取到的考试信息:', examInfo)
+
+    if (examInfo) {
+      examTitle.value = examInfo.title || route.query.title || '考试成绩'
+      // 如果有课程信息，可以更新课程名称
+      if (examInfo.courseId && !route.query.courseName) {
+        // 这里可以调用courseAPI获取课程名称，但为了简化，暂时使用现有逻辑
+      }
+    }
+  } catch (error) {
+    console.error('获取考试信息失败:', error)
+    // 获取考试信息失败不影响主要功能，使用默认值
+  }
+}
+
 // 组件挂载时获取数据
 onMounted(async () => {
   if (!examId) {
@@ -498,8 +566,12 @@ onMounted(async () => {
     goBack()
     return
   }
-  
-  await fetchExamStudents()
+
+  // 并行获取考试信息和学生成绩
+  await Promise.all([
+    fetchExamInfo(),
+    fetchExamStudents()
+  ])
 })
 </script>
 
@@ -646,6 +718,26 @@ onMounted(async () => {
 .stat-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+  margin-bottom: 5px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.statistics-container {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .stat-title {

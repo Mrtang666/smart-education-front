@@ -31,18 +31,48 @@
         label="题目选项"
         required
       >
-        <el-input
-          v-model="form.content"
-          type="textarea"
-          :rows="6"
-          placeholder="请输入选项内容，支持以下格式：&#10;A. 选项内容&#10;B. 选项内容&#10;或者每行一个选项"
-        />
-        <div class="form-tip">
-          <strong>支持格式：</strong><br>
-          • A. 选项内容<br>
-          • A) 选项内容<br>
-          • A 选项内容<br>
-          • 每行一个选项（自动编号）
+        <div class="options-container">
+          <!-- 选项列表 -->
+          <div class="options-list">
+            <div
+              v-for="(option, index) in options"
+              :key="index"
+              class="option-item"
+            >
+              <div class="option-label">{{ option.key }}.</div>
+              <el-input
+                v-model="option.content"
+                placeholder="请输入选项内容"
+                class="option-input"
+                @input="updateFormContent"
+              />
+              <el-button
+                v-if="options.length > 2"
+                type="danger"
+                size="small"
+                circle
+                @click="removeOption(index)"
+              >
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </div>
+          </div>
+
+          <!-- 添加选项按钮 -->
+          <div class="add-option-section">
+            <el-button
+              v-if="options.length < 8"
+              type="primary"
+              plain
+              @click="addOption"
+            >
+              <el-icon><Plus /></el-icon>
+              添加选项
+            </el-button>
+            <div class="form-tip">
+              最多支持8个选项（A-H），最少需要2个选项
+            </div>
+          </div>
         </div>
       </el-form-item>
 
@@ -142,6 +172,7 @@
 /* eslint-disable no-undef */
 import { ref, watch, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Plus, Delete } from '@element-plus/icons-vue'
 
 const props = defineProps({
   problemData: {
@@ -170,6 +201,12 @@ const form = ref({
 
 // 多选题的选中答案数组
 const selectedAnswers = ref([])
+
+// 选项管理
+const options = ref([
+  { key: 'A', content: '' },
+  { key: 'B', content: '' }
+])
 
 // 解析选择题选项（从content字段自动格式化）
 function parseOptionsFromContent(content) {
@@ -232,7 +269,12 @@ function parseOptionsFromContent(content) {
 // 解析后的选项列表
 const parsedOptions = computed(() => {
   if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
-    return parseOptionsFromContent(form.value.content)
+    return options.value
+      .filter(option => option.content.trim())
+      .map(option => ({
+        value: option.key,
+        content: option.content
+      }))
   }
   return []
 })
@@ -293,6 +335,11 @@ function initFormData(data) {
     expectedAnswer: data.expectedAnswer || (data.type === 'TRUE_FALSE' ? 'true' : '')
   }
 
+  // 初始化选项数组（针对选择题）
+  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(data.type)) {
+    initOptionsFromContent(data.content)
+  }
+
   // 初始化多选题的答案数组
   if (data.type === 'MULTI_CHOICE' && data.expectedAnswer) {
     try {
@@ -310,6 +357,79 @@ function initFormData(data) {
   }
 }
 
+// 添加选项
+function addOption() {
+  const keys = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+  if (options.value.length < keys.length) {
+    const nextKey = keys[options.value.length]
+    options.value.push({ key: nextKey, content: '' })
+    updateFormContent()
+  }
+}
+
+// 删除选项
+function removeOption(index) {
+  if (options.value.length > 2) {
+    options.value.splice(index, 1)
+    // 重新分配选项标签
+    options.value.forEach((option, idx) => {
+      option.key = String.fromCharCode(65 + idx) // A, B, C, D...
+    })
+    updateFormContent()
+
+    // 清理可能无效的答案
+    cleanupAnswers()
+  }
+}
+
+// 更新form.content字段（将选项数组转换为文本格式）
+function updateFormContent() {
+  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
+    const contentLines = options.value
+      .filter(option => option.content.trim())
+      .map(option => `${option.key}. ${option.content.trim()}`)
+    form.value.content = contentLines.join('\n')
+  }
+}
+
+// 从文本内容初始化选项数组
+function initOptionsFromContent(content) {
+  if (!content || !['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
+    options.value = [
+      { key: 'A', content: '' },
+      { key: 'B', content: '' }
+    ]
+    return
+  }
+
+  const parsedOptions = parseOptionsFromContent(content)
+  if (parsedOptions.length > 0) {
+    options.value = parsedOptions.map(option => ({
+      key: option.value,
+      content: option.content
+    }))
+  } else {
+    // 如果解析失败，使用默认选项
+    options.value = [
+      { key: 'A', content: '' },
+      { key: 'B', content: '' }
+    ]
+  }
+}
+
+// 清理无效答案
+function cleanupAnswers() {
+  const validKeys = options.value.map(option => option.key)
+
+  if (form.value.type === 'SINGLE_CHOICE') {
+    if (!validKeys.includes(form.value.expectedAnswer)) {
+      form.value.expectedAnswer = ''
+    }
+  } else if (form.value.type === 'MULTI_CHOICE') {
+    selectedAnswers.value = selectedAnswers.value.filter(answer => validKeys.includes(answer))
+  }
+}
+
 // 处理题目类型变化
 function handleTypeChange(newType) {
   // 重置答案相关数据
@@ -320,9 +440,17 @@ function handleTypeChange(newType) {
   if (newType === 'TRUE_FALSE') {
     form.value.expectedAnswer = 'true'
   } else if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(newType)) {
-    // 选择题：如果content为空，提供示例格式
+    // 选择题：初始化选项
     if (!form.value.content) {
-      form.value.content = 'A. 选项A\nB. 选项B\nC. 选项C\nD. 选项D'
+      options.value = [
+        { key: 'A', content: '' },
+        { key: 'B', content: '' },
+        { key: 'C', content: '' },
+        { key: 'D', content: '' }
+      ]
+      updateFormContent()
+    } else {
+      initOptionsFromContent(form.value.content)
     }
   }
 }
@@ -379,10 +507,31 @@ function saveProblem() {
   emit('save', submitData)
 }
 
+// 监听题目类型变化
+watch(() => form.value.type, (newType) => {
+  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(newType)) {
+    // 如果切换到选择题类型，确保有基本选项
+    if (options.value.length < 2) {
+      options.value = [
+        { key: 'A', content: '' },
+        { key: 'B', content: '' }
+      ]
+    }
+  }
+})
+
 // 组件挂载时初始化
 onMounted(() => {
   if (props.problemData) {
     initFormData(props.problemData)
+  } else {
+    // 如果没有数据，初始化默认选项
+    if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
+      options.value = [
+        { key: 'A', content: '' },
+        { key: 'B', content: '' }
+      ]
+    }
   }
 })
 </script>
@@ -470,5 +619,69 @@ onMounted(() => {
 .el-checkbox.is-checked {
   background: #f0f9ff;
   border-color: #409EFF;
+}
+
+/* 选项管理样式 */
+.options-container {
+  width: 100%;
+}
+
+.options-list {
+  margin-bottom: 15px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s ease;
+}
+
+.option-item:hover {
+  border-color: #c0c4cc;
+  background: #f5f7fa;
+}
+
+.option-item:last-child {
+  margin-bottom: 0;
+}
+
+.option-item .option-label {
+  font-weight: 600;
+  color: #409EFF;
+  min-width: 30px;
+  text-align: center;
+  font-size: 14px;
+  background: #f0f9ff;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.option-input {
+  flex: 1;
+}
+
+.add-option-section {
+  padding: 15px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 6px;
+  text-align: center;
+  background: #fafafa;
+  transition: all 0.2s ease;
+}
+
+.add-option-section:hover {
+  border-color: #409EFF;
+  background: #f0f9ff;
+}
+
+.add-option-section .form-tip {
+  margin-top: 10px;
+  text-align: center;
 }
 </style>
