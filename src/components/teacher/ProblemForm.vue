@@ -189,6 +189,17 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 /* eslint-enable no-undef */
 
+// ==================== 工具函数 ====================
+
+// 根据题目类型判定是否支持自动评分
+function getAutoGrading(type) {
+  // 单选题、多选题、填空题、判断题支持自动评分
+  const autoGradingTypes = ['SINGLE_CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRUE_FALSE']
+  return autoGradingTypes.includes(type)
+}
+
+// ==================== 表单数据 ====================
+
 // 表单数据
 const form = ref({
   title: '',
@@ -196,7 +207,8 @@ const form = ref({
   content: '',
   expectedAnswer: '',
   score: 10,
-  assignmentId: props.homeworkId
+  assignmentId: props.homeworkId,
+  autoGrading: getAutoGrading('SINGLE_CHOICE') // 默认单选题支持自动评分
 })
 
 // 多选题的选中答案数组
@@ -332,7 +344,8 @@ function initFormData(data) {
     content: data.content || '',
     score: data.score || 10,
     assignmentId: props.homeworkId,
-    expectedAnswer: data.expectedAnswer || (data.type === 'TRUE_FALSE' ? 'true' : '')
+    expectedAnswer: data.expectedAnswer || (data.type === 'TRUE_FALSE' ? 'true' : ''),
+    autoGrading: data.autoGrading !== undefined ? data.autoGrading : getAutoGrading(data.type || 'SINGLE_CHOICE')
   }
 
   // 初始化选项数组（针对选择题）
@@ -497,6 +510,7 @@ function saveProblem() {
     title: form.value.title,
     content: form.value.content,
     type: form.value.type,
+    autoGrading: getAutoGrading(form.value.type), // 根据题目类型自动设置自动评分
     expectedAnswer: form.value.expectedAnswer,
     score: form.value.score,
     assignmentId: props.homeworkId,
@@ -509,6 +523,9 @@ function saveProblem() {
 
 // 监听题目类型变化
 watch(() => form.value.type, (newType) => {
+  // 根据新的题目类型自动设置自动评分
+  form.value.autoGrading = getAutoGrading(newType)
+
   if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(newType)) {
     // 如果切换到选择题类型，确保有基本选项
     if (options.value.length < 2) {

@@ -431,6 +431,17 @@ import ProblemForm from '@/components/teacher/ProblemForm.vue'
 // 提交列表组件将在后续开发
 // import SubmissionsList from '@/components/teacher/SubmissionsList.vue'
 
+// ==================== 工具函数 ====================
+
+// 根据题目类型判定是否支持自动评分
+function getAutoGrading(type) {
+  // 单选题、多选题、填空题、判断题支持自动评分
+  const autoGradingTypes = ['SINGLE_CHOICE', 'MULTI_CHOICE', 'FILL_BLANK', 'TRUE_FALSE']
+  return autoGradingTypes.includes(type)
+}
+
+// ==================== 路由和状态管理 ====================
+
 const route = useRoute()
 const router = useRouter()
 
@@ -854,7 +865,8 @@ async function copyProblem(problem) {
       ...problem,
       problemId: undefined, // 清除原ID，让后端生成新ID
       title: `${problem.title} (副本)`,
-      sequence: problems.value.length + 1
+      sequence: problems.value.length + 1,
+      autoGrading: getAutoGrading(problem.type) // 根据题目类型自动设置自动评分
     }
 
     const result = await problemAPI.saveProblem(copiedProblem)
@@ -1018,7 +1030,8 @@ function handleFileChange(file) {
       importPreview.value = validProblems.map(problem => ({
         ...problem,
         score: problem.score || 10,
-        assignmentId: homeworkId.value
+        assignmentId: homeworkId.value,
+        autoGrading: getAutoGrading(problem.type) // 根据题目类型自动设置自动评分
       }))
 
       ElMessage.success(`成功解析 ${validProblems.length} 道题目`)
@@ -1808,14 +1821,16 @@ async function publishHomework() {
 // 显示添加题目对话框
 function showAddProblemDialog() {
   problemDialogTitle.value = '添加题目'
+  const defaultType = 'SINGLE_CHOICE'
   currentProblem.value = {
     title: '',
     content: '',
-    type: 'SINGLE_CHOICE',
+    type: defaultType,
     options: [],
     expectedAnswer: '',
     score: 10,
-    assignmentId: homeworkId.value
+    assignmentId: homeworkId.value,
+    autoGrading: getAutoGrading(defaultType) // 根据默认题目类型设置自动评分
   }
   addProblemDialogVisible.value = true
 }
@@ -1866,7 +1881,7 @@ async function saveProblem(problemData) {
       title: problemData.title, // 题目标题
       content: problemData.content, // 题目内容
       type: problemData.type, // 题目类型
-      autoGrading: problemData.autoGrading || false, // 是否自动评分
+      autoGrading: getAutoGrading(problemData.type), // 根据题目类型自动判定是否支持自动评分
       expectedAnswer: problemData.expectedAnswer || '', // 标准答案
       score: problemData.score || 10, // 题目分值
       sequence: problems.value.length + 1, // 设置题目序号

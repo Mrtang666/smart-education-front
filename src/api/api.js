@@ -33,31 +33,37 @@ const createStudentAuthorizedAxios = () => {
         (error) => Promise.reject(error)
     );
 
-    // 响应拦截器：处理401错误
+    // 响应拦截器：处理401和405错误
     instance.interceptors.response.use(
         (response) => response,
         async (error) => {
             const originalRequest = error.config;
-            
+
+            // 如果是405错误，记录警告但不阻止程序运行
+            if (error.response && error.response.status === 405) {
+                console.warn(`API接口不支持 ${originalRequest.method?.toUpperCase()} 方法: ${originalRequest.url}`);
+                // 对于405错误，我们在各个API方法中单独处理，这里只记录日志
+            }
+
             // 如果是401错误且没有重试过
             if (error.response && error.response.status === 401 && !originalRequest._retry) {
                 originalRequest._retry = true;
-                
+
                 try {
                     // 获取刷新token
                     const refreshToken = getRefreshToken();
                     if (!refreshToken) {
                         throw new Error('没有刷新token可用');
                     }
-                    
+
                     // 刷新token
                     const response = await authAPI.studentRefreshToken({ refreshToken });
                     const { accessToken, refreshToken: newRefreshToken } = response;
-                    
+
                     // 保存新token
                     setToken(accessToken);
                     setRefreshToken(newRefreshToken);
-                    
+
                     // 更新请求头并重试
                     originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
                     return instance(originalRequest);
@@ -68,7 +74,7 @@ const createStudentAuthorizedAxios = () => {
                     return Promise.reject(refreshError);
                 }
             }
-            
+
             return Promise.reject(error);
         }
     );
@@ -95,31 +101,37 @@ const createTeacherAuthorizedAxios = () => {
         (error) => Promise.reject(error)
     );
 
-    // 响应拦截器：处理401错误
+    // 响应拦截器：处理401和405错误
     instance.interceptors.response.use(
         (response) => response,
         async (error) => {
             const originalRequest = error.config;
-            
+
+            // 如果是405错误，记录警告但不阻止程序运行
+            if (error.response && error.response.status === 405) {
+                console.warn(`API接口不支持 ${originalRequest.method?.toUpperCase()} 方法: ${originalRequest.url}`);
+                // 对于405错误，我们在各个API方法中单独处理，这里只记录日志
+            }
+
             // 如果是401错误且没有重试过
             if (error.response && error.response.status === 401 && !originalRequest._retry) {
                 originalRequest._retry = true;
-                
+
                 try {
                     // 获取刷新token
                     const refreshToken = getRefreshToken();
                     if (!refreshToken) {
                         throw new Error('没有刷新token可用');
                     }
-                    
+
                     // 刷新token
                     const response = await authAPI.teacherRefreshToken({ refreshToken });
                     const { accessToken, refreshToken: newRefreshToken } = response;
-                    
+
                     // 保存新token
                     setToken(accessToken);
                     setRefreshToken(newRefreshToken);
-                    
+
                     // 更新请求头并重试
                     originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
                     return instance(originalRequest);
@@ -130,7 +142,7 @@ const createTeacherAuthorizedAxios = () => {
                     return Promise.reject(refreshError);
                 }
             }
-            
+
             return Promise.reject(error);
         }
     );
@@ -2273,10 +2285,12 @@ export const learningPlanAPI = {
      */
     async generateLearningPlan(studentId, targetGoal, timeFrame, courseIds, knowledgeIds) {
         const axios = createStudentAuthorizedAxios();
-        const params = { targetGoal, timeFrame };
-        if (courseIds) params.courseIds = courseIds;
-        if (knowledgeIds) params.knowledgeIds = knowledgeIds;
-        const response = await axios.get(`/api/learning-plan/student/${studentId}/generate`, { params });
+        const requestData = { targetGoal, timeFrame };
+        if (courseIds) requestData.courseIds = courseIds;
+        if (knowledgeIds) requestData.knowledgeIds = knowledgeIds;
+        const response = await axios.post(`/api/learning-plan/student/${studentId}/generate`, requestData, {
+            timeout: 60000 // 60秒超时
+        });
         return response.data;
     },
 
@@ -2291,8 +2305,10 @@ export const learningPlanAPI = {
      */
     async generateLearningPlanByKnowledgeName(studentId, targetGoal, timeFrame, knowledgeNames) {
         const axios = createStudentAuthorizedAxios();
-        const params = { targetGoal, timeFrame, knowledgeNames };
-        const response = await axios.get(`/api/learning-plan/student/${studentId}/generate/knowledge-names`, { params });
+        const requestData = { targetGoal, timeFrame, knowledgeNames };
+        const response = await axios.post(`/api/learning-plan/student/${studentId}/generate/knowledge-names`, requestData, {
+            timeout: 60000 // 60秒超时
+        });
         return response.data;
     },
 
@@ -2307,8 +2323,10 @@ export const learningPlanAPI = {
      */
     async generateLearningPlanByCourseName(studentId, targetGoal, timeFrame, courseNames) {
         const axios = createStudentAuthorizedAxios();
-        const params = { targetGoal, timeFrame, courseNames };
-        const response = await axios.get(`/api/learning-plan/student/${studentId}/generate/course-names`, { params });
+        const requestData = { targetGoal, timeFrame, courseNames };
+        const response = await axios.post(`/api/learning-plan/student/${studentId}/generate/course-names`, requestData, {
+            timeout: 60000 // 60秒超时
+        });
         return response.data;
     },
 
@@ -3112,11 +3130,24 @@ export const studentAssistantAPI = {
      */
     async generateExercise(studentId, courseId, knowledgeIds, difficultyLevel, questionCount) {
         const axios = createStudentAuthorizedAxios();
-        const params = { courseId, questionCount };
-        if (knowledgeIds) params.knowledgeIds = knowledgeIds;
-        if (difficultyLevel) params.difficultyLevel = difficultyLevel;
-        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise`, { params });
-        return response.data;
+        try {
+            const requestData = { courseId, problemCount: questionCount };
+            if (knowledgeIds) requestData.knowledgeIds = knowledgeIds;
+            if (difficultyLevel) requestData.difficultyLevel = difficultyLevel;
+            const response = await axios.post(`/api/student-assistant/student/${studentId}/generate-exercise`, requestData, {
+                timeout: 60000 // 60秒超时
+            });
+            return response.data;
+        } catch (error) {
+            console.error('生成智能练习失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI练习生成功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
     },
 
     /**
@@ -3127,40 +3158,107 @@ export const studentAssistantAPI = {
      */
     async generateWeakPointsExercise(studentId, questionCount) {
         const axios = createStudentAuthorizedAxios();
-        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/weak-points`, { params: { questionCount } });
-        return response.data;
+        try {
+            const response = await axios.post(`/api/student-assistant/student/${studentId}/generate-exercise/weak-points`, { problemCount: questionCount }, {
+                timeout: 60000 // 60秒超时
+            });
+            return response.data;
+        } catch (error) {
+            console.error('生成薄弱知识点练习失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI练习生成功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
     },
 
     /**
      * 按知识点名称生成练习（需要token）
-     * @param {number} studentId 学生ID
-     * @param {Array<string>} knowledgeNames 知识点名称数组
-     * @param {string} [difficultyLevel] 难度等级（可选）
-     * @param {number} questionCount 题目数量
+     * 接口路径：GET /api/student-assistant/student/{studentId}/generate-exercise/by-knowledge
+     * @param {number} studentId 学生ID - 路径参数
+     * @param {Array<string>} knowledgeNames 知识点名称数组 - 查询参数，多个知识点用逗号分隔
+     * @param {string} difficultyLevel 难度等级 - 查询参数（简单/中等/困难）
+     * @param {number} problemCount 题目数量 - 查询参数（1-20）
      * @returns {Promise<Object>} 练习生成结果
+     * 返回格式：
+     * {
+     *   "additionalProp1": {},
+     *   "additionalProp2": {},
+     *   "additionalProp3": {}
+     * }
      */
-    async generateExerciseByKnowledgeNames(studentId, knowledgeNames, difficultyLevel, questionCount) {
+    async generateExerciseByKnowledgeNames(studentId, knowledgeNames, difficultyLevel, problemCount) {
         const axios = createStudentAuthorizedAxios();
-        const params = { knowledgeNames, questionCount };
-        if (difficultyLevel) params.difficultyLevel = difficultyLevel;
-        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-knowledge`, { params });
-        return response.data;
+        try {
+            // 构建查询参数
+            const params = {
+                knowledgeNames: Array.isArray(knowledgeNames) ? knowledgeNames.join(',') : knowledgeNames,
+                difficultyLevel: difficultyLevel,
+                problemCount: problemCount
+            };
+
+            // 使用GET请求，参数通过query传递
+            const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-knowledge`, {
+                params: params,
+                timeout: 60000 // 60秒超时
+            });
+            return response.data;
+        } catch (error) {
+            console.error('按知识点生成练习失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI练习生成功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
     },
 
     /**
      * 按课程名称生成练习（需要token）
-     * @param {number} studentId 学生ID
-     * @param {string} courseName 课程名称
-     * @param {string} [difficultyLevel] 难度等级（可选）
-     * @param {number} questionCount 题目数量
+     * 接口路径：GET /api/student-assistant/student/{studentId}/generate-exercise/by-course
+     * @param {number} studentId 学生ID - 路径参数
+     * @param {string} courseName 课程名称 - 查询参数
+     * @param {string} difficultyLevel 难度等级 - 查询参数（简单/中等/困难）
+     * @param {number} problemCount 题目数量 - 查询参数（1-20）
      * @returns {Promise<Object>} 练习生成结果
+     * 返回格式：
+     * {
+     *   "additionalProp1": {},
+     *   "additionalProp2": {},
+     *   "additionalProp3": {}
+     * }
      */
-    async generateExerciseByCourseName(studentId, courseName, difficultyLevel, questionCount) {
+    async generateExerciseByCourseName(studentId, courseName, difficultyLevel, problemCount) {
         const axios = createStudentAuthorizedAxios();
-        const params = { courseName, questionCount };
-        if (difficultyLevel) params.difficultyLevel = difficultyLevel;
-        const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-course`, { params });
-        return response.data;
+        try {
+            // 构建查询参数
+            const params = {
+                courseName: courseName,
+                difficultyLevel: difficultyLevel,
+                problemCount: problemCount
+            };
+
+            // 使用GET请求，参数通过query传递
+            const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-course`, {
+                params: params,
+                timeout: 60000 // 60秒超时
+            });
+            return response.data;
+        } catch (error) {
+            console.error('按课程生成练习失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI练习生成功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
     }
 };
 
@@ -4114,7 +4212,7 @@ export const assignmentAPI = {
      * 每项字段：同updateAssignment返回字段
      */
     async getAssignmentsByCourseIdAndType(courseId, type) {
-        const axios = createTeacherAuthorizedAxios();
+        const axios = createStudentAuthorizedAxios();
         try {
             // 确保ID是字符串类型
             const courseIdStr = String(courseId);
@@ -4227,6 +4325,13 @@ export const studentAnswerAPI = {
             return response.data;
         } catch (error) {
             console.error('提交答案失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，提供更友好的错误信息
+            if (error.response && error.response.status === 405) {
+                console.error('后端不支持答案提交接口');
+                throw new Error('答案提交功能暂时不可用，请联系管理员');
+            }
+
             throw error;
         }
     },
@@ -4260,9 +4365,9 @@ export const studentAnswerAPI = {
             return response.data;
         } catch (error) {
             console.error('提交答案并自动评分失败:', error.response ? error.response.data : error.message);
-            // 如果自动评分接口不存在，回退到普通提交
-            if (error.response && error.response.status === 404) {
-                console.log('自动评分接口不存在，回退到普通提交');
+            // 如果自动评分接口不存在或不支持，回退到普通提交
+            if (error.response && (error.response.status === 404 || error.response.status === 405)) {
+                console.log('自动评分接口不存在或不支持，回退到普通提交');
                 return await this.submitAnswer(studentId, problemId, answer);
             }
             throw error;
@@ -4278,13 +4383,22 @@ export const studentAnswerAPI = {
     async gradeAnswer(answerId, score) {
         const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.post('/api/student-answer/grade', {
-                answerId,
-                score
+            const response = await axios.post('/api/student-answer/grade', null, {
+                params: {
+                    answerId,
+                    score
+                }
             });
             return response.data;
         } catch (error) {
             console.error('答案评分失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                console.warn('后端不支持答案评分接口');
+                throw new Error('答案评分功能暂时不可用，请联系管理员');
+            }
+
             throw error;
         }
     },
@@ -4301,6 +4415,13 @@ export const studentAnswerAPI = {
             return response.data;
         } catch (error) {
             console.error('获取问题答案失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口，返回空数组
+            if (error.response && error.response.status === 405) {
+                console.warn('后端不支持获取问题答案接口，返回空数组');
+                return [];
+            }
+
             throw error;
         }
     },
@@ -4364,38 +4485,7 @@ export const studentAnswerAPI = {
         }
     },
 
-    /**
-     * 获取学生作业的重做次数信息
-     * @param {number} studentId 学生ID
-     * @param {number} assignmentId 作业ID
-     * @returns {Promise<Object>} 重做次数信息
-     * 返回字段：
-     * - maxAttempts: number 最大重做次数
-     * - usedAttempts: number 已使用次数
-     * - remainingAttempts: number 剩余次数
-     * - canRedo: boolean 是否可以重做
-     */
-    async getRedoInfo(studentId, assignmentId) {
-        const axios = createStudentAuthorizedAxios();
-        try {
-            const response = await axios.get(`/api/student-answer/redo-info`, {
-                params: {
-                    studentId: String(studentId),
-                    assignmentId: String(assignmentId)
-                }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('获取重做信息失败:', error.response ? error.response.data : error.message);
-            // 如果后端不支持，返回默认值
-            return {
-                maxAttempts: 0,
-                usedAttempts: 0,
-                remainingAttempts: 0,
-                canRedo: false
-            };
-        }
-    },
+
 
     /**
      * 重置学生作业（重做）
@@ -4458,6 +4548,13 @@ export const studentAnswerAPI = {
             return response.data;
         } catch (error) {
             console.error('获取作业答案失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口，返回空数组
+            if (error.response && error.response.status === 405) {
+                console.warn('后端不支持获取作业答案接口，返回空数组');
+                return [];
+            }
+
             throw error;
         }
     },

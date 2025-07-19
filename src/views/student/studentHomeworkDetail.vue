@@ -24,8 +24,14 @@
               <span><i class="el-icon-time"></i> 截止时间: {{ formatDateTime(homeworkInfo.endTime) }}</span>
               <span><i class="el-icon-document"></i> 题目数量: {{ problems.length }} 题</span>
               <span><i class="el-icon-star-on"></i> 总分: {{ totalScore }} 分</span>
-              <span v-if="isSubmitted && totalFinalScore > 0" class="final-score">
-                <i class="el-icon-trophy"></i> 我的得分: {{ totalFinalScore }} 分
+              <span v-if="showAutoScore" class="final-score">
+                <i class="el-icon-trophy"></i> 我的得分: {{ autoScore }} 分
+              </span>
+              <span v-else-if="isSubmitted && !homeworkInfo.isScoreVisible" class="score-hidden">
+                <i class="el-icon-view"></i> 已完成（分数不公开）
+              </span>
+              <span v-else-if="isSubmitted" class="score-pending">
+                <i class="el-icon-loading"></i> 暂无分数
               </span>
               <span v-if="homeworkInfo.maxAttempts > 0" class="attempts-info">
                 <i class="el-icon-refresh"></i> 剩余重做次数: {{ remainingAttempts }} / {{ homeworkInfo.maxAttempts }}
@@ -47,6 +53,21 @@
         </div>
       </el-card>
 
+      <!-- 重做状态提示 -->
+      <el-alert
+        v-if="isRedoing"
+        title="重做模式"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="redo-alert"
+      >
+        <template #default>
+          <p>您正在重做作业，当前答案仅暂存在本地。完成答题后请点击"重新提交作业"按钮。</p>
+          <p>剩余重做次数：{{ remainingAttempts - 1 }} 次</p>
+        </template>
+      </el-alert>
+
       <!-- 作业进度 -->
       <el-card class="progress-card" v-if="problems.length > 0">
         <div class="progress-header">
@@ -64,7 +85,7 @@
       </el-card>
 
       <!-- 题目列表 -->
-      <el-card class="problems-card">
+      <el-card class="problems-card" v-if="!isSubmitted || isRedoing">
         <div class="problems-header">
           <h3>作业题目</h3>
           <div class="problems-nav" v-if="problems.length > 1">
@@ -83,6 +104,9 @@
 
         <div v-if="problems.length === 0" class="empty-container">
           <el-empty description="暂无题目" />
+          <div style="margin-top: 10px; font-size: 12px; color: #999;">
+            调试信息: problems.length = {{ problems.length }}, isRedoing = {{ isRedoing }}
+          </div>
         </div>
 
         <div v-else class="problems-container">
@@ -94,6 +118,14 @@
                 {{ getProblemTypeText(currentProblem.type) }}
               </span>
               <span class="problem-score">({{ currentProblem.score || 0 }}分)</span>
+              <el-tag
+                v-if="currentProblem.autoGrading || currentProblem.auto_grading"
+                type="info"
+                size="mini"
+                style="margin-left: 8px;"
+              >
+                自动判分
+              </el-tag>
             </div>
 
             <div class="problem-title">
@@ -172,20 +204,20 @@
                   type="primary"
                   size="small"
                   @click="saveAnswer(currentProblem)"
-                  :disabled="!isAnswerValid(currentProblem) || isSubmitted"
+                  :disabled="!isAnswerValid(currentProblem) || (isSubmitted && !isRedoing)"
                   :loading="saving"
                 >
-                  {{ submittedAnswers[currentProblem.problemId] ? '重新保存' : '保存答案' }}
+                  {{ getDraftAnswerButtonText(currentProblem) }}
                 </el-button>
 
                 <el-tag
-                  v-if="submittedAnswers[currentProblem.problemId]"
-                  type="success"
+                  v-if="getDraftAnswerStatus(currentProblem.problemId)"
+                  :type="getDraftAnswerTagType(currentProblem.problemId)"
                   size="small"
                   style="margin-left: 10px;"
                 >
-                  已保存
-                  <span v-if="submittedAnswers[currentProblem.problemId].isGraded">
+                  {{ getDraftAnswerTagText(currentProblem.problemId) }}
+                  <span v-if="submittedAnswers[currentProblem.problemId] && submittedAnswers[currentProblem.problemId].isGraded">
                     - {{ submittedAnswers[currentProblem.problemId].score }}分
                   </span>
                 </el-tag>
@@ -207,7 +239,7 @@
             </div>
 
             <!-- 已提交或已截止的作业显示答案区域 -->
-            <div v-else class="result-area">
+            <div v-else-if="!isRedoing" class="result-area">
               <div class="my-answer">
                 <div class="answer-label">我的答案:</div>
                 <div class="answer-content">{{ getDisplayAnswer(currentProblem) || '未作答' }}</div>
@@ -241,17 +273,28 @@
 
       <!-- 提交作业按钮 -->
       <div class="submit-homework-container" v-if="problems.length > 0">
-        <div v-if="!isSubmitted && canAnswer">
+        <div v-if="(!isSubmitted && canAnswer) || isRedoing">
           <el-button
             type="primary"
             size="large"
             @click="submitHomework"
             :loading="submitting"
-            :disabled="completedCount === 0"
+            :disabled="getSubmitButtonDisabled()"
           >
-            提交作业 ({{ completedCount }}/{{ problems.length }})
+            {{ getSubmitButtonText() }}
           </el-button>
-          <p class="submit-tip">提交后将无法修改答案</p>
+          <p class="submit-tip">{{ getSubmitTipText() }}</p>
+
+          <!-- 重做时的取消按钮 -->
+          <el-button
+            v-if="isRedoing"
+            type="default"
+            size="large"
+            @click="cancelRedo"
+            style="margin-left: 10px;"
+          >
+            取消重做
+          </el-button>
         </div>
 
         <div v-else-if="isSubmitted" class="submitted-info">
@@ -351,28 +394,7 @@
             <p class="redo-tip">重做作业将清空当前答案，重新开始答题</p>
           </div>
 
-          <!-- 调试：重做信息 -->
-          <div v-if="homeworkInfo.maxAttempts > 0" class="debug-redo-section">
-            <el-card>
-              <template #header>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>重做信息调试</span>
-                  <div>
-                    <el-button size="small" @click="refreshRedoInfo">刷新</el-button>
-                    <el-button size="small" type="danger" @click="resetRedoData">重置数据</el-button>
-                  </div>
-                </div>
-              </template>
-              <div class="debug-info">
-                <p><strong>最大重做次数:</strong> {{ homeworkInfo.maxAttempts }}</p>
-                <p><strong>剩余次数:</strong> {{ remainingAttempts }}</p>
-                <p><strong>是否可重做:</strong> {{ canRedo ? '是' : '否' }}</p>
-                <p><strong>是否已提交:</strong> {{ isSubmitted ? '是' : '否' }}</p>
-                <p><strong>总得分:</strong> {{ totalFinalScore }}</p>
-                <p><strong>本地存储状态:</strong> {{ getLocalStorageStatus() }}</p>
-              </div>
-            </el-card>
-          </div>
+
         </div>
 
         <div v-else class="deadline-passed">
@@ -426,13 +448,19 @@ export default {
       submittedAnswers: {}, // 已提交的答案 {problemId: {answerId, answer, score}}
       finalScores: [], // 最终得分列表
       totalFinalScore: 0, // 总得分
+      autoScore: 0, // 自动判题分数
 
       // 提交状态
       isSubmitted: false,
 
       // 重做相关
       remainingAttempts: 0, // 剩余重做次数
-      canRedo: false // 是否可以重做
+      canRedo: false, // 是否可以重做
+      isRedoing: false, // 是否处于重做状态
+      tempAnswers: {}, // 重做时的临时答案存储
+
+      // 答题模式：'draft' 草稿模式（暂存答案），'submit' 提交模式（直接提交）
+      answerMode: 'draft'
     };
   },
   computed: {
@@ -447,9 +475,16 @@ export default {
       return this.problems.reduce((sum, problem) => sum + (problem.score || 0), 0);
     },
 
-    // 已完成题目数量（已提交答案的题目）
+    // 已完成题目数量（已提交答案的题目或已暂存的题目）
     completedCount() {
-      return Object.keys(this.submittedAnswers).length;
+      // 统计暂存答案和已提交答案的总数（避免重复计算）
+      const tempAnswerIds = new Set(Object.keys(this.tempAnswers));
+      const submittedAnswerIds = new Set(Object.keys(this.submittedAnswers));
+
+      // 合并两个集合
+      const allAnsweredIds = new Set([...tempAnswerIds, ...submittedAnswerIds]);
+
+      return allAnsweredIds.size;
     },
 
     // 进度百分比
@@ -469,7 +504,12 @@ export default {
     canAnswer() {
       const now = new Date();
       const endTime = new Date(this.homeworkInfo.endTime);
-      return this.homeworkStatus === 'ONGOING' && now <= endTime;
+      return this.homeworkStatus === 'ONGOING' && now <= endTime && (!this.isSubmitted || this.isRedoing);
+    },
+
+    // 是否显示自动判题分数
+    showAutoScore() {
+      return this.isSubmitted && this.autoScore > 0 && this.homeworkInfo.isScoreVisible;
     }
   },
   watch: {
@@ -557,7 +597,8 @@ export default {
             problemId: problem.problemId,
             title: problem.title,
             type: problem.type,
-            autoGrading: problem.autoGrading,
+            autoGrading: problem.autoGrading || problem.auto_grading,
+            auto_grading: problem.auto_grading, // 显示原始字段
             expectedAnswer: problem.expectedAnswer,
             score: problem.score,
             content: problem.content
@@ -584,6 +625,24 @@ export default {
         this.$message.error('获取作业详情失败，请稍后再试');
       } finally {
         this.loading = false;
+      }
+    },
+
+    // 只获取题目数据（用于重做时）
+    async fetchProblemsOnly() {
+      try {
+        console.log('正在重新获取题目列表...');
+        const problemsResponse = await problemAPI.getProblemsByAssignment(this.assignmentId);
+        console.log('题目列表响应:', problemsResponse);
+        this.problems = Array.isArray(problemsResponse) ? problemsResponse.sort((a, b) => (a.sequence || 0) - (b.sequence || 0)) : [];
+
+        console.log('重新获取的题目数据:', {
+          problemsCount: this.problems.length,
+          problems: this.problems
+        });
+      } catch (error) {
+        console.error('获取题目数据失败:', error);
+        this.$message.error('获取题目数据失败，请刷新页面重试');
       }
     },
 
@@ -629,34 +688,56 @@ export default {
     // 获取最终得分
     async fetchFinalScores() {
       try {
-        console.log('正在获取最终得分...');
-        const scores = await studentAnswerAPI.getFinalScoresByAssignment(this.assignmentId, this.studentId);
-        console.log('最终得分:', scores);
+        console.log('正在获取作业答案和分数...');
 
-        // 确保 scores 是数组，如果不是则设为空数组
-        if (Array.isArray(scores)) {
-          this.finalScores = scores;
-        } else if (scores === null || scores === undefined) {
-          this.finalScores = [];
-          console.log('获取到的得分为空，可能还没有评分');
+        // 使用正确的API获取作业答案，包含autoScore
+        const answers = await studentAnswerAPI.getAnswersByAssignment(this.assignmentId, this.studentId);
+        console.log('作业答案:', answers);
+
+        // 处理答案数据
+        if (Array.isArray(answers)) {
+          // 如果不是重做状态，直接使用后端数据
+          // 如果是重做状态，需要合并前端已更新的分数
+          if (!this.isRedoing) {
+            this.finalScores = answers;
+          } else {
+            // 重做状态下，保留前端已更新的分数，只更新其他数据
+            console.log('重做状态下合并分数数据');
+            this.mergeFinalScores(answers);
+          }
+
+          // 计算自动判题总分
+          this.autoScore = answers.reduce((sum, answer) => {
+            if (answer && answer.autoScore !== undefined && answer.autoScore !== null) {
+              const scoreValue = Number(answer.autoScore);
+              return sum + (isNaN(scoreValue) ? 0 : scoreValue);
+            }
+            return sum;
+          }, 0);
+
+          // 计算总得分（兼容原有逻辑）
+          this.totalFinalScore = answers.reduce((sum, answer) => {
+            if (answer && answer.finalScore !== undefined && answer.finalScore !== null) {
+              const scoreValue = Number(answer.finalScore);
+              return sum + (isNaN(scoreValue) ? 0 : scoreValue);
+            } else if (answer && answer.autoScore !== undefined && answer.autoScore !== null) {
+              const scoreValue = Number(answer.autoScore);
+              return sum + (isNaN(scoreValue) ? 0 : scoreValue);
+            }
+            return sum;
+          }, 0);
+
+          // 检查是否已提交
+          this.isSubmitted = answers.length > 0;
         } else {
           this.finalScores = [];
-          console.warn('获取到的得分格式不正确:', scores);
+          this.autoScore = 0;
+          this.totalFinalScore = 0;
+          this.isSubmitted = false;
+          console.log('获取到的答案为空，可能还没有提交');
         }
 
-        // 计算总得分
-        this.totalFinalScore = this.finalScores.reduce((sum, score) => {
-          // 确保 score 不为 null 且有 finalScore 属性
-          if (score && typeof score === 'object' && score.finalScore !== undefined && score.finalScore !== null) {
-            const scoreValue = Number(score.finalScore);
-            return sum + (isNaN(scoreValue) ? 0 : scoreValue);
-          }
-          return sum;
-        }, 0);
-
-        // 检查是否已提交
-        this.isSubmitted = this.finalScores.length > 0;
-
+        console.log('自动判题分数:', this.autoScore);
         console.log('总得分:', this.totalFinalScore);
         console.log('是否已提交:', this.isSubmitted);
 
@@ -665,12 +746,13 @@ export default {
           this.debugScoring();
         }
       } catch (error) {
-        console.error('获取最终得分失败:', error);
+        console.error('获取作业答案失败:', error);
         // 设置默认值，防止页面报错
         this.finalScores = [];
+        this.autoScore = 0;
         this.totalFinalScore = 0;
         this.isSubmitted = false;
-        // 不显示错误消息，因为可能还没有得分
+        // 不显示错误消息，因为可能还没有提交
       }
     },
 
@@ -790,8 +872,13 @@ export default {
       return [];
     },
 
-    // 判断是否已答题（已提交答案）
+    // 判断是否已答题（已提交答案或已暂存答案）
     isAnswered(problemId) {
+      // 检查是否有暂存答案
+      if (Object.prototype.hasOwnProperty.call(this.tempAnswers, problemId)) {
+        return true;
+      }
+      // 检查是否有已提交答案
       return Object.prototype.hasOwnProperty.call(this.submittedAnswers, problemId);
     },
 
@@ -821,13 +908,28 @@ export default {
           formattedAnswer = String(answer);
         }
 
+        // 如果是重做状态或草稿模式，只暂存答案，不提交到后台
+        if (this.isRedoing || this.answerMode === 'draft') {
+          const targetStorage = this.isRedoing ? this.tempAnswers : this.tempAnswers;
+
+          targetStorage[problem.problemId] = {
+            answer: formattedAnswer,
+            timestamp: new Date().toISOString(),
+            submitted: false,
+            isRedoing: this.isRedoing
+          };
+
+          this.$message.success('答案已暂存');
+          return;
+        }
+
         console.log('提交答案:', {
           studentId: this.studentId,
           problemId: problem.problemId,
           answer: formattedAnswer,
           problemInfo: {
             type: problem.type,
-            autoGrading: problem.autoGrading,
+            autoGrading: problem.autoGrading || problem.auto_grading,
             expectedAnswer: problem.expectedAnswer,
             score: problem.score
           }
@@ -837,7 +939,9 @@ export default {
         let result;
 
         // 如果题目支持自动评分，尝试使用自动评分接口
-        if (problem.autoGrading && problem.expectedAnswer) {
+        // 兼容 autoGrading 和 auto_grading 两种字段名
+        const isAutoGrading = problem.autoGrading || problem.auto_grading;
+        if (isAutoGrading && problem.expectedAnswer) {
           try {
             result = await studentAnswerAPI.submitAnswerWithAutoGrading(
               this.studentId,
@@ -871,7 +975,7 @@ export default {
         });
 
         // 如果后端没有自动评分，在前端进行评分
-        if (problem.autoGrading && problem.expectedAnswer && (!result || result.score === undefined)) {
+        if (isAutoGrading && problem.expectedAnswer && (!result || result.score === undefined)) {
           console.log('后端未返回评分，执行前端自动评分');
           const clientScore = this.performClientSideGrading(formattedAnswer, problem);
           console.log('前端评分结果:', clientScore);
@@ -934,64 +1038,13 @@ export default {
     // 提交作业
     async submitHomework() {
       try {
-        // 检查是否有未保存的答案
-        const unsavedAnswers = [];
-        this.problems.forEach(problem => {
-          const hasAnswer = this.isAnswerValid(problem);
-          const isSubmitted = this.submittedAnswers[problem.problemId];
-          if (hasAnswer && !isSubmitted) {
-            unsavedAnswers.push(problem.title || `题目${problem.problemId}`);
-          }
-        });
-
-        if (unsavedAnswers.length > 0) {
-          await this.$confirm(
-            `以下题目有答案但未保存：\n${unsavedAnswers.join('\n')}\n\n是否先保存这些答案？`,
-            '发现未保存的答案',
-            {
-              confirmButtonText: '先保存',
-              cancelButtonText: '直接提交',
-              type: 'warning'
-            }
-          );
-
-          // 批量保存未保存的答案
-          for (const problem of this.problems) {
-            const hasAnswer = this.isAnswerValid(problem);
-            const isSubmitted = this.submittedAnswers[problem.problemId];
-            if (hasAnswer && !isSubmitted) {
-              await this.saveAnswer(problem);
-            }
-          }
+        if (this.isRedoing) {
+          // 重做状态下的提交逻辑
+          await this.submitRedoHomework();
+        } else {
+          // 正常提交逻辑
+          await this.submitNormalHomework();
         }
-
-        // 确认提交
-        await this.$confirm('确定要提交作业吗？提交后将无法修改答案。', '确认提交', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        });
-
-        this.submitting = true;
-
-        // 更新作业状态
-        this.homeworkStatus = 'SUBMITTED';
-        this.isSubmitted = true;
-
-        // 重新获取最终得分（可能需要等待自动评分）
-        setTimeout(async () => {
-          await this.fetchFinalScores();
-          // 重新计算重做信息
-          await this.calculateRedoInfo();
-          if (this.totalFinalScore > 0) {
-            this.$message.success(`作业提交成功！总得分：${this.totalFinalScore}分`);
-          } else {
-            this.$message.success('作业提交成功！正在评分中...');
-          }
-        }, 1000);
-
-        this.$message.success('作业提交成功！');
-
       } catch (error) {
         if (error !== 'cancel') {
           console.error('提交作业失败:', error);
@@ -1000,6 +1053,339 @@ export default {
       } finally {
         this.submitting = false;
       }
+    },
+
+    // 正常提交作业
+    async submitNormalHomework() {
+      // 检查是否有未暂存的答案
+      const unsavedAnswers = [];
+      this.problems.forEach(problem => {
+        const hasAnswer = this.isAnswerValid(problem);
+        const isSaved = this.tempAnswers[problem.problemId] || this.submittedAnswers[problem.problemId];
+        if (hasAnswer && !isSaved) {
+          unsavedAnswers.push(problem.title || `题目${problem.problemId}`);
+        }
+      });
+
+      if (unsavedAnswers.length > 0) {
+        await this.$confirm(
+          `以下题目有答案但未暂存：\n${unsavedAnswers.join('\n')}\n\n是否先暂存这些答案？`,
+          '发现未暂存的答案',
+          {
+            confirmButtonText: '先暂存',
+            cancelButtonText: '直接提交',
+            type: 'warning'
+          }
+        );
+
+        // 批量暂存未暂存的答案
+        for (const problem of this.problems) {
+          const hasAnswer = this.isAnswerValid(problem);
+          const isSaved = this.tempAnswers[problem.problemId] || this.submittedAnswers[problem.problemId];
+          if (hasAnswer && !isSaved) {
+            await this.saveAnswer(problem);
+          }
+        }
+      }
+
+      // 确认提交
+      const tempAnswerCount = Object.keys(this.tempAnswers).length;
+      const confirmMessage = tempAnswerCount > 0
+        ? `确定要提交作业吗？将提交 ${tempAnswerCount} 道暂存题目的答案，提交后将无法修改答案。`
+        : '确定要提交作业吗？提交后将无法修改答案。';
+
+      await this.$confirm(confirmMessage, '确认提交', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      });
+
+      this.submitting = true;
+
+      try {
+        // 批量提交所有暂存的答案
+        if (tempAnswerCount > 0) {
+          await this.submitAllTempAnswers();
+        }
+
+        // 更新作业状态
+        this.homeworkStatus = 'SUBMITTED';
+        this.isSubmitted = true;
+
+        // 清空暂存答案
+        this.tempAnswers = {};
+
+        // 立即重新计算总分
+        this.recalculateTotalScore();
+      } catch (error) {
+        console.error('提交暂存答案失败:', error);
+        this.$message.error('提交部分答案失败，请检查后重试');
+        throw error;
+      }
+
+      // 重新获取最终得分（可能需要等待自动评分）
+      setTimeout(async () => {
+        await this.fetchFinalScores();
+        // 重新计算重做信息
+        await this.calculateRedoInfo();
+
+        // 重新计算总分（以防后端数据有更新）
+        this.recalculateTotalScore();
+
+        if (this.totalFinalScore > 0) {
+          this.$message.success(`作业提交成功！总得分：${this.totalFinalScore}分`);
+        } else {
+          this.$message.success('作业提交成功！正在评分中...');
+        }
+      }, 1000);
+
+      this.$message.success('作业提交成功！');
+    },
+
+    // 重做状态下提交作业
+    async submitRedoHomework() {
+      if (Object.keys(this.tempAnswers).length === 0) {
+        this.$message.warning('请至少回答一道题目');
+        return;
+      }
+
+      // 确认重新提交
+      await this.$confirm(
+        `确定要重新提交作业吗？这将消耗1次重做机会，剩余 ${this.remainingAttempts - 1} 次机会。`,
+        '确认重新提交',
+        {
+          confirmButtonText: '确定提交',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      );
+
+      this.submitting = true;
+
+      try {
+        // 批量提交所有暂存的答案
+        for (const problemId of Object.keys(this.tempAnswers)) {
+          const tempAnswer = this.tempAnswers[problemId];
+          const problem = this.problems.find(p => p.problemId === problemId);
+
+          if (problem && tempAnswer) {
+            // 直接调用后端提交，强制提交到后端
+            await this.forceSubmitAnswer(problem, tempAnswer.answer);
+          }
+        }
+
+        // 更新本地存储的重做次数
+        const storageKey = `redo_attempts_${this.studentId}_${this.assignmentId}`;
+        try {
+          const storedData = localStorage.getItem(storageKey);
+          let usedAttempts = 1; // 默认已使用1次
+
+          if (storedData) {
+            const data = JSON.parse(storedData);
+            usedAttempts = (data.usedAttempts || 1) + 1; // 增加使用次数
+          }
+
+          localStorage.setItem(storageKey, JSON.stringify({
+            usedAttempts: usedAttempts,
+            lastRedoTime: new Date().toISOString()
+          }));
+
+          console.log('更新本地重做次数:', usedAttempts);
+        } catch (error) {
+          console.error('更新本地存储失败:', error);
+        }
+
+        // 退出重做状态
+        this.isRedoing = false;
+        this.tempAnswers = {};
+
+        // 立即重新计算总分
+        this.recalculateTotalScore();
+
+        // 重新获取最终得分和重做信息
+        setTimeout(async () => {
+          await this.fetchFinalScores();
+          await this.calculateRedoInfo();
+
+          // 重新计算总分（以防后端数据有更新）
+          this.recalculateTotalScore();
+
+          if (this.totalFinalScore > 0) {
+            this.$message.success(`作业重新提交成功！新得分：${this.totalFinalScore}分`);
+          } else {
+            this.$message.success('作业重新提交成功！正在评分中...');
+          }
+        }, 1000);
+
+        this.$message.success('作业重新提交成功！');
+
+      } catch (error) {
+        console.error('重新提交作业失败:', error);
+        this.$message.error('重新提交作业失败，请稍后再试');
+        throw error;
+      }
+    },
+
+    // 批量提交所有暂存的答案
+    async submitAllTempAnswers() {
+      console.log('开始批量提交暂存答案:', this.tempAnswers);
+
+      for (const problemId of Object.keys(this.tempAnswers)) {
+        const tempAnswer = this.tempAnswers[problemId];
+        const problem = this.problems.find(p => p.problemId === problemId);
+
+        if (problem && tempAnswer) {
+          // 使用强制提交方法，确保能够覆盖之前的答案
+          await this.forceSubmitAnswer(problem, tempAnswer.answer);
+        }
+      }
+
+      console.log('所有暂存答案提交完成');
+    },
+
+    // 强制提交答案到后端（用于重做时覆盖之前的答案）
+    async forceSubmitAnswer(problem, answer) {
+      try {
+        console.log(`强制提交题目 ${problem.problemId} 的答案:`, answer);
+
+        // 调用API提交答案
+        let result;
+
+        // 如果题目支持自动评分，尝试使用自动评分接口
+        const isAutoGrading = problem.autoGrading || problem.auto_grading;
+        if (isAutoGrading && problem.expectedAnswer) {
+          try {
+            result = await studentAnswerAPI.submitAnswerWithAutoGrading(
+              this.studentId,
+              problem.problemId,
+              answer,
+              true
+            );
+            console.log('自动评分提交结果:', result);
+          } catch (error) {
+            console.log('自动评分失败，使用普通提交:', error.message);
+            result = await studentAnswerAPI.submitAnswer(
+              this.studentId,
+              problem.problemId,
+              answer
+            );
+          }
+        } else {
+          result = await studentAnswerAPI.submitAnswer(
+            this.studentId,
+            problem.problemId,
+            answer
+          );
+        }
+
+        console.log('强制提交结果:', result);
+
+        // 如果后端没有自动评分，在前端进行评分
+        if (isAutoGrading && problem.expectedAnswer && (!result || result.score === undefined)) {
+          console.log('后端未返回评分，执行前端自动评分');
+          const clientScore = this.performClientSideGrading(answer, problem);
+          console.log('前端评分结果:', clientScore);
+
+          if (result) {
+            result.score = clientScore;
+            result.autoGraded = true;
+            result.gradedByClient = true;
+          }
+        }
+
+        // 强制更新已提交答案记录，覆盖之前的记录
+        this.submittedAnswers[problem.problemId] = {
+          answerId: result && (result.answerId || result.id) ? String(result.answerId || result.id) : null,
+          answer: answer,
+          timestamp: new Date().toISOString(),
+          score: result && result.score !== undefined ? Number(result.score) : null,
+          isGraded: result && result.score !== undefined,
+          autoGraded: result && result.autoGraded === true,
+          gradedByClient: result && result.gradedByClient === true
+        };
+
+        // 强制更新最终得分，覆盖之前的分数
+        if (result && result.score !== undefined) {
+          this.updateFinalScoreForProblem(problem.problemId, Number(result.score));
+        }
+
+        console.log(`题目 ${problem.problemId} 强制提交成功，新分数:`, result?.score);
+
+        return result;
+
+      } catch (error) {
+        console.error(`强制提交题目 ${problem.problemId} 失败:`, error);
+        throw new Error(`提交题目 ${problem.problemId} 失败: ${error.message}`);
+      }
+    },
+
+    // 重新计算总分
+    recalculateTotalScore() {
+      console.log('重新计算总分...');
+
+      // 从已提交答案中重新计算总分
+      let newTotalScore = 0;
+      const newFinalScores = [];
+
+      Object.keys(this.submittedAnswers).forEach(problemId => {
+        const submittedAnswer = this.submittedAnswers[problemId];
+        if (submittedAnswer && submittedAnswer.score !== null && submittedAnswer.score !== undefined) {
+          const score = Number(submittedAnswer.score);
+          if (!isNaN(score)) {
+            newTotalScore += score;
+            newFinalScores.push({
+              problemId: String(problemId),
+              finalScore: score,
+              timestamp: submittedAnswer.timestamp || new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      // 更新总分和分数列表
+      this.totalFinalScore = newTotalScore;
+      this.finalScores = newFinalScores;
+
+      console.log('重新计算总分完成:', {
+        totalFinalScore: this.totalFinalScore,
+        finalScores: this.finalScores
+      });
+    },
+
+    // 合并最终得分（用于重做时保留前端更新的分数）
+    mergeFinalScores(backendAnswers) {
+      console.log('合并前端和后端分数数据');
+
+      // 创建一个映射来快速查找前端已更新的分数
+      const frontendScoreMap = {};
+      this.finalScores.forEach(score => {
+        if (score && score.problemId) {
+          frontendScoreMap[score.problemId] = score;
+        }
+      });
+
+      // 合并后端数据，但保留前端已更新的分数
+      const mergedScores = [];
+      backendAnswers.forEach(answer => {
+        if (answer && answer.problemId) {
+          const frontendScore = frontendScoreMap[answer.problemId];
+          if (frontendScore) {
+            // 使用前端已更新的分数
+            mergedScores.push(frontendScore);
+            console.log(`保留题目 ${answer.problemId} 的前端分数:`, frontendScore.finalScore);
+          } else {
+            // 使用后端分数
+            mergedScores.push({
+              problemId: String(answer.problemId),
+              finalScore: answer.finalScore || answer.autoScore || 0,
+              timestamp: answer.updatedAt || answer.createdAt || new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      this.finalScores = mergedScores;
+      console.log('合并后的分数数据:', this.finalScores);
     },
 
     // 获取显示的答案
@@ -1018,6 +1404,88 @@ export default {
       }
     },
 
+    // 获取草稿答案按钮文本
+    getDraftAnswerButtonText(problem) {
+      if (this.isRedoing) {
+        return '暂存答案';
+      }
+
+      const hasTempAnswer = this.tempAnswers[problem.problemId];
+      const hasSubmittedAnswer = this.submittedAnswers[problem.problemId];
+
+      if (hasTempAnswer) {
+        return '重新暂存';
+      } else if (hasSubmittedAnswer) {
+        return '重新保存';
+      } else {
+        return '暂存答案';
+      }
+    },
+
+    // 获取草稿答案状态
+    getDraftAnswerStatus(problemId) {
+      return this.tempAnswers[problemId] || this.submittedAnswers[problemId];
+    },
+
+    // 获取草稿答案标签类型
+    getDraftAnswerTagType(problemId) {
+      if (this.tempAnswers[problemId]) {
+        return 'warning'; // 暂存状态用警告色
+      } else if (this.submittedAnswers[problemId]) {
+        return 'success'; // 已提交状态用成功色
+      }
+      return 'default';
+    },
+
+    // 获取草稿答案标签文本
+    getDraftAnswerTagText(problemId) {
+      if (this.tempAnswers[problemId]) {
+        return '已暂存';
+      } else if (this.submittedAnswers[problemId]) {
+        return '已提交';
+      }
+      return '';
+    },
+
+    // 获取提交按钮是否禁用
+    getSubmitButtonDisabled() {
+      if (this.isRedoing) {
+        return Object.keys(this.tempAnswers).length === 0;
+      } else {
+        return this.completedCount === 0;
+      }
+    },
+
+    // 获取提交按钮文本
+    getSubmitButtonText() {
+      if (this.isRedoing) {
+        return `重新提交作业 (${Object.keys(this.tempAnswers).length}/${this.problems.length})`;
+      } else {
+        const tempCount = Object.keys(this.tempAnswers).length;
+        const totalAnswered = this.completedCount;
+
+        if (tempCount > 0) {
+          return `提交作业 (${totalAnswered}/${this.problems.length}, ${tempCount}题暂存)`;
+        } else {
+          return `提交作业 (${totalAnswered}/${this.problems.length})`;
+        }
+      }
+    },
+
+    // 获取提交提示文本
+    getSubmitTipText() {
+      if (this.isRedoing) {
+        return '重新提交后将消耗一次重做机会';
+      } else {
+        const tempCount = Object.keys(this.tempAnswers).length;
+        if (tempCount > 0) {
+          return `提交后将把 ${tempCount} 道暂存题目的答案正式提交，提交后将无法修改答案`;
+        } else {
+          return '提交后将无法修改答案';
+        }
+      }
+    },
+
     // 计算重做相关信息
     async calculateRedoInfo() {
       const maxAttempts = this.homeworkInfo.maxAttempts || 0;
@@ -1031,29 +1499,9 @@ export default {
       });
 
       if (maxAttempts > 0) {
-        // 暂时使用前端逻辑，因为后端API还未实现
-        console.log('使用前端重做逻辑（后端API未实现）');
+        // 使用前端逻辑计算重做信息
+        console.log('使用前端重做逻辑');
         this.calculateRedoInfoFallback(maxAttempts);
-
-        // 注释掉后端API调用，等后端实现后再启用
-        /*
-        try {
-          // 从后端获取真实的重做信息
-          const redoInfo = await studentAnswerAPI.getRedoInfo(this.studentId, this.assignmentId);
-          console.log('后端重做信息:', redoInfo);
-
-          if (redoInfo && typeof redoInfo === 'object') {
-            this.remainingAttempts = Number(redoInfo.remainingAttempts) || 0;
-            this.canRedo = Boolean(redoInfo.canRedo) && this.isSubmitted && this.remainingAttempts > 0;
-          } else {
-            // 后端不支持，使用前端逻辑
-            this.calculateRedoInfoFallback(maxAttempts);
-          }
-        } catch (error) {
-          console.error('获取重做信息失败，使用前端逻辑:', error);
-          this.calculateRedoInfoFallback(maxAttempts);
-        }
-        */
       } else {
         this.remainingAttempts = 0;
         this.canRedo = false;
@@ -1122,10 +1570,10 @@ export default {
 
         // 确认重做
         await this.$confirm(
-          `确定要重新做作业吗？这将消耗1次重做机会，剩余 ${this.remainingAttempts - 1} 次机会。`,
+          `确定要重新做作业吗？您可以重新答题后再提交，这样才会消耗重做机会。`,
           '确认重做',
           {
-            confirmButtonText: '确定',
+            confirmButtonText: '开始重做',
             cancelButtonText: '取消',
             type: 'warning'
           }
@@ -1133,67 +1581,47 @@ export default {
 
         console.log('开始重做作业...');
 
-        // 更新本地存储的重做次数
-        const storageKey = `redo_attempts_${this.studentId}_${this.assignmentId}`;
-        try {
-          const storedData = localStorage.getItem(storageKey);
-          let usedAttempts = 1; // 默认已使用1次
-
-          if (storedData) {
-            const data = JSON.parse(storedData);
-            usedAttempts = (data.usedAttempts || 1) + 1; // 增加使用次数
-          }
-
-          localStorage.setItem(storageKey, JSON.stringify({
-            usedAttempts: usedAttempts,
-            lastRedoTime: new Date().toISOString()
-          }));
-
-          console.log('更新本地重做次数:', usedAttempts);
-        } catch (error) {
-          console.error('更新本地存储失败:', error);
+        // 检查题目数据是否存在
+        if (!this.problems || this.problems.length === 0) {
+          console.error('题目数据为空，重新获取题目数据');
+          await this.fetchProblemsOnly();
         }
 
-        // 暂时不调用后端重置API，因为还未实现
-        console.log('跳过后端重置API调用（未实现）');
+        // 进入重做状态
+        this.isRedoing = true;
 
-        // 注释掉后端API调用，等后端实现后再启用
-        /*
-        try {
-          const resetResult = await studentAnswerAPI.resetAssignment(this.studentId, this.assignmentId);
-          console.log('后端重置结果:', resetResult);
-          this.$message.success('作业已在服务器端重置');
-        } catch (apiError) {
-          console.error('后端重置失败，仅进行前端重置:', apiError);
-          this.$message.warning('服务器重置失败，仅进行本地重置');
-        }
-        */
+        // 清空所有暂存答案（包括重做和正常暂存的）
+        this.tempAnswers = {};
 
-        // 清空当前数据
+        // 清空当前用户答案，但保留原始提交的答案用于参考
         this.userAnswers = {};
-        this.answeredProblems = {};
-        this.submittedAnswers = {};
-        this.finalScores = [];
-        this.totalFinalScore = 0;
-        this.isSubmitted = false;
-        this.currentProblemIndex = 0;
-
-        // 重新初始化用户答案
-        this.initializeUserAnswers();
 
         // 重新判断作业状态
         this.determineHomeworkStatus();
 
-        // 重新计算重做信息（从后端获取最新状态）
-        await this.calculateRedoInfo();
+        // 重新初始化用户答案
+        this.initializeUserAnswers();
 
-        // 重新获取已提交的答案（应该为空）
-        await this.fetchSubmittedAnswers();
+        // 回到第一题
+        this.currentProblemIndex = 0;
 
-        // 重新获取最终得分（应该为空）
-        await this.fetchFinalScores();
+        // 调试信息
+        console.log('重做状态设置完成:', {
+          isRedoing: this.isRedoing,
+          problemsLength: this.problems.length,
+          currentProblemIndex: this.currentProblemIndex,
+          currentProblem: this.currentProblem,
+          userAnswers: this.userAnswers,
+          tempAnswers: this.tempAnswers,
+          canAnswer: this.canAnswer
+        });
 
-        this.$message.success('作业已重置，可以重新开始答题');
+        // 强制触发视图更新
+        this.$nextTick(() => {
+          this.$forceUpdate();
+        });
+
+        this.$message.success('已进入重做模式，您可以重新答题。完成后点击"重新提交作业"按钮。');
 
       } catch (error) {
         if (error !== 'cancel') {
@@ -1201,6 +1629,47 @@ export default {
           this.$message.error('重做作业失败，请稍后再试');
         }
       }
+    },
+
+    // 取消重做
+    cancelRedo() {
+      this.$confirm('确定要取消重做吗？已暂存的答案将会丢失。', '确认取消', {
+        confirmButtonText: '确定',
+        cancelButtonText: '继续重做',
+        type: 'warning'
+      }).then(() => {
+        // 退出重做状态
+        this.isRedoing = false;
+
+        // 清空临时答案
+        this.tempAnswers = {};
+
+        // 恢复原来的用户答案
+        this.restoreOriginalAnswers();
+
+        this.$message.info('已取消重做');
+      }).catch(() => {
+        // 用户选择继续重做，不做任何操作
+      });
+    },
+
+    // 恢复原始答案
+    restoreOriginalAnswers() {
+      this.userAnswers = {};
+
+      // 从已提交的答案中恢复
+      Object.keys(this.submittedAnswers).forEach(problemId => {
+        const submittedAnswer = this.submittedAnswers[problemId];
+        if (submittedAnswer && submittedAnswer.answer) {
+          // 根据题目类型恢复答案格式
+          const problem = this.problems.find(p => p.problemId === problemId);
+          if (problem && problem.type === 'MULTI_CHOICE') {
+            this.userAnswers[problemId] = submittedAnswer.answer.split(',');
+          } else {
+            this.userAnswers[problemId] = submittedAnswer.answer;
+          }
+        }
+      });
     },
 
     // 调试评分问题
@@ -1213,7 +1682,8 @@ export default {
         console.log(`题目 ${index + 1}:`, {
           problemId: problem.problemId,
           type: problem.type,
-          autoGrading: problem.autoGrading,
+          autoGrading: problem.autoGrading || problem.auto_grading,
+          auto_grading: problem.auto_grading, // 显示原始字段
           expectedAnswer: problem.expectedAnswer,
           score: problem.score,
           hasExpectedAnswer: !!problem.expectedAnswer
@@ -1241,7 +1711,7 @@ export default {
           submittedAnswer: submittedAnswer ? submittedAnswer.answer : 'none',
           finalScore: finalScore ? finalScore.finalScore : 'none',
           maxScore: problem.score,
-          isAutoGrading: problem.autoGrading,
+          isAutoGrading: problem.autoGrading || problem.auto_grading,
           shouldBeCorrect: submittedAnswer && problem.expectedAnswer &&
                           this.compareAnswers(submittedAnswer.answer, problem.expectedAnswer, problem.type)
         });
@@ -1280,7 +1750,7 @@ export default {
         return 0;
       }
 
-      const isCorrect = this.compareAnswers(userAnswer, problem.expectedAnswer, problem.type);
+      const isCorrect = this.enhancedCompareAnswers(userAnswer, problem.expectedAnswer, problem.type);
       const score = isCorrect ? (problem.score || 0) : 0;
 
       console.log('前端评分详情:', {
@@ -1357,50 +1827,15 @@ export default {
       }
     },
 
-    // 刷新重做信息（调试用）
-    async refreshRedoInfo() {
-      console.log('手动刷新重做信息...');
-      try {
-        await this.calculateRedoInfo();
-        this.$message.success('重做信息已刷新');
-      } catch (error) {
-        console.error('刷新重做信息失败:', error);
-        this.$message.error('刷新失败');
-      }
-    },
 
-    // 重置重做数据（调试用）
-    resetRedoData() {
-      const storageKey = `redo_attempts_${this.studentId}_${this.assignmentId}`;
-      try {
-        localStorage.removeItem(storageKey);
-        this.calculateRedoInfo();
-        this.$message.success('重做数据已重置');
-        console.log('本地重做数据已清除');
-      } catch (error) {
-        console.error('重置重做数据失败:', error);
-        this.$message.error('重置失败');
-      }
-    },
-
-    // 获取本地存储状态（调试用）
-    getLocalStorageStatus() {
-      const storageKey = `redo_attempts_${this.studentId}_${this.assignmentId}`;
-      try {
-        const storedData = localStorage.getItem(storageKey);
-        if (storedData) {
-          const data = JSON.parse(storedData);
-          return `已使用 ${data.usedAttempts || 0} 次`;
-        } else {
-          return '无本地数据';
-        }
-      } catch (error) {
-        return '读取失败';
-      }
-    },
 
     // 更新单个题目的最终得分
     updateFinalScoreForProblem(problemId, score) {
+      console.log(`更新题目 ${problemId} 的得分:`, {
+        oldScore: this.finalScores.find(s => s && s.problemId === problemId)?.finalScore,
+        newScore: score
+      });
+
       // 查找是否已存在该题目的得分记录
       const existingScoreIndex = this.finalScores.findIndex(s => s && s.problemId === problemId);
 
@@ -1412,13 +1847,16 @@ export default {
 
       if (existingScoreIndex >= 0) {
         // 更新现有记录
+        console.log(`覆盖题目 ${problemId} 的现有得分记录`);
         this.finalScores[existingScoreIndex] = scoreRecord;
       } else {
         // 添加新记录
+        console.log(`添加题目 ${problemId} 的新得分记录`);
         this.finalScores.push(scoreRecord);
       }
 
       // 重新计算总得分
+      const oldTotalScore = this.totalFinalScore;
       this.totalFinalScore = this.finalScores.reduce((sum, scoreItem) => {
         if (scoreItem && typeof scoreItem === 'object' && scoreItem.finalScore !== undefined && scoreItem.finalScore !== null) {
           const scoreValue = Number(scoreItem.finalScore);
@@ -1426,6 +1864,8 @@ export default {
         }
         return sum;
       }, 0);
+
+      console.log(`总分更新: ${oldTotalScore} -> ${this.totalFinalScore}`);
 
       // 更新提交状态
       this.isSubmitted = this.finalScores.length > 0;
@@ -1551,6 +1991,11 @@ export default {
 
 .loading-container {
   padding: 40px;
+}
+
+/* 重做状态提示 */
+.redo-alert {
+  margin-bottom: 20px;
 }
 
 /* 作业信息卡片 */
@@ -1820,6 +2265,16 @@ export default {
 
 .final-score {
   color: #67c23a;
+  font-weight: 600;
+}
+
+.score-hidden {
+  color: #909399;
+  font-weight: 600;
+}
+
+.score-pending {
+  color: #e6a23c;
   font-weight: 600;
 }
 

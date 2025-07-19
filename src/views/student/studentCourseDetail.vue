@@ -306,9 +306,9 @@
                                 <i class="el-icon-alarm-clock"></i>
                                 截止时间：{{ formatDateTime(assignment.endTime) }}
                               </span>
-                              <span v-if="assignment.maxAttempts > 0" class="meta-item attempts-meta">
+                              <span v-if="assignment.isRedoAllowed && assignment.maxAttempts > 0" class="meta-item attempts-meta">
                                 <i class="el-icon-refresh"></i>
-                                可重做次数：{{ assignment.maxAttempts }} 次
+                                重做次数：{{ assignment.remainingAttempts }}/{{ assignment.maxAttempts }} 次
                               </span>
                             </div>
                           </div>
@@ -327,18 +327,118 @@
                   </el-skeleton>
                 </div>
               </el-tab-pane>
-              <el-tab-pane label="学生自主上传" name="student">
-                <div class="assignment-list">
-                  <el-empty description="学生自主上传功能开发中...">
-                    <template #image>
-                      <i class="el-icon-upload" style="font-size: 60px; color: #ccc;"></i>
-                    </template>
-                    <template #description>
-                      <span style="color: #999;">此功能正在开发中，敬请期待</span>
-                    </template>
-                  </el-empty>
+
+              <!-- AI自主练习标签页 -->
+              <el-tab-pane label="AI自主练习" name="ai">
+                <div class="ai-exercise-section">
+                  <!-- AI生成按钮区域 -->
+                  <div class="ai-exercise-header">
+                    <div class="ai-exercise-intro">
+                      <h3>AI智能练习生成</h3>
+                      <p>基于当前课程或知识点，AI为您生成个性化练习题目</p>
+                    </div>
+                    <div class="ai-exercise-buttons">
+                      <el-button
+                        type="primary"
+                        @click="generateAIExerciseByCourse"
+                        :loading="aiGenerating"
+                        icon="el-icon-magic-stick"
+                      >
+                        按课程生成练习
+                      </el-button>
+                      <el-button
+                        type="success"
+                        @click="showKnowledgeInputDialog"
+                        :loading="aiGenerating"
+                        icon="el-icon-edit"
+                      >
+                        按知识点生成练习
+                      </el-button>
+                    </div>
+                  </div>
+
+                  <!-- 生成的练习内容展示区域 -->
+                  <div v-if="generatedQuestions.length > 0" class="generated-exercises">
+                    <div class="exercises-header">
+                      <h3>生成的练习题目 ({{ generatedQuestions.length }}题)</h3>
+                      <el-button type="danger" size="small" @click="clearGeneratedQuestions">
+                        清空题目
+                      </el-button>
+                    </div>
+
+                    <div class="exercises-content">
+                      <div v-for="(question, index) in generatedQuestions" :key="index" class="question-card">
+                        <div class="question-header">
+                          <span class="question-number">第{{ index + 1 }}题</span>
+                          <div class="question-type-info">
+                            <el-tag :type="getQuestionTypeTag(question.type)" size="small">
+                              {{ getQuestionTypeText(question.type) }}
+                            </el-tag>
+                            <span v-if="question.options && question.options.length > 0" class="option-count">
+                              ({{ question.options.length }}个选项)
+                            </span>
+                          </div>
+                        </div>
+
+                        <div class="question-content">
+                          <div class="question-title" v-if="question.title">
+                            <strong>{{ question.title }}</strong>
+                          </div>
+                          <div class="question-body">
+                            {{ question.content }}
+                          </div>
+
+                          <!-- 选择题选项 -->
+                          <div v-if="question.options && question.options.length > 0" class="question-options">
+                            <div class="options-title">选项：</div>
+                            <div
+                              v-for="(option, optIndex) in question.options"
+                              :key="optIndex"
+                              class="option-item"
+                              :class="{
+                                'correct-option': isCorrectOption(question, optIndex),
+                                'multi-choice-option': question.type === 'MULTI_CHOICE'
+                              }"
+                            >
+                              <span class="option-label" :class="question.type === 'MULTI_CHOICE' ? 'multi-label' : 'single-label'">
+                                {{ String.fromCharCode(65 + optIndex) }}.
+                              </span>
+                              <span class="option-text">{{ option }}</span>
+                              <span v-if="isCorrectOption(question, optIndex)" class="correct-indicator">
+                                <i class="el-icon-check"></i>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="question-meta">
+                          <div class="answer-section">
+                            <strong>答案：</strong>
+                            <span class="answer-text">{{ question.expectedAnswer }}</span>
+                          </div>
+                          <div v-if="question.analysis" class="analysis-section">
+                            <strong>解析：</strong>
+                            <span class="analysis-text">{{ question.analysis }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 空状态 -->
+                  <div v-else class="empty-exercises">
+                    <el-empty description="暂无生成的练习题目">
+                      <template #image>
+                        <i class="el-icon-magic-stick" style="font-size: 60px; color: #ccc;"></i>
+                      </template>
+                      <template #description>
+                        <span style="color: #999;">点击上方按钮生成您的第一个AI练习</span>
+                      </template>
+                    </el-empty>
+                  </div>
                 </div>
               </el-tab-pane>
+
             </el-tabs>
           </div>
         </div>
@@ -409,15 +509,59 @@
         </div>
       </div>
     </div>
+
+    <!-- 知识点输入对话框 -->
+    <el-dialog v-model="knowledgeInputDialogVisible" title="按知识点生成练习" width="500px">
+      <el-form :model="knowledgeForm" :rules="knowledgeRules" ref="knowledgeFormRef" label-width="120px">
+        <el-form-item label="知识点名称" prop="knowledgeNames">
+          <el-input
+            v-model="knowledgeForm.knowledgeNames"
+            placeholder="请输入知识点名称，多个知识点用逗号分隔"
+            type="textarea"
+            :rows="3"
+          />
+          <div class="form-tip">例如：线性代数，微积分，概率论</div>
+        </el-form-item>
+
+        <el-form-item label="难度等级" prop="difficultyLevel">
+          <el-select v-model="knowledgeForm.difficultyLevel" placeholder="请选择难度等级">
+            <el-option label="简单" value="简单" />
+            <el-option label="中等" value="中等" />
+            <el-option label="困难" value="困难" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="题目数量" prop="problemCount">
+          <el-input-number
+            v-model="knowledgeForm.problemCount"
+            :min="1"
+            :max="20"
+            placeholder="请输入题目数量"
+          />
+          <div class="form-tip">建议：题目数量越多，生成时间越长。首次使用建议选择5题以下。</div>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="knowledgeInputDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="generateAIExerciseByKnowledge" :loading="aiGenerating">
+            生成练习
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { knowledgeAPI, examAPI, attendanceAPI, docAPI, assignmentAPI } from '@/api/api';
+import { knowledgeAPI, examAPI, attendanceAPI, docAPI, assignmentAPI, studentAnswerAPI, studentAssistantAPI } from '@/api/api';
 import { getUserInfo } from '@/utils/auth';
 
 export default {
   name: 'StudentCourseDetail',
+  components: {
+  },
   data() {
     return {
       courseId: null,
@@ -454,9 +598,29 @@ export default {
       // 新的作业分类数据
       activeAssignmentTab: 'teacher', // 当前激活的作业标签页
       teacherAssignments: [], // 教师布置的作业
-      studentAssignments: [], // 学生自主上传的作业
       teacherAssignmentsLoading: false,
-      studentAssignmentsLoading: false,
+
+      // AI生成练习相关
+      aiGenerating: false,
+      generatedQuestions: [],
+      knowledgeInputDialogVisible: false,
+      knowledgeForm: {
+        knowledgeNames: '',
+        difficultyLevel: '中等',
+        problemCount: 5
+      },
+      knowledgeRules: {
+        knowledgeNames: [
+          { required: true, message: '请输入知识点名称', trigger: 'blur' }
+        ],
+        difficultyLevel: [
+          { required: true, message: '请选择难度等级', trigger: 'change' }
+        ],
+        problemCount: [
+          { required: true, message: '请输入题目数量', trigger: 'blur' },
+          { type: 'number', min: 1, max: 20, message: '题目数量应在1-20之间', trigger: 'blur' }
+        ]
+      },
       
       // 考试数据
       exams: [],
@@ -875,60 +1039,79 @@ export default {
     },
 
     // 获取教师布置的作业
-    fetchTeacherAssignments() {
+    async fetchTeacherAssignments() {
       this.teacherAssignmentsLoading = true;
 
-      assignmentAPI.getAssignmentsByCourseIdAndType(this.courseId, 'TEACHER_ASSIGNED')
-        .then(response => {
-          if (Array.isArray(response)) {
-            this.teacherAssignments = response.map(item => ({
-              assignmentId: item.assignmentId,
-              title: item.title || '未命名作业',
-              description: item.description || '',
-              startTime: item.startTime,
-              endTime: item.endTime,
-              type: item.type,
-              status: item.status,
-              courseId: item.courseId,
-              creatorId: item.creatorId,
-              isAnswerPublic: item.isAnswerPublic,
-              isScoreVisible: item.isScoreVisible,
-              isRedoAllowed: item.isRedoAllowed,
-              maxAttempts: item.maxAttempts,
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt
-            }));
-          } else {
-            this.teacherAssignments = [];
-          }
-        })
-        .catch(error => {
-          console.error('获取教师布置作业失败:', error);
-          this.$message.error('获取教师布置作业失败，请稍后再试');
+      try {
+        const response = await assignmentAPI.getAssignmentsByCourseIdAndType(this.courseId, 'TEACHER_ASSIGNED');
+
+        if (Array.isArray(response)) {
+          // 获取学生信息
+          const userInfo = getUserInfo();
+
+          // 为每个作业获取剩余重做次数
+          const assignmentsWithRedoInfo = await Promise.all(
+            response.map(async (item) => {
+              let remainingAttempts = 0;
+
+              // 如果允许重做，计算剩余重做次数
+              if (item.isRedoAllowed && item.maxAttempts > 0) {
+                try {
+                  // 使用简单的前端逻辑计算重做次数
+                  const answers = await studentAnswerAPI.getAnswersByAssignment(item.assignmentId, userInfo.studentId);
+                  if (Array.isArray(answers) && answers.length > 0) {
+                    // 如果已经有答案，说明至少使用了一次机会
+                    remainingAttempts = Math.max(0, item.maxAttempts - 1);
+                  } else {
+                    // 如果没有答案，说明还没开始做
+                    remainingAttempts = item.maxAttempts;
+                  }
+                } catch (answerError) {
+                  console.warn('获取作业答案失败:', answerError);
+                  remainingAttempts = item.maxAttempts; // 最后的默认值
+                }
+              }
+
+              return {
+                assignmentId: item.assignmentId,
+                title: item.title || '未命名作业',
+                description: item.description || '',
+                startTime: item.startTime,
+                endTime: item.endTime,
+                type: item.type,
+                status: item.status,
+                courseId: item.courseId,
+                creatorId: item.creatorId,
+                isAnswerPublic: item.isAnswerPublic,
+                isScoreVisible: item.isScoreVisible,
+                isRedoAllowed: item.isRedoAllowed,
+                maxAttempts: item.maxAttempts,
+                remainingAttempts: remainingAttempts, // 添加剩余重做次数
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt
+              };
+            })
+          );
+
+          this.teacherAssignments = assignmentsWithRedoInfo;
+        } else {
           this.teacherAssignments = [];
-        })
-        .finally(() => {
-          this.teacherAssignmentsLoading = false;
-        });
+        }
+      } catch (error) {
+        console.error('获取教师布置作业失败:', error);
+        this.$message.error('获取教师布置作业失败，请稍后再试');
+        this.teacherAssignments = [];
+      } finally {
+        this.teacherAssignmentsLoading = false;
+      }
     },
 
-    // 获取学生自主上传的作业（预留）
-    fetchStudentAssignments() {
-      this.studentAssignmentsLoading = true;
 
-      // 暂时设置为空数组，等待后续开发
-      setTimeout(() => {
-        this.studentAssignments = [];
-        this.studentAssignmentsLoading = false;
-      }, 500);
-    },
 
     // 处理作业标签页切换
     handleAssignmentTabClick(tab) {
       if (tab.name === 'teacher') {
         this.fetchTeacherAssignments();
-      } else if (tab.name === 'student') {
-        this.fetchStudentAssignments();
       }
     },
 
@@ -1366,6 +1549,667 @@ export default {
       
       return iconMap[extension] || 'el-icon-document';
     },
+
+    // ===== AI生成练习相关方法 =====
+
+    // 显示知识点输入对话框
+    showKnowledgeInputDialog() {
+      // 重置表单
+      this.knowledgeForm = {
+        knowledgeNames: '',
+        difficultyLevel: '中等',
+        problemCount: 5
+      };
+      this.knowledgeInputDialogVisible = true;
+    },
+
+    // 按课程生成练习
+    async generateAIExerciseByCourse() {
+      try {
+        this.aiGenerating = true;
+
+        // 获取用户信息
+        const userInfo = getUserInfo();
+        if (!userInfo || !userInfo.studentId) {
+          this.$message.warning('未找到用户信息，请重新登录');
+          return;
+        }
+
+        // 显示加载提示
+        const loading = this.$loading({
+          lock: true,
+          text: 'AI正在根据课程生成练习题目，请耐心等待...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        });
+
+        try {
+          // 调用API生成练习
+          const response = await studentAssistantAPI.generateExerciseByCourseName(
+            userInfo.studentId,
+            this.courseName,
+            '中等', // 默认中等难度
+            5 // 默认5题
+          );
+
+          console.log('AI生成练习响应:', response);
+
+          // 解析生成的题目
+          const questions = this.parseAIResponse(response);
+
+          if (questions.length === 0) {
+            this.$message.error('AI生成的题目格式有误，请重试');
+            return;
+          }
+
+          // 存储生成的题目
+          this.generatedQuestions = questions;
+          this.$message.success(`成功生成 ${questions.length} 道练习题！`);
+
+        } catch (error) {
+          console.error('生成练习失败:', error);
+
+          // 如果是405错误，使用模拟数据
+          if (error.response && error.response.status === 405) {
+            console.log('后端接口不可用，使用模拟数据演示');
+            const mockResponse = this.generateMockResponse('course');
+            const questions = this.parseAIResponse(mockResponse);
+            this.generatedQuestions = questions;
+            this.$message.success(`成功生成 ${questions.length} 道练习题！（演示模式）`);
+          } else {
+            this.$message.error('生成练习失败，请稍后重试');
+          }
+        } finally {
+          loading.close();
+        }
+
+      } catch (error) {
+        console.error('生成练习失败:', error);
+        this.$message.error('生成练习失败，请稍后重试');
+      } finally {
+        this.aiGenerating = false;
+      }
+    },
+
+    // 按知识点生成练习
+    async generateAIExerciseByKnowledge() {
+      try {
+        // 表单验证
+        if (!this.$refs.knowledgeFormRef) return;
+        const valid = await this.$refs.knowledgeFormRef.validate();
+        if (!valid) return;
+
+        this.aiGenerating = true;
+
+        // 获取用户信息
+        const userInfo = getUserInfo();
+        if (!userInfo || !userInfo.studentId) {
+          this.$message.warning('未找到用户信息，请重新登录');
+          return;
+        }
+
+        // 显示加载提示
+        const loading = this.$loading({
+          lock: true,
+          text: 'AI正在根据知识点生成练习题目，请耐心等待...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        });
+
+        try {
+          // 处理知识点名称
+          const knowledgeNames = this.knowledgeForm.knowledgeNames
+            .split(',')
+            .map(name => name.trim())
+            .filter(name => name.length > 0);
+
+          if (knowledgeNames.length === 0) {
+            this.$message.error('请输入有效的知识点名称');
+            return;
+          }
+
+          // 调用API生成练习
+          const response = await studentAssistantAPI.generateExerciseByKnowledgeNames(
+            userInfo.studentId,
+            knowledgeNames,
+            this.knowledgeForm.difficultyLevel,
+            this.knowledgeForm.problemCount
+          );
+
+          console.log('AI生成练习响应:', response);
+
+          // 解析生成的题目
+          const questions = this.parseAIResponse(response);
+
+          if (questions.length === 0) {
+            this.$message.error('AI生成的题目格式有误，请重试');
+            return;
+          }
+
+          // 存储生成的题目
+          this.generatedQuestions = questions;
+          this.$message.success(`成功生成 ${questions.length} 道练习题！`);
+
+          // 关闭对话框
+          this.knowledgeInputDialogVisible = false;
+
+        } catch (error) {
+          console.error('生成练习失败:', error);
+
+          // 如果是405错误，使用模拟数据
+          if (error.response && error.response.status === 405) {
+            console.log('后端接口不可用，使用模拟数据演示');
+            const mockResponse = this.generateMockResponse('knowledge');
+            const questions = this.parseAIResponse(mockResponse);
+            this.generatedQuestions = questions;
+            this.$message.success(`成功生成 ${questions.length} 道练习题！（演示模式）`);
+            this.knowledgeInputDialogVisible = false;
+          } else {
+            this.$message.error('生成练习失败，请稍后重试');
+          }
+        } finally {
+          loading.close();
+        }
+
+      } catch (error) {
+        console.error('生成练习失败:', error);
+        this.$message.error('生成练习失败，请稍后重试');
+      } finally {
+        this.aiGenerating = false;
+      }
+    },
+
+    // 清空生成的题目
+    clearGeneratedQuestions() {
+      this.generatedQuestions = [];
+      this.$message.info('已清空所有题目');
+    },
+
+    // 解析AI响应
+    parseAIResponse(response) {
+      try {
+        console.log('解析AI响应:', response);
+
+        // 处理不同的响应格式
+        let content = '';
+
+        // 如果响应是字符串
+        if (typeof response === 'string') {
+          content = response;
+        }
+        // 如果响应是对象，尝试获取内容
+        else if (typeof response === 'object' && response !== null) {
+          // 尝试多种可能的字段名
+          content = response.content || response.result || response.data || response.answer || '';
+
+          // 如果还是对象，尝试获取第一个字符串值
+          if (typeof content === 'object') {
+            const values = Object.values(content);
+            content = values.find(v => typeof v === 'string') || '';
+          }
+        }
+
+        if (!content || typeof content !== 'string') {
+          console.error('AI响应格式错误，无法提取文本内容:', response);
+          // 尝试直接使用响应对象的字符串表示
+          if (response && typeof response === 'object') {
+            const responseStr = JSON.stringify(response, null, 2);
+            console.log('尝试解析JSON字符串:', responseStr);
+            // 如果包含题目相关的关键字，尝试解析
+            if (responseStr.includes('题目') || responseStr.includes('答案') || responseStr.includes('解析')) {
+              content = responseStr;
+            } else {
+              return [];
+            }
+          } else {
+            return [];
+          }
+        }
+
+        const questions = [];
+
+        console.log('准备解析的内容:', content);
+
+        // 尝试多种解析方式
+
+        // 方式1: 按行分割内容解析
+        const lines = content.split(/[\n\r]+/).filter(line => line.trim());
+
+        let currentQuestion = null;
+        let questionIndex = 0;
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          console.log('处理行:', trimmedLine);
+
+          // 检测题目开始 - 支持多种格式
+          if (trimmedLine.match(/题目\d+[:：]/) || trimmedLine.startsWith('题目[') || trimmedLine.match(/^\d+[.、]/)) {
+            // 如果有之前的题目，先保存
+            if (currentQuestion) {
+              questions.push(currentQuestion);
+            }
+
+            // 开始新题目
+            questionIndex++;
+            let title = trimmedLine;
+
+            // 提取题目标题
+            if (trimmedLine.includes(':') || trimmedLine.includes('：')) {
+              const parts = trimmedLine.split(/[:：]/);
+              title = parts.length > 1 ? parts.slice(1).join(':').trim() : parts[0].trim();
+            }
+
+            currentQuestion = {
+              id: questionIndex,
+              title: title || `题目${questionIndex}`,
+              content: '',
+              type: 'SINGLE_CHOICE', // 默认单选题
+              options: [],
+              expectedAnswer: '',
+              analysis: '',
+              score: 10,
+              sequence: questionIndex
+            };
+
+            // 如果标题行就包含了题目内容，直接设置
+            if (title && title.length > 10) {
+              currentQuestion.content = title;
+            }
+          }
+          // 检测题目内容
+          else if ((trimmedLine.startsWith('题目内容:') || trimmedLine.startsWith('题目内容：')) && currentQuestion) {
+            currentQuestion.content = trimmedLine.replace(/题目内容[:：]/, '').trim();
+          }
+          // 检测选择题选项 - 支持中英文和更多格式
+          else if (trimmedLine.match(/^[A-D][.、]\s*/) && currentQuestion) {
+            const optionText = trimmedLine.replace(/^[A-D][.、]\s*/, '').trim();
+            if (optionText) {
+              currentQuestion.options.push(optionText);
+              currentQuestion.type = 'SINGLE_CHOICE'; // 先设为单选，后面会根据答案调整
+            }
+          }
+          // 检测其他可能的选项格式
+          else if (trimmedLine.match(/^[（(][A-D][）)]\s*/) && currentQuestion) {
+            const optionText = trimmedLine.replace(/^[（(][A-D][）)]\s*/, '').trim();
+            if (optionText) {
+              currentQuestion.options.push(optionText);
+              currentQuestion.type = 'SINGLE_CHOICE';
+            }
+          }
+          // 检测答案 - 支持中英文
+          else if ((trimmedLine.startsWith('答案:') || trimmedLine.startsWith('答案：')) && currentQuestion) {
+            currentQuestion.expectedAnswer = trimmedLine.replace(/答案[:：]/, '').trim();
+          }
+          // 检测解析 - 支持中英文
+          else if ((trimmedLine.startsWith('解析:') || trimmedLine.startsWith('解析：')) && currentQuestion) {
+            currentQuestion.analysis = trimmedLine.replace(/解析[:：]/, '').trim();
+          }
+          // 如果当前有题目但没有内容，且这行不是选项或答案，可能是题目内容
+          else if (currentQuestion && !currentQuestion.content && trimmedLine.length > 5 &&
+                   !trimmedLine.match(/^[A-D][.、]/) &&
+                   !trimmedLine.startsWith('答案') &&
+                   !trimmedLine.startsWith('解析')) {
+            currentQuestion.content = trimmedLine;
+          }
+          // 检查是否包含连续的选项（如 "A. 选项1 B. 选项2 C. 选项3 D. 选项4"）
+          else if (currentQuestion && trimmedLine.match(/[A-D][.、].*[A-D][.、]/)) {
+            console.log('发现连续选项行:', trimmedLine);
+            // 解析连续选项
+            const optionMatches = trimmedLine.match(/([A-D][.、]\s*[^A-D]*?)(?=[A-D][.、]|$)/g);
+            if (optionMatches) {
+              optionMatches.forEach(match => {
+                const optionText = match.replace(/^[A-D][.、]\s*/, '').trim();
+                if (optionText && !currentQuestion.options.includes(optionText)) {
+                  currentQuestion.options.push(optionText);
+                }
+              });
+              currentQuestion.type = 'SINGLE_CHOICE';
+              console.log('解析到连续选项:', currentQuestion.options);
+            }
+          }
+        }
+
+        // 保存最后一个题目
+        if (currentQuestion) {
+          // 在保存前进行题目类型和格式的最终检查
+          this.finalizeQuestion(currentQuestion);
+          questions.push(currentQuestion);
+        }
+
+        // 对所有题目进行最终处理
+        questions.forEach(question => {
+          this.finalizeQuestion(question);
+        });
+
+        console.log('第一种方法解析得到的题目:', questions);
+
+        // 如果第一种方法没有解析到题目，尝试第二种方法
+        if (questions.length === 0) {
+          console.log('第一种方法失败，尝试第二种解析方法');
+          return this.parseAIResponseAlternative(content);
+        }
+
+        return questions;
+
+      } catch (error) {
+        console.error('解析AI响应失败:', error);
+        return [];
+      }
+    },
+
+    // 题目最终处理方法
+    finalizeQuestion(question) {
+      if (!question) return;
+
+      console.log('最终处理题目:', question);
+
+      // 1. 确定题目类型
+      if (question.options && question.options.length > 0) {
+        // 有选项的是选择题
+        if (question.options.length >= 4) {
+          // 检查答案是否包含多个选项（如"AB"、"A,B"等）
+          const answer = question.expectedAnswer.toUpperCase();
+          if (answer.length > 1 || answer.includes(',') || answer.includes('、')) {
+            question.type = 'MULTI_CHOICE';
+          } else {
+            question.type = 'SINGLE_CHOICE';
+          }
+        } else {
+          question.type = 'SINGLE_CHOICE';
+        }
+      } else {
+        // 没有选项的是主观题
+        if (question.content && question.content.length > 100) {
+          question.type = 'ESSAY';
+        } else {
+          question.type = 'SHORT_ANSWER';
+        }
+      }
+
+      // 2. 处理答案格式和选项提取
+      if (question.expectedAnswer) {
+        const answerUpper = question.expectedAnswer.toUpperCase().trim();
+
+        // 如果答案看起来像选项标识符，但没有选项，尝试提取选项
+        if (answerUpper.match(/^[A-D]+$/) && (!question.options || question.options.length === 0)) {
+          console.warn('发现答案是选项标识符但没有选项，尝试提取选项');
+          this.extractOptionsFromContent(question);
+        }
+
+        // 格式化答案显示
+        if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTI_CHOICE') {
+          question.expectedAnswer = answerUpper;
+        }
+      }
+
+      // 3. 如果仍然没有选项但内容中可能包含选项，再次尝试提取
+      if ((!question.options || question.options.length === 0) && question.content) {
+        // 检查内容是否包含选项格式
+        if (question.content.match(/[A-D][.、]/)) {
+          console.log('内容中发现选项格式，尝试提取');
+          this.extractOptionsFromContent(question);
+        }
+      }
+
+      // 4. 确保题目内容不为空
+      if (!question.content && question.title) {
+        question.content = question.title;
+      }
+
+      // 5. 处理选项格式
+      if (question.options && question.options.length > 0) {
+        question.options = question.options.map(option => {
+          // 移除选项前的标识符（如果有的话）
+          return option.replace(/^[A-D][.、]\s*/, '').trim();
+        });
+      }
+
+      console.log('处理后的题目:', question);
+    },
+
+    // 从题目内容中提取选项
+    extractOptionsFromContent(question) {
+      if (!question.content) return;
+
+      const content = question.content;
+      console.log('尝试从内容中提取选项:', content);
+
+      // 方法1: 按行分割查找选项
+      const lines = content.split(/[\n\r]+/);
+      let options = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        // 查找选项格式的行
+        if (trimmed.match(/^[A-D][.、]\s*/)) {
+          const optionText = trimmed.replace(/^[A-D][.、]\s*/, '').trim();
+          if (optionText) {
+            options.push(optionText);
+          }
+        }
+      }
+
+      // 方法2: 如果按行分割没找到，尝试在单行中查找连续选项
+      if (options.length === 0) {
+        // 匹配类似 "A. 选项1 B. 选项2 C. 选项3 D. 选项4" 的格式
+        const optionPattern = /([A-D][.、]\s*[^A-D]*?)(?=[A-D][.、]|$)/g;
+        let match;
+
+        while ((match = optionPattern.exec(content)) !== null) {
+          const optionText = match[1].replace(/^[A-D][.、]\s*/, '').trim();
+          if (optionText) {
+            options.push(optionText);
+          }
+        }
+      }
+
+      // 方法3: 如果还是没找到，尝试更宽松的匹配
+      if (options.length === 0) {
+        // 查找包含选项标识符的文本
+        const matches = content.match(/[A-D][.、]\s*[^A-D\n\r]+/g);
+        if (matches) {
+          options = matches.map(match =>
+            match.replace(/^[A-D][.、]\s*/, '').trim()
+          ).filter(option => option.length > 0);
+        }
+      }
+
+      if (options.length > 0) {
+        question.options = options;
+
+        // 从内容中移除选项部分，只保留题目描述
+        let cleanContent = content;
+
+        // 移除所有选项相关的文本
+        options.forEach((option, index) => {
+          const letter = String.fromCharCode(65 + index);
+          const patterns = [
+            new RegExp(`${letter}[.、]\\s*${option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+            new RegExp(`${letter}[.、]\\s*${option.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi')
+          ];
+
+          patterns.forEach(pattern => {
+            cleanContent = cleanContent.replace(pattern, '');
+          });
+        });
+
+        // 清理多余的空白字符
+        cleanContent = cleanContent.replace(/\s+/g, ' ').trim();
+
+        // 如果清理后内容太短，保留原内容
+        if (cleanContent.length < 10) {
+          cleanContent = content;
+        }
+
+        question.content = cleanContent;
+
+        console.log('从内容中提取到选项:', options);
+        console.log('清理后的题目内容:', cleanContent);
+      } else {
+        console.log('未能从内容中提取到选项');
+      }
+    },
+
+    // 备用AI响应解析方法
+    parseAIResponseAlternative(content) {
+      try {
+        console.log('使用备用解析方法:', content);
+
+        // 如果内容看起来像JSON，尝试直接从对象中提取信息
+        if (content.includes('{') && content.includes('}')) {
+          try {
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const jsonStr = jsonMatch[0];
+              const parsed = JSON.parse(jsonStr);
+              console.log('解析的JSON对象:', parsed);
+
+              // 尝试从JSON对象中提取题目信息
+              if (parsed.answer) {
+                return [{
+                  id: 1,
+                  title: '题目1',
+                  content: parsed.answer || '从AI响应中提取的题目内容',
+                  type: 'SHORT_ANSWER',
+                  options: [],
+                  expectedAnswer: '请参考解析',
+                  analysis: '这是从AI响应中提取的内容',
+                  score: 10,
+                  sequence: 1
+                }];
+              }
+            }
+          } catch (e) {
+            console.log('JSON解析失败，继续其他方法');
+          }
+        }
+
+        // 简单的文本解析 - 尝试从整个内容中提取题目信息
+        if (content.length > 10) {
+          const question = {
+            id: 1,
+            title: 'AI生成的题目',
+            content: content,
+            type: 'SHORT_ANSWER',
+            options: [],
+            expectedAnswer: '请根据题目内容作答',
+            analysis: '这是AI生成的练习题目',
+            score: 10,
+            sequence: 1
+          };
+
+          // 尝试从内容中提取选项和答案
+          this.extractOptionsFromContent(question);
+
+          // 最终处理
+          this.finalizeQuestion(question);
+
+          return [question];
+        }
+
+        return [];
+
+      } catch (error) {
+        console.error('备用解析方法失败:', error);
+        return [];
+      }
+    },
+
+    // 生成模拟响应数据（用于演示）
+    generateMockResponse(type) {
+      const sampleQuestions = [
+        {
+          title: "线性代数基础概念",
+          content: "下列关于矩阵的说法正确的是？",
+          options: ["矩阵的行数必须等于列数", "矩阵的乘法满足交换律", "单位矩阵的对角线元素都是1", "所有矩阵都有逆矩阵"],
+          answer: "C",
+          analysis: "单位矩阵是主对角线上的元素都是1，其余元素都是0的方阵。"
+        },
+        {
+          title: "微积分应用",
+          content: "函数f(x) = x²在点x=2处的导数值是多少？",
+          options: ["2", "4", "8", "16"],
+          answer: "B",
+          analysis: "f'(x) = 2x，所以f'(2) = 2×2 = 4"
+        },
+        {
+          title: "概率论基础",
+          content: "抛掷一枚公平硬币3次，恰好出现2次正面的概率是？",
+          options: ["1/8", "3/8", "1/2", "5/8"],
+          answer: "B",
+          analysis: "使用二项分布公式：C(3,2) × (1/2)³ = 3 × 1/8 = 3/8"
+        }
+      ];
+
+      // 构造符合解析格式的响应
+      let content = "";
+      sampleQuestions.forEach((q, index) => {
+        const title = type === 'course' ? `${this.courseName}课程题目${index + 1}` : q.title;
+        content += `题目[题目${index + 1}]: ${title}\n`;
+        content += `题目内容: ${q.content}\n`;
+        q.options.forEach((option, optIndex) => {
+          content += `${String.fromCharCode(65 + optIndex)}. ${option}\n`;
+        });
+        content += `答案: ${q.answer}\n`;
+        content += `解析: ${q.analysis}\n\n`;
+      });
+
+      return { content };
+    },
+
+    // 获取题目类型标签颜色
+    getQuestionTypeTag(type) {
+      switch (type) {
+        case 'SINGLE_CHOICE':
+          return 'primary';
+        case 'MULTI_CHOICE':
+          return 'success';
+        case 'SHORT_ANSWER':
+          return 'warning';
+        case 'ESSAY':
+          return 'info';
+        default:
+          return 'default';
+      }
+    },
+
+    // 获取题目类型文本
+    getQuestionTypeText(type) {
+      switch (type) {
+        case 'SINGLE_CHOICE':
+          return '单选题';
+        case 'MULTI_CHOICE':
+          return '多选题';
+        case 'SHORT_ANSWER':
+          return '简答题';
+        case 'ESSAY':
+          return '论述题';
+        default:
+          return '未知类型';
+      }
+    },
+
+    // 判断选项是否为正确答案
+    isCorrectOption(question, optionIndex) {
+      if (!question.expectedAnswer) return false;
+
+      const answer = question.expectedAnswer.toUpperCase().trim();
+      const optionLetter = String.fromCharCode(65 + optionIndex); // A, B, C, D
+
+      // 单选题：答案应该是单个字母
+      if (question.type === 'SINGLE_CHOICE') {
+        return answer === optionLetter;
+      }
+
+      // 多选题：答案可能包含多个字母
+      if (question.type === 'MULTI_CHOICE') {
+        // 支持多种格式：AB, A,B, A、B, A B等
+        const answerLetters = answer.replace(/[,、\s]+/g, '').split('');
+        return answerLetters.includes(optionLetter);
+      }
+
+      return false;
+    }
 
   }
 }
@@ -2028,5 +2872,412 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* AI生成练习样式 */
+.ai-exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  color: white;
+}
+
+.ai-exercise-intro h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ai-exercise-intro p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.ai-generated-card {
+  border-left: 4px solid #667eea;
+  background: linear-gradient(135deg, #f5f7ff 0%, #f0f4ff 100%);
+}
+
+.ai-generated-card .assignment-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-icon {
+  color: #667eea;
+  font-size: 16px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+/* AI生成练习对话框样式 */
+.ai-exercise-container {
+  display: flex;
+  gap: 20px;
+  max-height: 600px;
+}
+
+.generate-form-section {
+  flex: 0 0 400px;
+  border-right: 1px solid #e4e7ed;
+  padding-right: 20px;
+}
+
+.generated-content-section {
+  flex: 1;
+  overflow-y: auto;
+  padding-left: 20px;
+}
+
+.section-header {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.section-header h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 16px;
+}
+
+.questions-container {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.question-item {
+  background: #f8f9fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.question-number {
+  font-weight: bold;
+  color: #409eff;
+  font-size: 14px;
+}
+
+.question-content {
+  margin-bottom: 12px;
+}
+
+.question-title {
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.question-body {
+  color: #606266;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.question-options {
+  margin: 12px 0;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding: 6px 0;
+}
+
+.option-label {
+  font-weight: bold;
+  color: #409eff;
+  margin-right: 8px;
+  min-width: 20px;
+}
+
+.option-text {
+  color: #606266;
+  line-height: 1.5;
+}
+
+.question-meta {
+  border-top: 1px solid #e4e7ed;
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.answer-section,
+.analysis-section {
+  margin-bottom: 8px;
+}
+
+.answer-section strong,
+.analysis-section strong {
+  color: #67c23a;
+  margin-right: 8px;
+}
+
+.answer-text {
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.analysis-text {
+  color: #606266;
+  line-height: 1.5;
+}
+
+/* AI自主练习样式 */
+.ai-exercise-section {
+  padding: 20px;
+}
+
+.ai-exercise-buttons {
+  display: flex;
+  gap: 15px;
+}
+
+.ai-exercise-buttons .el-button {
+  padding: 12px 24px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.generated-exercises {
+  margin-top: 30px;
+}
+
+.exercises-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e4e7ed;
+}
+
+.exercises-header h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.exercises-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.question-card {
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.question-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-color: #409eff;
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.question-type-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-count {
+  font-size: 12px;
+  color: #909399;
+  font-style: italic;
+}
+
+.question-number {
+  font-weight: 600;
+  color: #409eff;
+  font-size: 16px;
+}
+
+.question-content {
+  margin-bottom: 15px;
+}
+
+.question-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.question-body {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+.question-options {
+  margin: 15px 0;
+}
+
+.options-title {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.option-item:hover {
+  background: #e9ecef;
+  border-color: #c0c4cc;
+}
+
+.option-item.correct-option {
+  background: #f0f9ff;
+  border-color: #67c23a;
+  box-shadow: 0 0 0 1px rgba(103, 194, 58, 0.2);
+}
+
+.option-item.multi-choice-option {
+  border-left: 3px solid #e6a23c;
+}
+
+.option-item.multi-choice-option.correct-option {
+  border-left: 3px solid #67c23a;
+}
+
+.option-label {
+  font-weight: 600;
+  color: #409eff;
+  margin-right: 10px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  border-radius: 50%;
+  background: #ecf5ff;
+  font-size: 12px;
+}
+
+.option-label.multi-label {
+  border-radius: 3px;
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+
+.option-label.single-label {
+  border-radius: 50%;
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.correct-option .option-label {
+  background: #f0f9ff;
+  color: #67c23a;
+}
+
+.option-text {
+  color: #606266;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.correct-option .option-text {
+  color: #303133;
+  font-weight: 500;
+}
+
+.correct-indicator {
+  color: #67c23a;
+  font-weight: bold;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.question-meta {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 15px;
+  margin-top: 15px;
+}
+
+.answer-section {
+  margin-bottom: 10px;
+}
+
+.answer-section strong {
+  color: #67c23a;
+}
+
+.answer-text {
+  color: #67c23a;
+  font-weight: 600;
+  margin-left: 5px;
+}
+
+.analysis-section strong {
+  color: #909399;
+}
+
+.empty-exercises {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.dialog-footer {
+  text-align: right;
+}
+
+.dialog-footer .el-button {
+  margin-left: 10px;
 }
 </style>
