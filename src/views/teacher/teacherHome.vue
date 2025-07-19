@@ -60,7 +60,7 @@
         </div>
 
         <!-- 作业管理方块 -->
-        <div class="feature-card" @click="navigateTo('/teacher/homework')">
+        <div class="feature-card" @click="navigateTo('/teacher/exercise')">
           <div class="card-icon green">
             <el-icon :size="32">
               <EditPen />
@@ -490,12 +490,12 @@ function navigateTo(path) {
     } else if (path.includes('exam')) {
       setActiveMenu('考试')
     } else if (path.includes('knowledge')) {
-      setActiveMenu('知识点')
-    } else if (path.includes('homework')) {
+      setActiveMenu('知识')
+    } else if (path.includes('exercise') || path.includes('homework')) {
       setActiveMenu('作业')
     }
   }
-  
+
   // 导航到目标路径
   router.push(path)
 }
