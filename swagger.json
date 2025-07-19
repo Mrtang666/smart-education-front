@@ -6800,6 +6800,96 @@
         ]
       }
     },
+    "/api/assignment/incomplete/student/{studentId}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "根据学生id获取该学生已选课程中还未完成的作业",
+        "operationId": "getAssignmentsByStudentId",
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentBO"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/assignment/incomplete-student/course/{courseId}/assignment/{assignmentId}": {
+      "get": {
+        "tags": [
+          "assignment"
+        ],
+        "summary": "获取课程下还未完成指定作业的学生Id",
+        "operationId": "getIncompleteStudentsByCourseIdAndAssignmentId",
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/assignment/creatorId/{creatorId}": {
       "get": {
         "tags": [

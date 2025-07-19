@@ -152,57 +152,106 @@
           </div>
         </div>
       </el-card>
-    </div>
-    <!-- 右下角固定任务区块 -->
-    <div class="fixed-task-block">
-      <el-collapse v-model="activeTaskPanel" accordion>
-        <!-- 未完成作业 -->
-        <el-collapse-item name="assignments">
-          <template #title>
-            <div class="block-header">
-              <span>未完成作业</span>
-              <span class="block-brief" v-if="activeTaskPanel !== 'assignments'">
-                {{ (unfinishedAssignments || []).length ? unfinishedAssignments[0].title : '暂无' }}
-                <span v-if="(unfinishedAssignments || []).length > 1">等{{ unfinishedAssignments.length }}项</span>
+
+      <!-- 待办任务区块 -->
+      <el-card shadow="hover" class="recent-card">
+        <template #header>
+          <div class="card-header">
+            <h3>待办任务</h3>
+            <span class="task-count">
+              {{ (unfinishedAssignments || []).length + (ongoingExamDetails || []).length }} 项待办
+            </span>
+          </div>
+        </template>
+        
+        <div class="recent-list">
+          <!-- 未完成作业 -->
+          <div class="task-section">
+            <div class="section-title">
+              <el-icon class="section-icon">
+                <EditPen />
+              </el-icon>
+              未完成作业
+              <span class="section-count" v-if="(unfinishedAssignments || []).length > 0">
+                {{ unfinishedAssignments.length }}
               </span>
             </div>
-          </template>
-          <div v-if="(unfinishedAssignments || []).length === 0" class="block-empty">暂无未完成作业</div>
-          <div v-else class="block-list-scroll">
-            <div v-for="item in unfinishedAssignments" :key="item.id" class="block-list-item">
-              <div class="block-title">{{ item.title }}</div>
-              <div class="block-meta">
-                <span>截止：{{ item.endTime || '--' }}</span>
-                <el-tag size="small" :type="getAssignmentTagType(item.status)">{{ item.status }}</el-tag>
+            <div v-if="(unfinishedAssignments || []).length === 0" class="empty-tip">
+              <span class="empty-text">暂无未完成作业</span>
+            </div>
+            <div v-else class="task-items">
+              <div v-for="item in unfinishedAssignments" :key="item.id" class="recent-item task-item">
+                <div class="item-icon" :style="{ backgroundColor: getRandomColor(item.id) }">
+                  <el-icon>
+                    <EditPen />
+                  </el-icon>
+                </div>
+                <div class="item-content">
+                  <div class="item-title">{{ item.title }}</div>
+                  <div class="item-subtitle">
+                    <span class="course-info">
+                      <el-icon>
+                        <Collection />
+                      </el-icon>
+                      {{ item.courseName || '' }}
+                    </span>
+                    <span class="deadline-info">
+                      <el-icon>
+                        <Timer />
+                      </el-icon>
+                      截止：{{ formatDateTimeLocal(item.endTime) }}
+                    </span>
+                  </div>
+                  <div class="item-meta">
+                    <span class="score-info">总分：{{ item.totalScore }}分</span>
+                    <el-tag size="small" :type="getAssignmentTagType(item.status)">{{ item.status }}</el-tag>
+                  </div>
+                </div>
               </div>
-              <div class="block-desc">{{ item.description || '' }}</div>
             </div>
           </div>
-        </el-collapse-item>
-        <!-- 待参加考试 -->
-        <el-collapse-item name="exams">
-          <template #title>
-            <div class="block-header">
-              <span>待参加考试</span>
-              <span class="block-brief" v-if="activeTaskPanel !== 'exams'">
-                {{ (ongoingExamDetails || []).length ? ongoingExamDetails[0].title : '暂无' }}
-                <span v-if="(ongoingExamDetails || []).length > 1">等{{ ongoingExamDetails.length }}项</span>
+
+          <!-- 待参加考试 -->
+          <div class="task-section">
+            <div class="section-title">
+              <el-icon class="section-icon">
+                <Document />
+              </el-icon>
+              待参加考试
+              <span class="section-count" v-if="(ongoingExamDetails || []).length > 0">
+                {{ ongoingExamDetails.length }}
               </span>
             </div>
-          </template>
-          <div v-if="(ongoingExamDetails || []).length === 0" class="block-empty">暂无待参加考试</div>
-          <div v-else class="block-list-scroll">
-            <div v-for="item in ongoingExamDetails" :key="item.id" class="block-list-item">
-              <div class="block-title">{{ item.title }}</div>
-              <div class="block-meta">
-                <span>时间：{{ item.examTime || '--' }}</span>
-                <el-tag size="small" type="warning">进行中</el-tag>
+            <div v-if="(ongoingExamDetails || []).length === 0" class="empty-tip">
+              <span class="empty-text">暂无待参加考试</span>
+            </div>
+            <div v-else class="task-items">
+              <div v-for="item in ongoingExamDetails" :key="item.id" class="recent-item task-item" @click="goToExam(item)">
+                <div class="item-icon" :style="{ backgroundColor: getRandomColor(item.id) }">
+                  <el-icon>
+                    <Document />
+                  </el-icon>
+                </div>
+                <div class="item-content">
+                  <div class="item-title">{{ item.title }}</div>
+                  <div class="item-subtitle">
+                    <span class="course-info">
+                      <el-icon>
+                        <Collection />
+                      </el-icon>
+                      {{ item.courseName || '' }}
+                    </span>
+                  </div>
+                  <div class="item-meta">
+                    <span class="exam-time">时间：{{ item.examTime || '--' }}</span>
+                    <el-tag size="small" type="warning">进行中</el-tag>
+                  </div>
+                </div>
               </div>
-              <div class="block-desc">{{ item.courseName || '' }}</div>
             </div>
           </div>
-        </el-collapse-item>
-      </el-collapse>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -211,8 +260,8 @@
 import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Reading, /*Document,*/ Calendar, Collection, EditPen, Document } from '@element-plus/icons-vue'
-import { courseSelectionAPI, studentExamAPI, learningPlanAPI } from '@/api/api'
+import { Reading, /*Document,*/ Calendar, Collection, EditPen, Document, Timer } from '@element-plus/icons-vue'
+import { courseSelectionAPI, studentExamAPI, learningPlanAPI, assignmentAPI, courseAPI, problemAPI, examAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
 // 配置ElMessage默认选项
@@ -348,12 +397,12 @@ const courseCount = computed(() => (courses.value || []).length)
 const planCount = computed(() => (plans.value || []).length)
 const recentCourses = computed(() => (courses.value || []).slice(0, 3))
 // 新增：未完成作业和待参加考试数量
-const unfinishedAssignmentCount = computed(() => (assignments.value || []).filter(a => a.status !== '已提交').length)
+const unfinishedAssignmentCount = computed(() => (assignments.value || []).length)
 const ongoingExamCount = ref(0)
 const ongoingExamLoading = ref(false)
 
 // 添加缺失的计算属性
-const unfinishedAssignments = computed(() => (assignments.value || []).filter(a => a.status !== '已提交'))
+const unfinishedAssignments = computed(() => assignments.value || [])
 const ongoingExamDetails = computed(() => (exams.value || []).filter(e => e.status === '进行中'))
 
 // 统计待参加考试数量（进行中且未作答）
@@ -448,6 +497,20 @@ function getAssignmentTagType(status) {
   }
 }
 
+// 格式化日期时间
+function formatDateTimeLocal(dateTimeStr) {
+  if (!dateTimeStr) return '--'
+  
+  const date = new Date(dateTimeStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
 // 更新当前时间
 function updateCurrentTime() {
   const now = new Date()
@@ -512,6 +575,15 @@ function enterCourse(course) {
   showMessage('success', `正在进入课程: ${course.name}`)
 }
 
+// 跳转到考试详情页面
+function goToExam(exam) {
+  if (!userInfo.value || !userInfo.value.studentId) {
+    showMessage('error', '请先登录以查看考试详情')
+    return
+  }
+  router.push(`/student/exam/${exam.id}`)
+  showMessage('success', `正在进入考试: ${exam.title}`)
+}
 
 
 // 显示邀请码输入框
@@ -586,6 +658,8 @@ async function fetchStudentCourses(isRetry = false) {
 
 // 获取近期考试数据
 async function fetchExams(isRetry = false) {
+  console.log('fetchExams 函数被调用')
+  
   if (!userInfo.value || !userInfo.value.studentId) {
     console.warn('未找到学生ID，无法获取考试数据')
     exams.value = []
@@ -594,37 +668,101 @@ async function fetchExams(isRetry = false) {
   }
 
   try {
-    const response = await Promise.race([
-      studentExamAPI.getStudentExamScores(userInfo.value.studentId, ""),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 5000))
-    ])
-
-    // 处理服务器返回空数据的情况
-    if (!response || (Array.isArray(response) && response.length === 0)) {
-      console.warn('服务器返回的考试数据为空')
+    console.log('开始获取学生课程信息...')
+    
+    // 1. 获取学生的全部课程
+    const studentCoursesResponse = await courseSelectionAPI.getStudentCourses(userInfo.value.studentId)
+    console.log('学生课程信息:', studentCoursesResponse)
+    
+    if (!studentCoursesResponse || !Array.isArray(studentCoursesResponse) || studentCoursesResponse.length === 0) {
+      console.warn('学生没有选课或课程数据为空')
       exams.value = []
       updateOngoingExamCount()
       return
     }
 
-    // 确保response是数组
-    const examData = Array.isArray(response) ? response : [response].filter(Boolean)
+    // 2. 获取每个课程对应的考试信息
+    const allExams = []
+    const examIds = []
+    
+    for (const course of studentCoursesResponse) {
+      try {
+        console.log(`获取课程 ${course.courseName || course.name} 的考试信息...`)
+        const courseExamsResponse = await examAPI.getExamsInCourse(course.courseId || course.id)
+        
+        if (courseExamsResponse && Array.isArray(courseExamsResponse)) {
+          courseExamsResponse.forEach(exam => {
+            allExams.push({
+              ...exam,
+              courseName: course.courseName || course.name,
+              courseId: course.courseId || course.id
+            })
+            if (exam.examId) {
+              examIds.push(exam.examId)
+            }
+          })
+        }
+      } catch (error) {
+        console.warn(`获取课程 ${course.courseName || course.name} 的考试信息失败:`, error)
+      }
+    }
+    
+    console.log('所有考试信息:', allExams)
+    console.log('考试ID列表:', examIds)
 
-    // 处理API返回的数据
-    exams.value = examData.map(exam => ({
-      id: exam.examId,
-      title: exam.examTitle || exam.title || '未命名考试',
-      courseName: exam.courseName || '未知课程',
-      examTime: exam.examTime || exam.startTime,
-      daysLeft: calculateDaysLeft(exam.examTime || exam.startTime),
-      status: exam.status || '',
-    }))
+    if (allExams.length === 0) {
+      console.warn('没有找到任何考试')
+      exams.value = []
+      updateOngoingExamCount()
+      return
+    }
+
+    // 3. 检查学生是否已经作答这些考试
+    let answeredExams = []
+    if (examIds.length > 0) {
+      try {
+        console.log('检查学生是否作答考试...')
+        const answeredResponse = await studentExamAPI.checkIfExamsAnswered(userInfo.value.studentId, examIds)
+        console.log('作答检查结果:', answeredResponse)
+        
+        if (Array.isArray(answeredResponse)) {
+          answeredExams = answeredResponse
+        }
+      } catch (error) {
+        console.warn('检查考试作答状态失败:', error)
+        // 如果检查失败，假设所有考试都未作答
+        answeredExams = new Array(examIds.length).fill(false)
+      }
+    }
+
+    // 4. 筛选出未作答的考试
+    const unAnsweredExams = []
+    for (let i = 0; i < allExams.length; i++) {
+      const exam = allExams[i]
+      const isAnswered = answeredExams[i] || false
+      
+      if (!isAnswered) {
+        unAnsweredExams.push({
+          id: exam.examId,
+          title: exam.examTitle || exam.title || '未命名考试',
+          courseName: exam.courseName || '未知课程',
+          examTime: exam.examTime || exam.startTime,
+          daysLeft: calculateDaysLeft(exam.examTime || exam.startTime),
+          status: exam.status || '未作答',
+          courseId: exam.courseId
+        })
+      }
+    }
+
+    console.log('未作答的考试:', unAnsweredExams)
+    exams.value = unAnsweredExams
 
     // 重置错误状态
     apiErrorShown.exams = false
     await updateOngoingExamCount()
   } catch (error) {
     console.error('获取考试数据失败:', error)
+    console.error('错误详情:', error.response || error.message)
     exams.value = []
     updateOngoingExamCount()
 
@@ -712,6 +850,138 @@ async function fetchPlans(isRetry = false) {
   }
 }
 
+// 获取学生未完成作业数据
+async function fetchUnfinishedAssignments(isRetry = false) {
+  console.log('fetchUnfinishedAssignments 函数被调用')
+  console.log('userInfo.value:', userInfo.value)
+  
+  if (!userInfo.value || !userInfo.value.studentId) {
+    console.warn('未找到学生ID，无法获取未完成作业数据')
+    console.log('userInfo.value.studentId:', userInfo.value?.studentId)
+    assignments.value = []
+    return
+  }
+
+  console.log('开始调用 assignmentAPI.getAssignmentsByStudentId，studentId:', userInfo.value.studentId)
+
+  try {
+    const response = await Promise.race([
+      assignmentAPI.getAssignmentsByStudentId(userInfo.value.studentId),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 5000))
+    ])
+
+    console.log('API响应:', response)
+    console.log('API响应类型:', typeof response)
+    console.log('API响应是否为数组:', Array.isArray(response))
+
+    // 处理服务器返回空数据的情况
+    if (!response || (Array.isArray(response) && response.length === 0)) {
+      console.warn('服务器返回的未完成作业数据为空')
+      assignments.value = []
+      return
+    }
+
+    // 确保response是数组
+    const assignmentData = Array.isArray(response) ? response : [response].filter(Boolean)
+    console.log('处理后的作业数据:', assignmentData)
+    console.log('第一个作业数据示例:', assignmentData[0])
+
+    // 处理API返回的数据 - 根据AssignmentBO的实际结构
+    const processedAssignments = []
+    
+    for (const assignment of assignmentData) {
+      console.log('处理单个作业:', assignment)
+      
+      // 获取课程名称
+      let courseName = '未知课程'
+      try {
+        if (assignment.courseId) {
+          const courseResponse = await courseAPI.getCourseById(assignment.courseId)
+          if (courseResponse && courseResponse.name) {
+            courseName = courseResponse.name
+          }
+        }
+      } catch (error) {
+        console.warn('获取课程名称失败:', error)
+      }
+      
+      // 获取作业中的问题并计算总分
+      let totalScore = 0
+      try {
+        const problemsResponse = await problemAPI.getProblemsByAssignment(assignment.assignmentId)
+        if (Array.isArray(problemsResponse)) {
+          totalScore = problemsResponse.reduce((sum, problem) => {
+            return sum + (problem.score || 0)
+          }, 0)
+        }
+      } catch (error) {
+        console.warn('获取作业问题失败:', error)
+      }
+      
+      processedAssignments.push({
+        id: assignment.assignmentId,
+        title: assignment.title || '未命名作业',
+        courseName: courseName,
+        endTime: assignment.endTime,
+        status: assignment.status || '进行中',
+        description: assignment.description || '',
+        totalScore: totalScore,
+        submitted: false, // 这个接口返回的都是未完成的作业
+        submittedTime: null,
+        submittedScore: null,
+        submittedComment: null,
+        submittedBy: null,
+        submittedByName: null,
+        submittedByAvatar: null,
+        submittedByRole: null,
+        submittedByStudentId: null,
+        submittedByStudentName: null,
+        submittedByStudentAvatar: null,
+        submittedByStudentRole: null,
+        // 添加AssignmentBO中的其他字段
+        type: assignment.type,
+        creatorId: assignment.creatorId,
+        courseId: assignment.courseId,
+        isAnswerPublic: assignment.isAnswerPublic,
+        isScoreVisible: assignment.isScoreVisible,
+        isRedoAllowed: assignment.isRedoAllowed,
+        maxAttempts: assignment.maxAttempts,
+        startTime: assignment.startTime,
+        createdAt: assignment.createdAt,
+        updatedAt: assignment.updatedAt
+      })
+    }
+
+    assignments.value = processedAssignments
+    console.log('最终处理后的assignments.value:', assignments.value)
+
+    // 重置错误状态
+    apiErrorShown.assignments = false
+  } catch (error) {
+    console.error('获取未完成作业数据失败:', error)
+    console.error('错误详情:', error.response || error.message)
+    assignments.value = []
+
+    // 只在首次错误时显示提示
+    if (!isRetry && !apiErrorShown.assignments) {
+      apiErrorShown.assignments = true
+
+      // 只有在401/403错误时才提示用户重新登录
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        showMessage('error', '登录已过期，请重新登录')
+        setTimeout(() => {
+          router.push('/login')
+        }, 1000)
+      } else {
+        // 显示通用错误消息，但避免重复显示
+        if (!errorState.hasShownError) {
+          showMessage('error', '服务器错误，请稍后再试')
+        }
+      }
+    }
+  }
+}
+
 // 计算截止日期剩余天数
 function calculateDaysLeft(dateString) {
   const targetDate = new Date(dateString)
@@ -768,6 +1038,7 @@ onMounted(() => {
     errorState.hasShownError = false
 
     // 获取数据 - 使用Promise.all并添加错误处理
+    console.log('开始获取数据...')
     Promise.all([
       fetchStudentCourses().catch(err => {
         console.error('课程数据加载错误:', err)
@@ -781,6 +1052,10 @@ onMounted(() => {
       fetchPlans().catch(err => {
         console.error('学习计划加载错误:', err)
         plans.value = [] // 使用空数组
+      }),
+      fetchUnfinishedAssignments().catch(err => {
+        console.error('未完成作业加载错误:', err)
+        assignments.value = [] // 使用空数组
       })
     ]).catch(error => {
       console.error('数据加载过程中发生错误:', error)
@@ -790,6 +1065,7 @@ onMounted(() => {
       exams.value = (exams.value && exams.value.length) ? exams.value : []
       plans.value = (plans.value && plans.value.length) ? plans.value : []
     }).finally(() => {
+      console.log('数据加载完成')
       loading.value = false // 无论如何都结束加载状态
     })
   } catch (error) {
@@ -1238,130 +1514,88 @@ onUnmounted(() => {
   scrollbar-color: #ccc #f1f1f1;
 }
 
-.task-float-card {
-  position: fixed;
-  right: 32px;
-  bottom: 32px;
-  z-index: 2000;
-  width: 340px;
-  max-height: 60vh;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-  border-radius: 12px;
-  background: #fff;
-}
-.task-float-inner-card {
-  padding-bottom: 32px;
-}
-.task-list-scroll {
-  max-height: 220px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.task-list-item {
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-.task-title {
-  font-weight: bold;
-  font-size: 15px;
-  margin-bottom: 2px;
-}
-.task-meta {
-  font-size: 13px;
-  color: #888;
-  margin-bottom: 2px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.task-desc {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 2px;
-}
-.task-float-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
-}
-.task-float-open {
-  position: fixed;
-  right: 40px;
-  bottom: 40px;
-  z-index: 2001;
-}
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
+/* 任务区块样式 */
+.task-count {
+  font-size: 14px;
+  color: #909399;
 }
 
-.fixed-task-block {
-  position: fixed;
-  right: 32px;
-  bottom: 32px;
-  width: 340px;
-  height: 340px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-  z-index: 2000;
+.task-section {
+  margin-bottom: 20px;
+}
+
+.task-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F0F0F0;
+}
+
+.section-icon {
+  font-size: 16px;
+  color: #409EFF;
+}
+
+.section-count {
+  background: #409EFF;
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+
+.empty-text {
+  color: #909399;
+  font-size: 14px;
+}
+
+.task-items {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  padding: 0 0 0 0;
+  gap: 12px;
 }
-.block-header {
+
+.task-item {
+  cursor: pointer;
+}
+
+.task-item:hover {
+  background-color: #F5F7FA;
+}
+
+.deadline-info,
+.exam-time {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-weight: bold;
-  font-size: 15px;
-  padding: 0 8px;
-}
-.block-brief {
-  color: #888;
-  font-size: 13px;
-  font-weight: normal;
-  margin-left: 8px;
+  gap: 4px;
+  color: #909399;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
 }
-.block-list-scroll {
-  max-height: 220px;
-  overflow-y: auto;
-  padding: 0 8px 0 16px;
+
+.deadline-info .el-icon {
+  font-size: 14px;
+  color: #E6A23C;
 }
-.block-list-item {
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-.block-title {
-  font-weight: bold;
-  font-size: 15px;
-  margin-bottom: 2px;
-}
-.block-meta {
-  font-size: 13px;
-  color: #888;
-  margin-bottom: 2px;
+
+.item-meta {
   display: flex;
-  gap: 12px;
   align-items: center;
-}
-.block-desc {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 2px;
-}
-.block-empty {
-  color: #aaa;
-  text-align: center;
-  padding: 24px 0;
+  gap: 8px;
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style>
 

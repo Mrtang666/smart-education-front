@@ -1,5 +1,4 @@
-<!-- 修改接口，对接后端要正确的接口，比如获得考试题目之类的 -->
-
+<!-- 学生考试详情页面 -->
 <template>
   <div class="exam-detail-container">
     <div v-if="loading" class="loading-container">
@@ -10,14 +9,14 @@
       <!-- 考试信息头部 -->
       <el-card class="exam-info-card">
         <div class="exam-header">
-          <h2>{{ examInfo.title }}</h2>
+          <h2>{{ examInfo.title || '考试详情' }}</h2>
           <div class="exam-meta">
-            <span><i class="el-icon-date"></i> 开始时间: {{ formatDateTime(examInfo.startTime) }}</span>
-            <span><i class="el-icon-time"></i> 结束时间: {{ formatDateTime(examInfo.endTime) }}</span>
-            <span><i class="el-icon-timer"></i> 时长: {{ examInfo.durationMinutes }} 分钟</span>
-            <span><i class="el-icon-notebook-2"></i> 总分: {{ examInfo.totalScore }} 分</span>
+            <span><el-icon><Calendar /></el-icon> 开始时间: {{ formatDateTime(examInfo.startTime) }}</span>
+            <span><el-icon><Timer /></el-icon> 结束时间: {{ formatDateTime(examInfo.endTime) }}</span>
+            <span><el-icon><Timer /></el-icon> 时长: {{ examInfo.durationMinutes || 0 }} 分钟</span>
+            <span><el-icon><Document /></el-icon> 总分: {{ examInfo.totalScore || 0 }} 分</span>
           </div>
-          <div class="exam-description">
+          <div class="exam-description" v-if="examInfo.description">
             {{ examInfo.description }}
           </div>
         </div>
@@ -197,446 +196,431 @@
   </div>
 </template>
 
-<script>
-import { studentExamAPI } from '@/api/api';
-import { getUserInfo } from '@/utils/auth';
+<script setup>
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Calendar, Timer, Document } from '@element-plus/icons-vue'
+import { studentExamAPI } from '@/api/api'
+import { getUserInfo } from '@/utils/auth'
 
-export default {
-  name: 'StudentExamDetail',
-  data() {
-    return {
-      // 考试信息
-      studentId: getUserInfo().studentId,
-      examId: null,
-      examInfo: {},
-      questions: [],
-      loading: true,
-      submitting: false,
-      
-      // 答题相关
-      currentQuestionIndex: 0,
-      userAnswers: {},
-      answeredQuestions: {},
-      
-      // 计时器
-      remainingTime: 0,
-      timerInterval: null,
-      
-      // 考试状态: 'NOT_STARTED', 'ONGOING', 'ENDED', 'SUBMITTED'
-      examStatus: 'ONGOING',
-      
-      // 结果相关
-      totalScore: 0,
-      correctCount: 0,
-      showReferenceAnswer: false
-    };
-  },
-  computed: {
-    // 当前题目
-    currentQuestion() {
-      if (this.questions.length === 0) return null;
-      return this.questions[this.currentQuestionIndex];
-    },
-    
-    // 格式化剩余时间
-    formatTimeRemaining() {
-      if (this.remainingTime <= 0) return '00:00:00';
-      
-      const hours = Math.floor(this.remainingTime / 3600);
-      const minutes = Math.floor((this.remainingTime % 3600) / 60);
-      const seconds = this.remainingTime % 60;
-      
-      return [
-        hours.toString().padStart(2, '0'),
-        minutes.toString().padStart(2, '0'),
-        seconds.toString().padStart(2, '0')
-      ].join(':');
-    },
-    
-    // 已答题数量
-    answeredCount() {
-      return Object.keys(this.answeredQuestions).length;
-    },
-    
-    // 未答题数量
-    unansweredCount() {
-      return this.questions.length - this.answeredCount;
-    },
-    
-    // 得分百分比
-    scorePercentage() {
-      if (!this.examInfo.totalScore) return 0;
-      return Math.round((this.totalScore / this.examInfo.totalScore) * 100);
-    },
-    
-    // 得分状态
-    scoreStatus() {
-      if (this.scorePercentage >= 80) return 'success';
-      if (this.scorePercentage >= 60) return '';
-      return 'exception';
-    }
-  },
-  watch: {
-    // 监听路由参数变化
-    '$route.params.examId': {
-      handler(newExamId) {
-        if (newExamId) {
-          this.examId = newExamId;
-          this.fetchExamDetail();
-        }
-      },
-      immediate: true
-    }
-  },
-  created() {
-    // 从路由参数获取考试ID
-    this.examId = this.$route.params.examId;
-    
-    // 加载考试详情
-    if (this.examId) {
-      this.fetchExamDetail();
-    }
-  },
-  beforeUnmount() {
-    // 清除计时器
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-    }
-  },
-  methods: {
-    // 获取考试详情
-    async fetchExamDetail() {
-      this.loading = true;
-      
-      try {
-        const sid = String(this.studentId);
-        const eid = String(this.examId);
-        
-        // 获取考试信息
-        const examInfo = await studentExamAPI.getExamDetail(sid, eid);
-        this.examInfo = examInfo;
-        
-        // 获取考试题目和作答
-        const answers = await studentExamAPI.getStudentExamAnswers(sid, eid);
-        
-        // 处理题目和答案
-        if (Array.isArray(answers)) {
-          // 提取题目信息
-          const questions = answers.map(answer => ({
-            questionId: answer.questionId,
-            content: answer.questionContent,
-            questionType: answer.questionType,
-            options: this.parseOptions(answer.options),
-            scorePoints: answer.scorePoints,
-            referenceAnswer: answer.referenceAnswer
-          }));
-          
-          this.questions = questions;
-          
-          // 初始化用户答案和已答题状态
-          this.initUserAnswers(answers);
-          
-          // 设置考试状态
-          this.determineExamStatus();
-          
-          // 如果考试正在进行中，启动计时器
-          if (this.examStatus === 'ONGOING') {
-            this.startTimer();
-          }
-          
-          // 如果考试已结束，计算总分和正确题数
-          if (this.examStatus === 'ENDED' || this.examStatus === 'SUBMITTED') {
-            this.calculateResults(answers);
-            this.showReferenceAnswer = true;
-          }
-        }
-      } catch (error) {
-        console.error('获取考试详情失败:', error);
-        this.$message.error('获取考试详情失败，请稍后再试');
-      } finally {
-        this.loading = false;
-      }
-    },
-    
-    // 解析选项
-    parseOptions(options) {
-      if (typeof options === 'string') {
-        try {
-          return JSON.parse(options);
-        } catch (e) {
-          return [];
-        }
-      }
-      return Array.isArray(options) ? options : [];
-    },
-    
-    // 初始化用户答案
-    initUserAnswers(answers) {
-      const userAnswers = {};
-      const answeredQuestions = {};
-      
-      answers.forEach(answer => {
-        const questionId = answer.questionId;
-        const questionType = answer.questionType;
-        
-        // 如果已有答案
-        if (answer.studentAnswer) {
-          if (questionType === 'MULTIPLE_CHOICE') {
-            try {
-              userAnswers[questionId] = answer.studentAnswer.split(',').map(item => item.trim());
-            } catch (e) {
-              userAnswers[questionId] = [];
-            }
-          } else {
-            userAnswers[questionId] = answer.studentAnswer;
-          }
-          
-          // 标记为已答题
-          answeredQuestions[questionId] = {
-            answered: true,
-            score: answer.score,
-            graded: answer.graded
-          };
-        } else {
-          // 初始化空答案
-          if (questionType === 'MULTIPLE_CHOICE') {
-            userAnswers[questionId] = [];
-          } else {
-            userAnswers[questionId] = '';
-          }
-        }
-      });
-      
-      this.userAnswers = userAnswers;
-      this.answeredQuestions = answeredQuestions;
-    },
-    
-    // 确定考试状态
-    determineExamStatus() {
-      const now = new Date();
-      const startTime = new Date(this.examInfo.startTime);
-      const endTime = new Date(this.examInfo.endTime);
-      
-      if (now < startTime) {
-        this.examStatus = 'NOT_STARTED';
-      } else if (now > endTime) {
-        this.examStatus = 'ENDED';
-      } else {
-        // 检查是否所有题目都已提交
-        const allAnswered = this.questions.every(q => this.answeredQuestions[q.questionId]);
-        if (allAnswered) {
-          this.examStatus = 'SUBMITTED';
-        } else {
-          this.examStatus = 'ONGOING';
-        }
-      }
-    },
-    
-    // 启动计时器
-    startTimer() {
-      const endTime = new Date(this.examInfo.endTime).getTime();
-      const updateTimer = () => {
-        const now = new Date().getTime();
-        const diff = Math.max(0, Math.floor((endTime - now) / 1000));
-        
-        this.remainingTime = diff;
-        
-        // 如果时间到了，自动提交考卷
-        if (diff <= 0) {
-          clearInterval(this.timerInterval);
-          this.examStatus = 'ENDED';
-          this.$message.warning('考试时间已结束，系统将自动提交您的答卷');
-          this.submitExam();
-        }
-      };
-      
-      // 立即更新一次
-      updateTimer();
-      
-      // 设置定时器，每秒更新一次
-      this.timerInterval = setInterval(updateTimer, 1000);
-    },
-    
-    // 提交单题答案
-    async submitAnswer(question) {
-      const questionId = question.questionId;
-      const answer = this.userAnswers[questionId];
-      
-      if (!this.isAnswerValid(question)) {
-        this.$message.warning('请完成答题后再提交');
-        return;
-      }
-      
-      try {
-        const answerData = {
-          examId: String(this.examId),
-          questionId: String(questionId),
-          studentId: String(this.studentId),
-          studentAnswer: question.questionType === 'MULTIPLE_CHOICE' ? answer.join(',') : answer,
-          examTitle: this.examInfo.title,
-          questionContent: question.content,
-          questionType: question.questionType
-        };
-        
-        await studentExamAPI.submitAnswer(answerData);
+const route = useRoute()
+const router = useRouter()
 
-        // 标记为已答题
-        this.answeredQuestions[questionId] = { answered: true };
+// 响应式数据
+const loading = ref(true)
+const submitting = ref(false)
+const examId = ref(null)
+const examInfo = ref({})
+const questions = ref([])
+const currentQuestionIndex = ref(0)
+const userAnswers = ref({})
+const answeredQuestions = ref({})
+const remainingTime = ref(0)
+const timerInterval = ref(null)
+const examStatus = ref('ONGOING')
+const totalScore = ref(0)
+const correctCount = ref(0)
+const showReferenceAnswer = ref(false)
 
-        // 显示提交成功提示
-        this.$message.success('答案已提交');
+// 获取用户信息
+const userInfo = getUserInfo()
+const studentId = userInfo?.studentId
 
-        // 自动前进到下一题
-        this.nextQuestion();
-      } catch (error) {
-        console.error('提交答案失败:', error);
-        this.$message.error('提交答案失败，请稍后再试');
-      }
-    },
-    
-    // 提交整份考卷
-    async submitExam() {
-      if (this.submitting) return;
-      
-      // 确认提交
-      try {
-        await this.$confirm('确认提交整份考卷吗？提交后将无法修改答案', '提交确认', {
-          confirmButtonText: '确认提交',
-          cancelButtonText: '继续答题',
-          type: 'warning'
-        });
-      } catch (e) {
-        return; // 用户取消提交
-      }
-      
-      this.submitting = true;
-      
-      try {
-        // 准备批量提交的答案
-        const answerList = this.questions.map(question => {
-          const questionId = question.questionId;
-          const answer = this.userAnswers[questionId];
-          
-          return {
-            examId: String(this.examId),
-            questionId: String(questionId),
-            studentId: String(this.studentId),
-            studentAnswer: question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer) ? answer.join(',') : (answer || ''),
-            examTitle: this.examInfo.title,
-            questionContent: question.content,
-            questionType: question.questionType
-          };
-        });
-        
-        // 批量提交答案
-        await studentExamAPI.batchSubmitAnswers(answerList);
-        
-        // 更新考试状态
-        this.examStatus = 'SUBMITTED';
-        
-        // 重新获取考试结果
-        await this.fetchExamDetail();
-        
-        // 显示提交成功提示
-        this.$message.success('考卷已成功提交');
-      } catch (error) {
-        console.error('提交考卷失败:', error);
-        this.$message.error('提交考卷失败，请稍后再试');
-      } finally {
-        this.submitting = false;
-      }
-    },
-    
-    // 计算考试结果
-    calculateResults(answers) {
-      let totalScore = 0;
-      let correctCount = 0;
-      
-      answers.forEach(answer => {
-        if (answer.score !== undefined && answer.score !== null) {
-          totalScore += parseFloat(answer.score);
-          
-          // 如果得分等于题目满分，则认为是正确的
-          if (answer.score === answer.scorePoints) {
-            correctCount++;
-          }
-        }
-      });
-      
-      this.totalScore = totalScore;
-      this.correctCount = correctCount;
-    },
-    
-    // 下一题
-    nextQuestion() {
-      if (this.currentQuestionIndex < this.questions.length - 1) {
-        this.currentQuestionIndex++;
-      }
-    },
-    
-    // 上一题
-    prevQuestion() {
-      if (this.currentQuestionIndex > 0) {
-        this.currentQuestionIndex--;
-      }
-    },
-    
-    // 获取题目类型文本
-    getQuestionTypeText(type) {
-      const typeMap = {
-        'SINGLE_CHOICE': '单选题',
-        'MULTIPLE_CHOICE': '多选题',
-        'FILL_BLANK': '填空题',
-        'SUBJECTIVE': '主观题'
-      };
-      return typeMap[type] || type;
-    },
-    
-    // 获取题目选项
-    getQuestionOptions(question) {
-      return Array.isArray(question.options) ? question.options : [];
-    },
-    
-    // 检查答案是否有效
-    isAnswerValid(question) {
-      const answer = this.userAnswers[question.questionId];
-      
-      if (question.questionType === 'MULTIPLE_CHOICE') {
-        return Array.isArray(answer) && answer.length > 0;
-      } else if (question.questionType === 'SINGLE_CHOICE') {
-        return answer && answer.trim() !== '';
-      } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE') {
-        return answer && answer.trim() !== '';
-      }
-      
-      return false;
-    },
-    
-    // 获取用户答案显示文本
-    getDisplayAnswer(question) {
-      const answer = this.userAnswers[question.questionId];
-      if (!answer) return '未作答';
-      
-      if (question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer)) {
-        return answer.join(', ');
-      }
-      return answer;
-    },
-    
-    // 格式化日期时间
-    formatDateTime(dateString) {
-      if (!dateString) return '';
-      
-      const date = new Date(dateString);
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-    },
-    
-    // 格式化百分比
-    percentFormat(percentage) {
-      return `${percentage}%`;
+// 计算属性
+const currentQuestion = computed(() => {
+  if (questions.value.length === 0) return null
+  return questions.value[currentQuestionIndex.value]
+})
+
+const formatTimeRemaining = computed(() => {
+  if (remainingTime.value <= 0) return '00:00:00'
+  
+  const hours = Math.floor(remainingTime.value / 3600)
+  const minutes = Math.floor((remainingTime.value % 3600) / 60)
+  const seconds = remainingTime.value % 60
+  
+  return [
+    hours.toString().padStart(2, '0'),
+    minutes.toString().padStart(2, '0'),
+    seconds.toString().padStart(2, '0')
+  ].join(':')
+})
+
+const answeredCount = computed(() => {
+  return Object.keys(answeredQuestions.value).length
+})
+
+const unansweredCount = computed(() => {
+  return questions.value.length - answeredCount.value
+})
+
+const scorePercentage = computed(() => {
+  if (!examInfo.value.totalScore) return 0
+  return Math.round((totalScore.value / examInfo.value.totalScore) * 100)
+})
+
+const scoreStatus = computed(() => {
+  if (scorePercentage.value >= 80) return 'success'
+  if (scorePercentage.value >= 60) return ''
+  return 'exception'
+})
+
+// 方法定义 - 必须在watch之前定义
+const parseOptions = (options) => {
+  if (typeof options === 'string') {
+    try {
+      return JSON.parse(options)
+    } catch (e) {
+      return []
     }
   }
-};
+  return Array.isArray(options) ? options : []
+}
+
+const initUserAnswers = (answers) => {
+  const userAnswersData = {}
+  const answeredQuestionsData = {}
+  
+  answers.forEach(answer => {
+    const questionId = answer.questionId
+    const questionType = answer.questionType
+    
+    // 如果已有答案
+    if (answer.studentAnswer) {
+      if (questionType === 'MULTIPLE_CHOICE') {
+        try {
+          userAnswersData[questionId] = answer.studentAnswer.split(',').map(item => item.trim())
+        } catch (e) {
+          userAnswersData[questionId] = []
+        }
+      } else {
+        userAnswersData[questionId] = answer.studentAnswer
+      }
+      
+      // 标记为已答题
+      answeredQuestionsData[questionId] = {
+        answered: true,
+        score: answer.score,
+        graded: answer.graded
+      }
+    } else {
+      // 初始化空答案
+      if (questionType === 'MULTIPLE_CHOICE') {
+        userAnswersData[questionId] = []
+      } else {
+        userAnswersData[questionId] = ''
+      }
+    }
+  })
+  
+  userAnswers.value = userAnswersData
+  answeredQuestions.value = answeredQuestionsData
+}
+
+const determineExamStatus = () => {
+  const now = new Date()
+  const startTime = new Date(examInfo.value.startTime)
+  const endTime = new Date(examInfo.value.endTime)
+  
+  if (now < startTime) {
+    examStatus.value = 'NOT_STARTED'
+  } else if (now > endTime) {
+    examStatus.value = 'ENDED'
+  } else {
+    // 检查是否所有题目都已提交
+    const allAnswered = questions.value.every(q => answeredQuestions.value[q.questionId])
+    if (allAnswered) {
+      examStatus.value = 'SUBMITTED'
+    } else {
+      examStatus.value = 'ONGOING'
+    }
+  }
+}
+
+const startTimer = () => {
+  const endTime = new Date(examInfo.value.endTime).getTime()
+  const updateTimer = () => {
+    const now = new Date().getTime()
+    const diff = Math.max(0, Math.floor((endTime - now) / 1000))
+    
+    remainingTime.value = diff
+    
+    // 如果时间到了，自动提交考卷
+    if (diff <= 0) {
+      clearInterval(timerInterval.value)
+      examStatus.value = 'ENDED'
+      ElMessage.warning('考试时间已结束，系统将自动提交您的答卷')
+      submitExam()
+    }
+  }
+  
+  // 立即更新一次
+  updateTimer()
+  
+  // 设置定时器，每秒更新一次
+  timerInterval.value = setInterval(updateTimer, 1000)
+}
+
+const calculateResults = (answers) => {
+  let total = 0
+  let correct = 0
+  
+  answers.forEach(answer => {
+    if (answer.score !== undefined && answer.score !== null) {
+      total += parseFloat(answer.score)
+      
+      // 如果得分等于题目满分，则认为是正确的
+      if (answer.score === answer.scorePoints) {
+        correct++
+      }
+    }
+  })
+  
+  totalScore.value = total
+  correctCount.value = correct
+}
+
+const fetchExamDetail = async () => {
+  loading.value = true
+  
+  try {
+    console.log('开始获取考试详情，examId:', examId.value, 'studentId:', studentId)
+    
+    if (!studentId) {
+      ElMessage.error('用户信息获取失败，请重新登录')
+      router.push('/login')
+      return
+    }
+
+    const sid = String(studentId)
+    const eid = String(examId.value)
+    
+    // 获取考试信息
+    console.log('获取考试信息...')
+    const examInfoResponse = await studentExamAPI.getExamDetail(sid, eid)
+    console.log('考试信息:', examInfoResponse)
+    examInfo.value = examInfoResponse || {}
+    
+    // 获取考试题目和作答
+    console.log('获取考试题目和作答...')
+    const answersResponse = await studentExamAPI.getStudentExamAnswers(sid, eid)
+    console.log('题目和作答信息:', answersResponse)
+    
+    // 处理题目和答案
+    if (Array.isArray(answersResponse)) {
+      // 提取题目信息
+      const questionsData = answersResponse.map(answer => ({
+        questionId: answer.questionId,
+        content: answer.questionContent,
+        questionType: answer.questionType,
+        options: parseOptions(answer.options),
+        scorePoints: answer.scorePoints,
+        referenceAnswer: answer.referenceAnswer
+      }))
+      
+      questions.value = questionsData
+      console.log('处理后的题目:', questionsData)
+      
+      // 初始化用户答案和已答题状态
+      initUserAnswers(answersResponse)
+      
+      // 设置考试状态
+      determineExamStatus()
+      
+      // 如果考试正在进行中，启动计时器
+      if (examStatus.value === 'ONGOING') {
+        startTimer()
+      }
+      
+      // 如果考试已结束，计算总分和正确题数
+      if (examStatus.value === 'ENDED' || examStatus.value === 'SUBMITTED') {
+        calculateResults(answersResponse)
+        showReferenceAnswer.value = true
+      }
+    } else {
+      console.warn('题目数据格式不正确:', answersResponse)
+      questions.value = []
+    }
+  } catch (error) {
+    console.error('获取考试详情失败:', error)
+    ElMessage.error('获取考试详情失败，请稍后再试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const submitAnswer = async (question) => {
+  const questionId = question.questionId
+  const answer = userAnswers.value[questionId]
+  
+  if (!isAnswerValid(question)) {
+    ElMessage.warning('请完成答题后再提交')
+    return
+  }
+  
+  try {
+    const answerData = {
+      examId: String(examId.value),
+      questionId: String(questionId),
+      studentId: String(studentId),
+      studentAnswer: question.questionType === 'MULTIPLE_CHOICE' ? answer.join(',') : answer,
+      examTitle: examInfo.value.title,
+      questionContent: question.content,
+      questionType: question.questionType
+    }
+    
+    await studentExamAPI.submitAnswer(answerData)
+
+    // 标记为已答题
+    answeredQuestions.value[questionId] = { answered: true }
+
+    // 显示提交成功提示
+    ElMessage.success('答案已提交')
+
+    // 自动前进到下一题
+    nextQuestion()
+  } catch (error) {
+    console.error('提交答案失败:', error)
+    ElMessage.error('提交答案失败，请稍后再试')
+  }
+}
+
+const submitExam = async () => {
+  if (submitting.value) return
+  
+  // 确认提交
+  try {
+    await ElMessageBox.confirm('确认提交整份考卷吗？提交后将无法修改答案', '提交确认', {
+      confirmButtonText: '确认提交',
+      cancelButtonText: '继续答题',
+      type: 'warning'
+    })
+  } catch (e) {
+    return // 用户取消提交
+  }
+  
+  submitting.value = true
+  
+  try {
+    // 准备批量提交的答案
+    const answerList = questions.value.map(question => {
+      const questionId = question.questionId
+      const answer = userAnswers.value[questionId]
+      
+      return {
+        examId: String(examId.value),
+        questionId: String(questionId),
+        studentId: String(studentId),
+        studentAnswer: question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer) ? answer.join(',') : (answer || ''),
+        examTitle: examInfo.value.title,
+        questionContent: question.content,
+        questionType: question.questionType
+      }
+    })
+    
+    // 批量提交答案
+    await studentExamAPI.batchSubmitAnswers(answerList)
+    
+    // 更新考试状态
+    examStatus.value = 'SUBMITTED'
+    
+    // 重新获取考试结果
+    await fetchExamDetail()
+    
+    // 显示提交成功提示
+    ElMessage.success('考卷已成功提交')
+  } catch (error) {
+    console.error('提交考卷失败:', error)
+    ElMessage.error('提交考卷失败，请稍后再试')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const nextQuestion = () => {
+  if (currentQuestionIndex.value < questions.value.length - 1) {
+    currentQuestionIndex.value++
+  }
+}
+
+const prevQuestion = () => {
+  if (currentQuestionIndex.value > 0) {
+    currentQuestionIndex.value--
+  }
+}
+
+const getQuestionTypeText = (type) => {
+  const typeMap = {
+    'SINGLE_CHOICE': '单选题',
+    'MULTIPLE_CHOICE': '多选题',
+    'FILL_BLANK': '填空题',
+    'SUBJECTIVE': '主观题'
+  }
+  return typeMap[type] || type
+}
+
+const getQuestionOptions = (question) => {
+  return Array.isArray(question.options) ? question.options : []
+}
+
+const isAnswerValid = (question) => {
+  const answer = userAnswers.value[question.questionId]
+  
+  if (question.questionType === 'MULTIPLE_CHOICE') {
+    return Array.isArray(answer) && answer.length > 0
+  } else if (question.questionType === 'SINGLE_CHOICE') {
+    return answer && answer.trim() !== ''
+  } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE') {
+    return answer && answer.trim() !== ''
+  }
+  
+  return false
+}
+
+const getDisplayAnswer = (question) => {
+  const answer = userAnswers.value[question.questionId]
+  if (!answer) return '未作答'
+  
+  if (question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer)) {
+    return answer.join(', ')
+  }
+  return answer
+}
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return ''
+  
+  const date = new Date(dateString)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+const percentFormat = (percentage) => {
+  return `${percentage}%`
+}
+
+// 监听路由参数变化 - 必须在函数定义之后
+watch(() => route.params.examId, (newExamId) => {
+  if (newExamId) {
+    examId.value = newExamId
+    fetchExamDetail()
+  }
+}, { immediate: true })
+
+// 组件挂载
+onMounted(() => {
+  examId.value = route.params.examId
+  if (examId.value) {
+    fetchExamDetail()
+  }
+})
+
+// 组件卸载
+onUnmounted(() => {
+  if (timerInterval.value) {
+    clearInterval(timerInterval.value)
+  }
+})
 </script>
 
 <style scoped>

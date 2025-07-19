@@ -180,6 +180,147 @@
           </div>
         </div>
       </div>
+
+      <!-- 题目列表区域 -->
+      <div class="questions-container">
+        <div class="questions-header">
+          <h2>考试题目列表</h2>
+          <div class="header-actions">
+            <el-button @click="refreshQuestions" :loading="isLoadingQuestions" type="primary">
+              <el-icon><Refresh /></el-icon>
+              刷新题目
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 题目管理工具栏 -->
+        <div class="question-toolbar" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+          <el-button type="primary" @click="handleAddQuestion">添加题目</el-button>
+          <el-button type="danger" :disabled="!selectedQuestions.length" @click="handleBatchDelete">批量删除 ({{ selectedQuestions.length }})</el-button>
+        </div>
+
+        <!-- 题目统计信息 -->
+        <div class="question-statistics">
+          <el-row :gutter="20">
+            <el-col :span="6">
+              <el-statistic title="题目总数" :value="questionStatistics.totalCount" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="总分数" :value="questionStatistics.totalScore" suffix="分" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="平均分值" :value="questionStatistics.averageScore" suffix="分" :precision="1" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="题目类型" :value="Object.keys(questionStatistics.typeStatistics || {}).length" suffix="种" />
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 题目搜索和筛选 -->
+        <div class="question-search" v-if="examQuestions.length > 0">
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-input
+                v-model="questionSearchKeyword"
+                placeholder="搜索题目内容"
+                @input="handleQuestionSearch"
+                clearable
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </el-col>
+            <el-col :span="6">
+              <el-select v-model="questionFilterType" placeholder="筛选题目类型" @change="handleQuestionFilter" clearable>
+                <el-option label="单选题" value="SINGLE_CHOICE" />
+                <el-option label="多选题" value="MULTI_CHOICE" />
+                <el-option label="填空题" value="FILL_BLANK" />
+                <el-option label="简答题" value="ESSAY_QUESTION" />
+                <el-option label="判断题" value="TRUE_FALSE" />
+              </el-select>
+            </el-col>
+            <el-col :span="10">
+              <div class="score-range">
+                <span>分值范围：</span>
+                <el-input-number v-model="questionMinScore" :min="0" :max="100" placeholder="最小分值" style="width: 120px;" />
+                <span style="margin: 0 10px;">-</span>
+                <el-input-number v-model="questionMaxScore" :min="0" :max="100" placeholder="最大分值" style="width: 120px;" />
+                <el-button @click="handleQuestionScoreFilter" style="margin-left: 10px;">筛选</el-button>
+              </div>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 题目列表 -->
+        <div class="questions-body">
+          <div v-if="examQuestions.length === 0" class="empty-questions">
+            <el-empty description="暂无题目数据" :image-size="200">
+              <template #description>
+                <p>暂无考试题目数据</p>
+                <p class="empty-sub-text">请检查考试配置或联系管理员</p>
+              </template>
+            </el-empty>
+          </div>
+          
+          <div v-else-if="filteredQuestions.length === 0" class="empty-questions">
+            <el-empty description="暂无符合条件的题目" :image-size="200">
+              <template #description>
+                <p>没有找到符合条件的题目</p>
+                <p class="empty-sub-text">请尝试调整搜索条件或筛选条件</p>
+              </template>
+            </el-empty>
+          </div>
+          
+          <div v-else class="questions-list">
+            <div class="questions-summary">
+              共找到 {{ filteredQuestions.length }} 道题目
+            </div>
+            <el-table
+              :data="filteredQuestions"
+              style="width: 100%"
+              border
+              stripe
+              @selection-change="handleSelectionChange"
+            >
+              <el-table-column type="selection" width="55" />
+              <el-table-column label="序号" type="index" width="60" />
+              <el-table-column prop="content" label="题目内容" min-width="200">
+                <template #default="scope">
+                  <span>{{ truncateText(getQuestionContent(scope.row), 50) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="questionType" label="题型" width="100">
+                <template #default="scope">
+                  <el-tag size="small" :type="getQuestionTypeTagType(scope.row.questionType)">
+                    {{ getQuestionTypeText(scope.row.questionType) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="difficulty" label="难度" width="100">
+                <template #default="scope">
+                  <el-tag size="small" :type="getDifficultyType(scope.row.difficulty)">
+                    {{ getDifficultyText(scope.row.difficulty) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="scorePoints" label="分值" width="80" />
+              <el-table-column prop="referenceAnswer" label="参考答案" min-width="120">
+                <template #default="scope">
+                  <span>{{ truncateText(scope.row.referenceAnswer, 30) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="160" fixed="right">
+                <template #default="scope">
+                  <el-button size="small" @click="editQuestion(scope.row)">编辑</el-button>
+                  <el-button size="small" type="danger" @click="deleteQuestion(scope.row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 学生详情对话框 -->
@@ -238,15 +379,85 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 题目编辑弹窗 -->
+    <el-dialog v-model="showEditDialog" :title="editingQuestion ? '编辑题目' : '添加题目'" width="600px">
+      <div class="edit-form">
+        <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="90px">
+          <el-form-item label="题目内容" prop="content">
+            <el-input v-model="editForm.content" type="textarea" :rows="3" placeholder="请输入题目内容" />
+          </el-form-item>
+          <el-form-item label="题型" prop="questionType">
+            <el-select v-model="editForm.questionType" placeholder="请选择题型">
+              <el-option label="单选题" value="SINGLE_CHOICE" />
+              <el-option label="多选题" value="MULTI_CHOICE" />
+              <el-option label="填空题" value="FILL_BLANK" />
+              <el-option label="简答题" value="ESSAY_QUESTION" />
+              <el-option label="判断题" value="TRUE_FALSE" />
+            </el-select>
+          </el-form-item>
+
+          <!-- 选项编辑区，仅选择题/多选题/判断题显示 -->
+          <template v-if="['SINGLE_CHOICE','MULTI_CHOICE','TRUE_FALSE'].includes(editForm.questionType)">
+            <el-form-item label="选项">
+              <div v-for="(option, index) in editForm.options" :key="option.key" style="display:flex;align-items:center;margin-bottom:8px;">
+                <div style="width:24px;">{{ option.key }}.</div>
+                <el-input v-model="option.text" placeholder="请输入选项内容" :disabled="editForm.questionType==='TRUE_FALSE'" style="flex:1;" />
+                <el-button @click="removeOption(index)" type="danger" circle plain v-if="editForm.options.length > 2 && editForm.questionType!=='TRUE_FALSE'">
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </div>
+              <el-button @click="addOption" type="primary" plain v-if="editForm.questionType!=='TRUE_FALSE' && editForm.options.length < 6">
+                <el-icon><Plus /></el-icon>添加选项
+              </el-button>
+            </el-form-item>
+          </template>
+
+          <!-- 参考答案 -->
+          <el-form-item label="参考答案" prop="referenceAnswer">
+            <template v-if="['SINGLE_CHOICE','TRUE_FALSE'].includes(editForm.questionType)">
+              <el-select v-model="editForm.referenceAnswer" placeholder="请选择正确答案">
+                <el-option v-for="option in editForm.options" :key="option.key" :label="option.key" :value="option.key" />
+              </el-select>
+            </template>
+            <template v-else-if="editForm.questionType==='MULTI_CHOICE'">
+              <el-select v-model="editForm.referenceAnswer" multiple placeholder="请选择所有正确答案">
+                <el-option v-for="option in editForm.options" :key="option.key" :label="option.key" :value="option.key" />
+              </el-select>
+            </template>
+            <template v-else>
+              <el-input v-model="editForm.referenceAnswer" type="textarea" :rows="2" placeholder="请输入参考答案" />
+            </template>
+          </el-form-item>
+
+          <el-form-item label="难度" prop="difficulty">
+            <el-select v-model="editForm.difficulty" placeholder="请选择难度">
+              <el-option label="简单" value="EASY" />
+              <el-option label="中等" value="MEDIUM" />
+              <el-option label="困难" value="HARD" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="分值" prop="scorePoints">
+            <el-input-number v-model="editForm.scorePoints" :min="1" :max="100" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveQuestion">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft, Loading } from '@element-plus/icons-vue'
-import { examAPI, courseAPI, courseSelectionAPI } from '@/api/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, Loading, Refresh, Search, Plus, Delete } from '@element-plus/icons-vue'
+import { examAPI, courseAPI, courseSelectionAPI, knowledgeAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart, RadarChart, ScatterChart } from 'echarts/charts'
@@ -308,6 +519,21 @@ const currentStudent = ref(null)
 const studentAnswers = ref([])
 const isLoadingDetail = ref(false)
 
+// 题目列表相关
+const examQuestions = ref([])
+const questionStatistics = ref({
+  totalCount: 0,
+  totalScore: 0,
+  averageScore: 0,
+  typeStatistics: {}
+})
+const questionSearchKeyword = ref('')
+const questionFilterType = ref(null)
+const questionMinScore = ref(0)
+const questionMaxScore = ref(100)
+const isLoadingQuestions = ref(false)
+const questionStats = ref({}) // 存储每个题目的答题统计
+
 // 图表相关
 // const chartContainer = ref(null)
 let scoreDistributionChart = null
@@ -326,6 +552,35 @@ const filteredStudents = computed(() => {
     (student.studentId && student.studentId.toString().includes(keyword)) ||
     (student.fullName && student.fullName.toLowerCase().includes(keyword))
   )
+})
+
+// 过滤题目列表
+const filteredQuestions = computed(() => {
+  let questions = examQuestions.value
+
+  // 关键词搜索
+  if (questionSearchKeyword.value) {
+    const keyword = questionSearchKeyword.value.toLowerCase()
+    questions = questions.filter(question => 
+      getQuestionContent(question).toLowerCase().includes(keyword) ||
+      (question.referenceAnswer && question.referenceAnswer.toLowerCase().includes(keyword))
+    )
+  }
+
+  // 题目类型筛选
+  if (questionFilterType.value) {
+    questions = questions.filter(question => question.questionType === questionFilterType.value)
+  }
+
+  // 分值范围筛选
+  if (questionMinScore.value > 0 || questionMaxScore.value < 100) {
+    questions = questions.filter(question => {
+      const score = question.scorePoints || 0
+      return score >= questionMinScore.value && score <= questionMaxScore.value
+    })
+  }
+
+  return questions
 })
 
 // 计算统计数据
@@ -399,7 +654,7 @@ async function fetchExamStudents() {
     }
 
     // 3. 合并数据
-    console.log('开始合并数据')
+    console.log('开始合并学生数据')
     await mergeStudentData(allCourseStudents, completedStudentsScores)
 
     // 4. 如果最终没有学生数据，使用后备方案
@@ -589,7 +844,196 @@ async function fetchQuestionTypeAnalysis(examIdStr) {
   }
 }
 
+// 获取题目列表和统计信息
+async function fetchExamQuestions() {
+  try {
+    isLoadingQuestions.value = true
+    const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
+    console.log('开始获取题目数据，examId:', examIdStr)
 
+    // 获取题目列表 - 使用knowledgeAPI中的方法
+    const questions = await knowledgeAPI.getQuestionsByExamId(examIdStr)
+    console.log('获取到的题目列表:', questions)
+    if (Array.isArray(questions)) {
+      examQuestions.value = questions.map(q => ({
+        ...q,
+        questionId: String(q.questionId || q.id),
+        questionContent: q.content || '题目内容',
+        questionType: q.questionType || 'UNKNOWN',
+        scorePoints: q.scorePoints || 0,
+        difficulty: q.difficulty || 'MEDIUM',
+        referenceAnswer: q.referenceAnswer || '',
+        options: q.options || [],
+        createdAt: q.createdAt || q.created_at || '',
+        updatedAt: q.updatedAt || q.updated_at || ''
+      }))
+    } else {
+      examQuestions.value = []
+    }
+
+    // 计算题目统计信息
+    calculateQuestionStatistics()
+
+  } catch (error) {
+    console.error('获取题目列表失败:', error)
+    ElMessage.error('获取题目列表失败，请稍后重试')
+    examQuestions.value = []
+    questionStatistics.value = { totalCount: 0, totalScore: 0, averageScore: 0, typeStatistics: {} }
+    questionStats.value = {}
+  } finally {
+    isLoadingQuestions.value = false
+  }
+}
+
+// 计算题目统计信息
+function calculateQuestionStatistics() {
+  if (examQuestions.value.length === 0) {
+    questionStatistics.value = { totalCount: 0, totalScore: 0, averageScore: 0, typeStatistics: {} }
+    questionStats.value = {}
+    console.log('题目统计信息：暂无题目数据')
+    return
+  }
+
+  const totalCount = examQuestions.value.length
+  const totalScore = examQuestions.value.reduce((sum, q) => sum + (q.scorePoints || 0), 0)
+  const averageScore = totalCount > 0 ? (totalScore / totalCount).toFixed(1) : 0
+
+  // 统计题型分布
+  const typeStatistics = {}
+  examQuestions.value.forEach(q => {
+    const type = q.questionType || 'UNKNOWN'
+    if (!typeStatistics[type]) {
+      typeStatistics[type] = {
+        count: 0,
+        totalScore: 0
+      }
+    }
+    typeStatistics[type].count++
+    typeStatistics[type].totalScore += q.scorePoints || 0
+  })
+
+  questionStatistics.value = {
+    totalCount,
+    totalScore,
+    averageScore: parseFloat(averageScore),
+    typeStatistics
+  }
+
+  // 初始化题目统计（这里可以根据实际需求从后端获取）
+  questionStats.value = {}
+  examQuestions.value.forEach(q => {
+    questionStats.value[q.questionId] = {
+      answerCount: 0, // 这里可以从后端获取实际数据
+      correctRate: 0, // 这里可以从后端获取实际数据
+      avgScore: 0     // 这里可以从后端获取实际数据
+    }
+  })
+
+  console.log('题目统计信息计算完成:', questionStatistics.value)
+}
+
+// 刷新题目列表
+function refreshQuestions() {
+  fetchExamQuestions()
+}
+
+// 处理题目搜索
+function handleQuestionSearch() {
+  console.log('题目搜索关键词:', questionSearchKeyword.value)
+}
+
+// 处理题目筛选
+function handleQuestionFilter(value) {
+  console.log('题目类型筛选:', value)
+}
+
+// 处理题目分数筛选
+function handleQuestionScoreFilter() {
+  console.log('题目分数筛选:', questionMinScore.value, '-', questionMaxScore.value)
+}
+
+// 获取题目类型文本
+function getQuestionTypeText(type) {
+  switch(type) {
+    case 'SINGLE_CHOICE':
+      return '单选题'
+    case 'MULTI_CHOICE':
+      return '多选题'
+    case 'FILL_BLANK':
+      return '填空题'
+    case 'ESSAY_QUESTION':
+      return '简答题'
+    case 'TRUE_FALSE':
+      return '判断题'
+    default:
+      return '未知题型'
+  }
+}
+
+// 获取题目类型标签类型
+function getQuestionTypeTagType(type) {
+  switch(type) {
+    case 'SINGLE_CHOICE':
+      return 'info'
+    case 'MULTI_CHOICE':
+      return 'warning'
+    case 'FILL_BLANK':
+      return 'success'
+    case 'ESSAY_QUESTION':
+      return 'primary'
+    case 'TRUE_FALSE':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+// 获取题目难度文本
+function getDifficultyText(difficulty) {
+  switch(difficulty) {
+    case 'EASY':
+      return '简单'
+    case 'MEDIUM':
+      return '中等'
+    case 'HARD':
+      return '困难'
+    default:
+      return '未知难度'
+  }
+}
+
+// 获取题目难度类型
+function getDifficultyType(difficulty) {
+  switch(difficulty) {
+    case 'EASY':
+      return 'success'
+    case 'MEDIUM':
+      return 'warning'
+    case 'HARD':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+// 获取题目内容（处理富文本）
+function getQuestionContent(question) {
+  if (question.content) {
+    // 去除HTML标签，获取纯文本内容
+    return question.content.replace(/<[^>]*>/g, '').trim()
+  }
+  if (question.questionContent) {
+    return question.questionContent.replace(/<[^>]*>/g, '').trim()
+  }
+  return '题目内容'
+}
+
+// 文本截断函数
+function truncateText(text, maxLength) {
+  if (!text) return ''
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
 
 // 查看学生详情
 async function viewStudentDetail(student) {
@@ -1235,10 +1679,228 @@ onMounted(async () => {
     return
   }
 
+  // 初始化题目统计信息
+  initQuestionStatistics()
+
   // 先获取考试信息（包含courseId），再获取学生成绩
   await fetchExamInfo()
   await fetchExamStudents()
+  await fetchExamQuestions() // 获取题目列表和统计信息
 })
+
+// 初始化题目统计信息
+function initQuestionStatistics() {
+  questionStatistics.value = {
+    totalCount: 0,
+    totalScore: 0,
+    averageScore: 0,
+    typeStatistics: {}
+  }
+  questionStats.value = {}
+  console.log('题目统计信息初始化完成')
+}
+
+// 题目多选相关
+const selectedQuestions = ref([])
+
+function handleSelectionChange(selection) {
+  selectedQuestions.value = selection
+}
+
+function handleAddQuestion() {
+  editingQuestion.value = null
+  showEditDialog.value = true
+  // 清空表单
+  editForm.value = {
+    content: '',
+    questionType: 'SINGLE_CHOICE',
+    options: [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ],
+    referenceAnswer: '',
+    difficulty: 'MEDIUM',
+    scorePoints: 100
+  }
+}
+
+function editQuestion(question) {
+  editingQuestion.value = { ...question }
+  showEditDialog.value = true
+  editForm.value = {
+    content: question.content || '',
+    questionType: question.questionType || 'SINGLE_CHOICE',
+    options: Array.isArray(question.options)
+      ? question.options
+      : [
+          { key: 'A', text: '' },
+          { key: 'B', text: '' },
+          { key: 'C', text: '' },
+          { key: 'D', text: '' }
+        ],
+    referenceAnswer: question.referenceAnswer || '',
+    difficulty: question.difficulty || 'MEDIUM',
+    scorePoints: question.scorePoints || 100
+  }
+}
+
+function deleteQuestion(question) {
+  ElMessageBox.confirm('确定要删除该题目吗？', '提示', {
+    type: 'warning',
+  }).then(async () => {
+    // 调用删除API
+    await knowledgeAPI.deleteQuestion(question.questionId)
+    ElMessage.success('删除成功')
+    refreshQuestions()
+  })
+}
+
+function handleBatchDelete() {
+  ElMessageBox.confirm(`确定要批量删除选中的${selectedQuestions.value.length}道题目吗？`, '提示', {
+    type: 'warning',
+  }).then(async () => {
+    const ids = selectedQuestions.value.map(q => q.questionId)
+    // 调用批量删除API（如有）或循环删除
+    for (const id of ids) {
+      await knowledgeAPI.deleteQuestion(id)
+    }
+    ElMessage.success('批量删除成功')
+    refreshQuestions()
+  })
+}
+
+// 题目编辑弹窗相关
+const showEditDialog = ref(false)
+const editingQuestion = ref(null)
+
+const editForm = ref({
+  content: '',
+  questionType: 'SINGLE_CHOICE',
+  options: [
+    { key: 'A', text: '' },
+    { key: 'B', text: '' },
+    { key: 'C', text: '' },
+    { key: 'D', text: '' }
+  ],
+  referenceAnswer: '',
+  difficulty: 'MEDIUM',
+  scorePoints: 100
+})
+
+const editRules = {
+  content: [
+    { required: true, message: '请输入题目内容', trigger: 'blur' },
+    { min: 1, max: 300, message: '题目内容长度应在1到300个字符之间', trigger: 'blur' }
+  ],
+  questionType: [
+    { required: true, message: '请选择题型', trigger: 'change' }
+  ],
+  difficulty: [
+    { required: true, message: '请选择难度', trigger: 'change' }
+  ],
+  scorePoints: [
+    { required: true, message: '请输入分值', trigger: 'blur' },
+    { type: 'number', min: 1, max: 100, message: '分值应在1到100之间', trigger: 'blur' }
+  ],
+  referenceAnswer: [
+    { required: true, message: '请输入参考答案', trigger: 'blur' },
+    { min: 1, max: 300, message: '参考答案长度应在1到300个字符之间', trigger: 'blur' }
+  ]
+}
+
+const editFormRef = ref(null)
+
+async function saveQuestion() {
+  editFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    try {
+      let content = editForm.value.content
+      // 选择题/多选题/判断题，将选项拼接到content
+      if (['SINGLE_CHOICE','MULTI_CHOICE','TRUE_FALSE'].includes(editForm.value.questionType)) {
+        content = formatOptionsToContent(editForm.value.content, editForm.value.options)
+      }
+      const payload = {
+        ...editForm.value,
+        content,
+        // 不再传options字段
+        options: undefined,
+        referenceAnswer: Array.isArray(editForm.value.referenceAnswer)
+          ? editForm.value.referenceAnswer.join(',')
+          : editForm.value.referenceAnswer,
+        examId: examId
+      }
+      if (editingQuestion.value && editingQuestion.value.questionId) {
+        await knowledgeAPI.updateQuestion({ ...payload, questionId: editingQuestion.value.questionId })
+        ElMessage.success('题目编辑成功')
+      } else {
+        await knowledgeAPI.addQuestion(payload)
+        ElMessage.success('题目添加成功')
+      }
+      showEditDialog.value = false
+      editingQuestion.value = null
+      refreshQuestions()
+    } catch (e) {
+      ElMessage.error('保存失败，请重试')
+    }
+  })
+}
+
+// 题型切换时自动初始化选项
+watch(() => editForm.value.questionType, (newType) => {
+  editForm.value.referenceAnswer = ''
+  if (newType === 'SINGLE_CHOICE') {
+    editForm.value.options = [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ]
+  } else if (newType === 'MULTI_CHOICE') {
+    editForm.value.options = [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ]
+  } else if (newType === 'TRUE_FALSE') {
+    editForm.value.options = [
+      { key: 'A', text: '正确' },
+      { key: 'B', text: '错误' }
+    ]
+  } else {
+    editForm.value.options = []
+  }
+})
+
+// 选项增删
+function addOption() {
+  const keys = ['A', 'B', 'C', 'D', 'E', 'F']
+  if (editForm.value.options.length < keys.length) {
+    const nextKey = keys[editForm.value.options.length]
+    editForm.value.options.push({ key: nextKey, text: '' })
+  }
+}
+function removeOption(index) {
+  if (editForm.value.options.length > 2) {
+    if (editForm.value.referenceAnswer === editForm.value.options[index].key) {
+      editForm.value.referenceAnswer = ''
+    }
+    editForm.value.options.splice(index, 1)
+    // 重新排序key
+    const keys = ['A', 'B', 'C', 'D', 'E', 'F']
+    editForm.value.options.forEach((option, idx) => {
+      option.key = keys[idx]
+    })
+  }
+}
+
+function formatOptionsToContent(content, options) {
+  if (!Array.isArray(options) || options.length === 0) return content
+  const optionLines = options.map(opt => `${opt.key}. ${opt.text || ''}`)
+  return [content, ...optionLines].join('\n')
+}
 </script>
 
 <style scoped>
@@ -1637,5 +2299,285 @@ onMounted(async () => {
 
 :deep(.el-table td) {
   text-align: center !important;
+}
+
+/* 题目列表样式 */
+.questions-container {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  margin-top: 20px;
+}
+
+.questions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.questions-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.question-statistics {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.question-search {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.score-range {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.score-range span {
+  font-size: 14px;
+  color: #606266;
+  margin-right: 5px;
+}
+
+.questions-body {
+  overflow-y: auto;
+}
+
+.questions-list .el-collapse-item {
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.questions-list .el-collapse-item__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #EBEEF5;
+  padding: 15px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.question-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.header-main {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  margin-right: 10px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.question-index {
+  font-weight: bold;
+  margin-right: 10px;
+  color: #409EFF;
+  flex-shrink: 0;
+}
+
+.question-type {
+  font-size: 14px;
+  color: #606266;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.question-content {
+  flex-grow: 1;
+  color: #303133;
+  font-size: 15px;
+  margin-right: 10px;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.question-score {
+  font-weight: bold;
+  color: #409EFF;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.question-difficulty {
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.question-content-detail {
+  padding: 15px 20px;
+  border-top: 1px solid #EBEEF5;
+}
+
+.question-title-full {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.question-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  color: #606266;
+  font-size: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.question-info .el-tag {
+  margin-right: 8px;
+}
+
+.question-score-info {
+  font-weight: 500;
+  color: #409EFF;
+  margin-left: 10px;
+}
+
+.question-answer {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #F5F7FA;
+  border-radius: 8px;
+  border: 1px solid #EBEEF5;
+}
+
+.answer-label {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.answer-content {
+  color: #303133;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.question-stats {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #EBEEF5;
+}
+
+.stats-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.stats-content {
+  font-size: 14px;
+  color: #303133;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stats-content span {
+  background-color: #F5F7FA;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #EBEEF5;
+}
+
+.empty-questions {
+  padding: 30px 0;
+  text-align: center;
+}
+
+.empty-sub-text {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 10px;
+}
+
+.questions-summary {
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  background-color: #F5F7FA;
+  border-radius: 6px;
+  border: 1px solid #EBEEF5;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .questions-container {
+    padding: 20px;
+  }
+  
+  .questions-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .question-content {
+    max-width: 100%;
+    white-space: normal;
+  }
+  
+  .question-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .question-difficulty {
+    margin-left: 0;
+    margin-top: 10px;
+  }
+  
+  .score-range {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .stats-content {
+    flex-direction: column;
+    gap: 10px;
+  }
 }
 </style> 
