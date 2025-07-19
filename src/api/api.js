@@ -3321,6 +3321,104 @@ export const studentAssistantAPI = {
 
             throw error;
         }
+    },
+
+    /**
+     * 生成教学方案（需要token）
+     * @param {Object} lessonData 教学方案生成数据
+     * @param {string} lessonData.subjectType 学科类型
+     * @param {string} lessonData.courseOutline 课程大纲
+     * @param {number} lessonData.duration 课程时长（分钟）
+     * @param {string} lessonData.difficultyLevel 难度等级
+     * @param {string} lessonData.teachingStyle 教学风格
+     * @returns {Promise<Object>} 教学方案生成结果
+     */
+    async generateLesson(lessonData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log('生成教学方案，请求数据:', lessonData);
+
+            const response = await axios.post('/api/teaching-assistant/lesson/generate', lessonData, {
+                timeout: 120000 // 2分钟超时
+            });
+
+            console.log('生成教学方案API响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('生成教学方案失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI教学方案生成功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
+    },
+
+    /**
+     * 改进教学方案（需要token）
+     * @param {Object} improveData 教学方案改进数据
+     * @param {string} improveData.teachingPlan 当前教学方案
+     * @param {string} improveData.suggestion 改进建议
+     * @returns {Promise<Object>} 教学方案改进结果
+     */
+    async improveLesson(improveData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            console.log('改进教学方案，请求数据:', improveData);
+
+            const response = await axios.post('/api/teaching-assistant/lesson/improve', improveData, {
+                timeout: 120000 // 2分钟超时
+            });
+
+            console.log('改进教学方案API响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('改进教学方案失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI教学方案改进功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
+    },
+
+    /**
+     * 分析学生课程学习情况（需要token）
+     * @param {string|number} courseId 课程ID
+     * @param {string|number} studentId 学生ID
+     * @returns {Promise<Object>} 学习情况分析结果
+     */
+    async analyzeStudentCourseProgress(courseId, studentId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const courseIdStr = String(courseId);
+            const studentIdStr = String(studentId);
+
+            console.log(`分析学生课程学习情况，课程ID: ${courseIdStr}, 学生ID: ${studentIdStr}`);
+
+            const response = await axios.post('/api/student-assistant/analyze-progress', {
+                courseId: courseIdStr,
+                studentId: studentIdStr
+            }, {
+                timeout: 120000 // 2分钟超时
+            });
+
+            console.log('分析学生学习情况API响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('分析学生学习情况失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI学习情况分析功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
     }
 };
 
@@ -3497,6 +3595,38 @@ export const courseSelectionAPI = {
             };
         } catch (error) {
             console.error('批量删除课程学生失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 8.生成课程邀请码（需要token）
+     * @param {string} courseId 课程ID
+     * @returns {Promise<Object>} 邀请码生成结果
+     * 返回字段：
+     *   - invite_code: string 生成的邀请码
+     *   - success: boolean 是否生成成功
+     *   - message: string 提示信息
+     */
+    async generateInviteCode(courseId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            // 确保ID是字符串类型
+            const courseIdStr = String(courseId);
+
+            console.log(`生成课程邀请码，课程ID: ${courseIdStr}`);
+
+            // 使用查询参数而不是请求体
+            const response = await axios.post('/api/course-selection/generate-invite-code', null, {
+                params: {
+                    courseId: courseIdStr
+                }
+            });
+
+            console.log('生成邀请码API响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('生成课程邀请码失败:', error.response ? error.response.data : error.message);
             throw error;
         }
     }

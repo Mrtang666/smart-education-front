@@ -43,12 +43,14 @@
 
           <el-tab-pane label="学生管理" name="students">
             <!-- 学生管理组件 -->
-            <StudentManagement 
+            <StudentManagement
               :courseStudents="courseStudents"
               :selectedStudents="selectedStudents"
               :isLoading="isLoadingStudents"
               :currentPage="currentPage"
               :pageSize="pageSize"
+              :courseId="courseId"
+              :courseName="courseName"
               @batch-remove-students="batchRemoveStudents"
               @show-add-student="showAddStudentDialog"
               @view-student="viewStudent"
