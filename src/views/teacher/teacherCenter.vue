@@ -35,16 +35,18 @@
       </section>
     </main>
 
-    <!-- 右下角AI对话框入口 -->
+    <!-- 右下角AI对话框入口 - 已注释 -->
+    <!--
     <div class="ai-chat-entry" @click="showAIChat = true" v-if="!showAIChat">
       <el-icon :size="24"><ChatDotRound /></el-icon>
     </div>
-    <!-- AI聊天弹窗 -->
+    -->
+    <!-- AI聊天弹窗 - 已注释 -->
+    <!--
     <transition name="slide-up">
       <div v-if="showAIChat" class="ai-chat-modal" :style="{ width: chatWidth + 'px' }">
-        <!-- 左侧拖动调整大小的区域 -->
         <div class="resize-handle" @mousedown="startResize"></div>
-        
+
         <div class="ai-chat-header">
           <span>AI智能对话</span>
           <el-icon class="close-icon" @click="showAIChat = false"><Close /></el-icon>
@@ -78,21 +80,22 @@
         </div>
       </div>
     </transition>
+    -->
   </div>
 </template>
 
 <script setup>
 import { getValidToken } from '@/utils/auth'
-import { ref, onUnmounted, provide } from 'vue'
+import { ref, provide } from 'vue' // onUnmounted 已注释（AI助手相关）
 import { ElMessage } from 'element-plus'
 import AppHeader from '@/components/common/AppHeader.vue'
 import { useRouter } from 'vue-router'
-import { 
-  ChatDotRound, 
-  Close, 
-  Position, 
-  Reading, 
-  Document, 
+import {
+  // ChatDotRound,  // AI助手相关 - 已注释
+  // Close,         // AI助手相关 - 已注释
+  // Position,      // AI助手相关 - 已注释
+  Reading,
+  Document,
   DataAnalysis,
   Setting,
   HomeFilled
@@ -102,22 +105,24 @@ const router = useRouter()
 const logoUrl = ref('@/assets/projectlogo.png') // 项目logo
 const avatarUrl = ref('https://placehold.co/40x40?text=头像') // 默认头像
 const userName = getUserName() // 默认用户名
-const showAIChat = ref(false)
-const chatInput = ref('')
+// AI助手相关变量 - 已注释
+// const showAIChat = ref(false)
+// const chatInput = ref('')
 const searchValue = ref('') // 搜索框的值
-const chatMessages = ref([
-  { role: 'ai', content: '您好，有什么可以帮您？' }
-])
+// const chatMessages = ref([
+//   { role: 'ai', content: '您好，有什么可以帮您？' }
+// ])
 
-// 对话框宽度相关
-const chatWidth = ref(400) // 初始宽度
-const minWidth = 300 // 最小宽度
-const maxWidth = 800 // 最大宽度
-const isResizing = ref(false)
-const startX = ref(0)
-const startWidth = ref(0)
+// 对话框宽度相关 - 已注释
+// const chatWidth = ref(400) // 初始宽度
+// const minWidth = 300 // 最小宽度
+// const maxWidth = 800 // 最大宽度
+// const isResizing = ref(false)
+// const startX = ref(0)
+// const startWidth = ref(0)
 
-// 开始调整大小
+// AI助手调整大小函数 - 已注释
+/*
 function startResize(e) {
   isResizing.value = true
   startX.value = e.clientX
@@ -127,6 +132,7 @@ function startResize(e) {
   // 防止文本选择
   document.body.style.userSelect = 'none'
 }
+*/
 
 function getUserName() {
   // 从localStorage获取用户信息
@@ -151,16 +157,17 @@ function getUserName() {
   }
 }
 
-// 处理调整大小
+// AI助手调整大小相关函数 - 已注释
+/*
 function handleResize(e) {
   if (!isResizing.value) return
   const offsetX = startX.value - e.clientX
   let newWidth = startWidth.value + offsetX
-  
+
   // 限制最小和最大宽度
   if (newWidth < minWidth) newWidth = minWidth
   if (newWidth > maxWidth) newWidth = maxWidth
-  
+
   chatWidth.value = newWidth
 }
 
@@ -171,20 +178,25 @@ function stopResize() {
   document.removeEventListener('mouseup', stopResize)
   document.body.style.userSelect = ''
 }
+*/
 
-// 组件卸载时清理事件监听器
+// AI助手组件卸载清理 - 已注释
+/*
 onUnmounted(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
 })
+*/
 
-// 聊天建议选项
+// AI助手聊天建议选项 - 已注释
+/*
 const chatSuggestions = ref([
   '如何创建课程?',
   '如何查看学生作业?',
   '怎样生成考试试卷?',
   '如何分析学情报告?'
 ])
+*/
 
 // 左侧菜单栏
 const menuList = [
@@ -272,11 +284,13 @@ function handleAvatarChange(newAvatarUrl) {
   ElMessage.success('头像更新成功')
 }
 
-// 建议点击函数
+// AI助手建议点击函数 - 已注释
+/*
 function suggestClick(suggest) {
   chatInput.value = suggest
   sendChat()
 }
+*/
 
 function handleSearchInput(value) {
   searchValue.value = value
@@ -289,6 +303,8 @@ function handleSearch(value) {
   // 这里可以添加实际的搜索逻辑
 }
 
+// AI助手发送聊天函数 - 已注释
+/*
 function sendChat() {
   if (!chatInput.value.trim()) return
   const userMessage = chatInput.value
@@ -299,6 +315,7 @@ function sendChat() {
   }, 500)
   chatInput.value = ''
 }
+*/
 </script>
 
 <style scoped>
@@ -449,6 +466,7 @@ function sendChat() {
   margin-top: 100px;
 }
 
+/* AI助手样式 - 已注释
 .ai-chat-entry {
   position: fixed;
   right: 20px;
@@ -473,8 +491,9 @@ function sendChat() {
   transform: translateY(-3px);
   box-shadow: 0 6px 20px rgba(64, 158, 255, 0.25);
 }
+*/
 
-/* AI聊天弹窗样式 */
+/* AI聊天弹窗样式 - 已注释
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition: all 0.4s cubic-bezier(.25, .8, .25, 1);
@@ -489,7 +508,7 @@ function sendChat() {
 .ai-chat-modal {
   position: fixed;
   right: 0;
-  top: 60px; /* 导航栏高度，根据实际情况调整 */
+  top: 60px;
   bottom: 0;
   width: 400px;
   height: auto;
@@ -503,7 +522,6 @@ function sendChat() {
   overflow: hidden;
 }
 
-/* 拖动调整大小的区域 */
 .resize-handle {
   position: absolute;
   left: 0;
@@ -679,6 +697,7 @@ function sendChat() {
   background: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
 }
+*/
 
 /* 确保所有文字都是横向显示的 */
 :deep(.el-dropdown-menu__item),
