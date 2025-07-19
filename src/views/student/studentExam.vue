@@ -277,7 +277,7 @@ async function fetchExamList() {
     const start = (currentPage.value - 1) * pageSize.value
     const end = start + pageSize.value
     examList.value = filtered.slice(start, end)
-    updateExamsStatus()
+      updateExamsStatus()
   } catch (error) {
     console.error('获取考试列表失败:', error)
     ElMessage.error('获取考试列表失败')

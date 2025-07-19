@@ -78,7 +78,7 @@
                     <el-statistic title="总分数" :value="problemStatistics.totalScore" suffix="分" />
                   </el-col>
                   <el-col :span="6">
-                    <el-statistic title="平均分值" :value="problemStatistics.averageScore" suffix="分" :precision="1" />
+                    <el-statistic title="学生平均分" :value="getAverageScoreNumber()" suffix="分" :precision="1" />
                   </el-col>
                   <el-col :span="6">
                     <el-statistic title="题目类型" :value="Object.keys(problemStatistics.typeStatistics || {}).length" suffix="种" />
@@ -190,50 +190,29 @@
                 </div>
 
                 <el-table :data="submissions" style="width: 100%" stripe>
-                  <el-table-column prop="studentId" label="学生ID" width="100" />
-                  <el-table-column prop="totalScore" label="总分" width="100" sortable />
-                  <el-table-column prop="submittedAt" label="提交时间" width="180" sortable>
+                  <el-table-column label="学生姓名" min-width="150">
                     <template #default="scope">
-                      {{ scope.row.submittedAt ? new Date(scope.row.submittedAt).toLocaleString() : '未知' }}
+                      {{ scope.row.studentName || '获取中...' }}
                     </template>
                   </el-table-column>
-                  <el-table-column label="答题数量" width="100">
+                  <el-table-column prop="totalScore" label="总分" width="120" sortable>
                     <template #default="scope">
-                      {{ scope.row.answers ? scope.row.answers.length : 0 }}
+                      {{ scope.row.totalScore || 0 }}分
                     </template>
                   </el-table-column>
-                  <el-table-column label="智能分析" width="200">
+                  <el-table-column prop="submittedAt" label="提交时间" min-width="180" sortable>
                     <template #default="scope">
-                      <div v-if="scope.row.analysisResult">
-                        <el-tag type="success">已分析</el-tag>
-                        <el-button size="small" @click="showAnalysisDetail(scope.row.studentId)" style="margin-left: 8px;">
-                          查看详情
-                        </el-button>
-                      </div>
-                      <div v-else>
-                        <el-tag type="info">未分析</el-tag>
-                        <el-button size="small" @click="reanalyzeStudentSubmission(scope.row.studentId)" style="margin-left: 8px;">
-                          重新分析
-                        </el-button>
-                      </div>
+                      {{ scope.row.submittedAt ? new Date(scope.row.submittedAt).toLocaleString() : '未提交' }}
                     </template>
                   </el-table-column>
-                  <el-table-column label="学习建议" width="200">
+                  <el-table-column label="答题数量" width="120">
                     <template #default="scope">
-                      <div v-if="scope.row.learningAdvice && scope.row.learningAdvice.length > 0">
-                        <el-tag type="success">{{ scope.row.learningAdvice.length }}条建议</el-tag>
-                        <el-button size="small" @click="showLearningAdvice(scope.row.studentId)" style="margin-left: 8px;">
-                          查看建议
-                        </el-button>
-                      </div>
-                      <div v-else>
-                        <el-tag type="info">暂无建议</el-tag>
-                      </div>
+                      {{ scope.row.answers ? scope.row.answers.length : 0 }}题
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" width="150">
+                  <el-table-column label="操作" width="150" fixed="right">
                     <template #default="scope">
-                      <el-button size="small" @click="showExamDetails(scope.row.studentId)">
+                      <el-button size="small" type="primary" @click="viewStudentExamDetail(scope.row.studentId)">
                         查看详情
                       </el-button>
                     </template>
@@ -422,7 +401,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled, ArrowLeft, /* Edit, */ Check, Upload, Refresh, Plus, Download, Delete, Search } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { assignmentAPI, problemAPI, courseSelectionAPI, studentAnswerAPI, studentExamAPI } from '@/api/api'
+import { assignmentAPI, problemAPI, courseSelectionAPI, studentAnswerAPI, studentExamAPI, teacherAPI } from '@/api/api'
 
 // 组件引用
 import HomeworkBasicInfo from '@/components/teacher/HomeworkBasicInfo.vue'
@@ -663,77 +642,59 @@ function getSubmissionStatus() {
 function getAverageScore() {
   if (submissions.value.length === 0) return '暂无'
 
-  // 计算所有学生的总分
-  const totalScore = submissions.value.reduce((sum, submission) => {
+  // 过滤掉没有有效分数的提交
+  const validSubmissions = submissions.value.filter(submission => {
+    return submission.totalScore !== null && submission.totalScore !== undefined && submission.totalScore >= 0
+  })
+
+  if (validSubmissions.length === 0) return '暂无'
+
+  // 计算所有有效学生的总分
+  const totalScore = validSubmissions.reduce((sum, submission) => {
     return sum + (submission.totalScore || 0)
   }, 0)
 
   // 计算平均分并保留一位小数
-  const average = totalScore / submissions.value.length
+  const average = totalScore / validSubmissions.length
   return Math.round(average * 10) / 10
 }
 
-// 获取学生的智能分析结果
-function getStudentAnalysis(studentId) {
-  const submission = submissions.value.find(s => s.studentId === studentId)
-  return submission?.analysisResult || null
+// 获取平均分数的数值版本（用于统计组件）
+function getAverageScoreNumber() {
+  if (submissions.value.length === 0) return 0
+
+  // 过滤掉没有有效分数的提交
+  const validSubmissions = submissions.value.filter(submission => {
+    return submission.totalScore !== null && submission.totalScore !== undefined && submission.totalScore >= 0
+  })
+
+  if (validSubmissions.length === 0) return 0
+
+  // 计算所有有效学生的总分
+  const totalScore = validSubmissions.reduce((sum, submission) => {
+    return sum + (submission.totalScore || 0)
+  }, 0)
+
+  // 计算平均分并保留一位小数
+  const average = totalScore / validSubmissions.length
+  return Math.round(average * 10) / 10
 }
 
-// 获取学生的学习建议
-function getStudentLearningAdvice(studentId) {
-  const submission = submissions.value.find(s => s.studentId === studentId)
-  return submission?.learningAdvice || []
-}
 
-// 获取学生的考试详情
-function getStudentExamDetails(studentId) {
-  const submission = submissions.value.find(s => s.studentId === studentId)
-  return submission?.examDetails || null
-}
 
-// 重新分析某个学生的答卷
-async function reanalyzeStudentSubmission(studentId) {
-  try {
-    if (!homeworkId.value) return
 
-    // 重新获取智能分析
-    const analysisResult = await studentExamAPI.analyzeExamResult(studentId, homeworkId.value)
 
-    // 重新获取学习建议
-    const learningAdvice = await studentExamAPI.generateLearningAdvice(studentId, homeworkId.value)
-
-    // 更新对应学生的数据
-    const submission = submissions.value.find(s => s.studentId === studentId)
-    if (submission) {
-      submission.analysisResult = analysisResult
-      submission.learningAdvice = learningAdvice
+// 查看学生考卷详情（跳转到学生考卷详情页面）
+function viewStudentExamDetail(studentId) {
+  // 跳转到学生考卷详情页面，传递学生ID和作业ID
+  router.push({
+    path: `/teacher/student-exam-detail/${studentId}/${homeworkId.value}`,
+    query: {
+      studentId: studentId,
+      examId: homeworkId.value,
+      homeworkTitle: homeworkData.value.title || '作业详情'
     }
-
-    ElMessage.success('重新分析完成')
-    return { analysisResult, learningAdvice }
-  } catch (error) {
-    console.error('重新分析失败:', error)
-    ElMessage.error('重新分析失败: ' + error.message)
-    return null
-  }
-}
-
-// 显示智能分析详情
-function showAnalysisDetail(studentId) {
-  currentAnalysis.value = getStudentAnalysis(studentId)
-  analysisDialogVisible.value = true
-}
-
-// 显示学习建议
-function showLearningAdvice(studentId) {
-  currentAdvice.value = getStudentLearningAdvice(studentId)
-  adviceDialogVisible.value = true
-}
-
-// 显示考试详情
-function showExamDetails(studentId) {
-  currentExamDetails.value = getStudentExamDetails(studentId)
-  examDetailsDialogVisible.value = true
+  })
 }
 
 // ==================== 题目管理增强功能 ====================
@@ -1128,8 +1089,93 @@ function getProblemTypeText(type) {
 function getScorePercentage() {
   const score = getAverageScore()
   if (score === '暂无') return 0
+
+  // 获取作业的总分值作为基准
+  const maxPossibleScore = getMaxPossibleScore()
+  if (maxPossibleScore > 0) {
+    return Math.min(Math.round((score / maxPossibleScore) * 100), 100)
+  }
+
+  // 如果无法获取总分值，假设满分为100
   return Math.min(Math.round((score / 100) * 100), 100)
 }
+
+// 获取作业的最大可能分数
+function getMaxPossibleScore() {
+  if (problems.value && problems.value.length > 0) {
+    return problems.value.reduce((sum, problem) => {
+      return sum + (parseFloat(problem.score) || 0)
+    }, 0)
+  }
+  return 100 // 默认满分
+}
+
+// 重新计算学生分数（用于验证和修正）
+function recalculateStudentScore(submission) {
+  if (!submission.answers || submission.answers.length === 0) {
+    return 0
+  }
+
+  // 重新计算总分，优先使用 finalScore
+  const recalculatedScore = submission.answers.reduce((sum, answer) => {
+    const score = parseFloat(answer.finalScore) || parseFloat(answer.autoScore) || parseFloat(answer.score) || 0
+    return sum + score
+  }, 0)
+
+  console.log(`学生 ${submission.studentId} 分数重新计算: 原分数=${submission.totalScore}, 重新计算=${recalculatedScore}`)
+
+  return recalculatedScore
+}
+
+// 验证并修正所有学生的分数
+function validateAndFixScores() {
+  submissions.value.forEach(submission => {
+    const recalculatedScore = recalculateStudentScore(submission)
+
+    // 如果重新计算的分数与原分数差异较大，使用重新计算的分数
+    if (Math.abs(recalculatedScore - (submission.totalScore || 0)) > 0.1) {
+      console.log(`修正学生 ${submission.studentId} 的分数: ${submission.totalScore} -> ${recalculatedScore}`)
+      submission.totalScore = recalculatedScore
+    }
+  })
+}
+
+
+
+// // 答案比较函数
+// function compareAnswers(userAnswer, expectedAnswer, questionType) {
+//   if (!userAnswer || !expectedAnswer) return false
+
+//   // 标准化答案（去除空格，转换为大写）
+//   const normalizeAnswer = (answer) => {
+//     return String(answer).trim().toUpperCase()
+//   }
+
+//   const normalizedUser = normalizeAnswer(userAnswer)
+//   const normalizedExpected = normalizeAnswer(expectedAnswer)
+
+//   switch (questionType) {
+//     case 'SINGLE_CHOICE':
+//     case 'TRUE_FALSE':
+//       return normalizedUser === normalizedExpected
+
+//     case 'MULTI_CHOICE': {
+//       // 多选题需要处理逗号分隔的选项
+//       const userOptions = normalizedUser.split(',').sort().join(',')
+//       const expectedOptions = normalizedExpected.split(',').sort().join(',')
+//       return userOptions === expectedOptions
+//     }
+
+//     case 'FILL_BLANK': {
+//       // 填空题支持多个可能的答案（用|分隔）
+//       const possibleAnswers = normalizedExpected.split('|')
+//       return possibleAnswers.some(possible => normalizedUser === possible.trim())
+//     }
+
+//     default:
+//       return normalizedUser === normalizedExpected
+//   }
+// }
 
 // ==================== 图表相关功能 ====================
 
@@ -1619,11 +1665,13 @@ async function fetchProblems() {
 // 获取提交情况
 async function fetchSubmissions() {
   try {
+    console.log('=== 开始获取提交情况 ===')
     if (!homeworkId.value) {
       console.warn('作业ID不存在，无法获取提交情况')
       submissions.value = []
       return
     }
+    console.log(`作业ID: ${homeworkId.value}`)
 
     // 方法1: 使用 studentAnswerAPI 获取基础答案数据
     const answers = await studentAnswerAPI.getAnswersByAssignment(homeworkId.value)
@@ -1649,7 +1697,13 @@ async function fetchSubmissions() {
 
         const submission = submissionMap.get(studentId)
         submission.answers.push(answer)
-        submission.totalScore += (answer.score || 0)
+
+        // 使用答案的最终得分，优先使用 finalScore，其次是 autoScore，最后是 score
+        const answerScore = parseFloat(answer.finalScore) || parseFloat(answer.autoScore) || parseFloat(answer.score) || 0
+        submission.totalScore += answerScore
+
+        // 记录答案详情用于调试
+        console.log(`学生 ${studentId} 答案: 题目ID=${answer.problemId}, finalScore=${answer.finalScore}, autoScore=${answer.autoScore}, score=${answer.score}, 使用得分=${answerScore}, 累计总分=${submission.totalScore}`)
 
         // 更新最新提交时间
         if (answer.updatedAt && (!submission.submittedAt || answer.updatedAt > submission.submittedAt)) {
@@ -1658,39 +1712,109 @@ async function fetchSubmissions() {
       })
 
       // 方法2: 为每个学生获取详细的考试信息（如果作业ID可以作为考试ID使用）
+      console.log(`准备为 ${submissionMap.size} 个学生获取详细信息`)
       const submissionPromises = Array.from(submissionMap.values()).map(async (submission) => {
         try {
-          // 获取学生的考试详情
-          const examDetails = await studentExamAPI.getExamDetail(submission.studentId, homeworkId.value)
-          submission.examDetails = examDetails
+          console.log(`处理学生提交数据:`, submission)
 
-          // 获取学生的考试成绩
-          const examScore = await studentExamAPI.getExamScore(submission.studentId, homeworkId.value)
-          if (examScore && examScore.totalScore !== undefined) {
-            submission.totalScore = examScore.totalScore
+          // 获取学生姓名
+          try {
+            console.log(`开始获取学生 ${submission.studentId} 的信息...`)
+            const studentInfo = await teacherAPI.getStudentById(submission.studentId)
+            console.log(`学生 ${submission.studentId} 的完整信息:`, studentInfo)
+            submission.studentName = studentInfo.fullName || `学生${submission.studentId}`
+            console.log(`成功获取学生 ${submission.studentId} 姓名: ${submission.studentName}`)
+          } catch (error) {
+            console.error(`获取学生 ${submission.studentId} 姓名失败:`, error)
+            console.error('错误详情:', error.response?.data || error.message)
+            submission.studentName = `学生${submission.studentId}`
           }
 
-          // 获取智能分析结果
-          const analysisResult = await studentExamAPI.analyzeExamResult(submission.studentId, homeworkId.value)
-          submission.analysisResult = analysisResult
+          // 获取学生的考试详情（可选，失败不影响学生姓名显示）
+          try {
+            const examDetails = await studentExamAPI.getExamDetail(submission.studentId, homeworkId.value)
+            submission.examDetails = examDetails
+          } catch (error) {
+            console.warn(`获取学生 ${submission.studentId} 考试详情失败:`, error.message)
+            submission.examDetails = null
+          }
 
-          // 获取学习建议
-          const learningAdvice = await studentExamAPI.generateLearningAdvice(submission.studentId, homeworkId.value)
-          submission.learningAdvice = learningAdvice
+          // 获取学生的考试成绩（可选，失败不影响学生姓名显示）
+          try {
+            const examScore = await studentExamAPI.getExamScore(submission.studentId, homeworkId.value)
+            if (examScore && examScore.totalScore !== undefined) {
+              // 比较基础计算分数和API分数，使用更合理的那个
+              const apiScore = parseFloat(examScore.totalScore) || 0
+              const calculatedScore = submission.totalScore || 0
+
+              // 如果API分数明显更合理（非零且不同），则使用API分数
+              if (apiScore > 0 && (calculatedScore === 0 || Math.abs(apiScore - calculatedScore) > 0.1)) {
+                console.log(`学生 ${submission.studentId}: 使用API分数 ${apiScore} 替代计算分数 ${calculatedScore}`)
+                submission.totalScore = apiScore
+              }
+            }
+          } catch (error) {
+            console.warn(`获取学生 ${submission.studentId} 考试成绩失败:`, error.message)
+          }
+
+          // 获取智能分析结果（可选，失败不影响学生姓名显示）
+          try {
+            const analysisResult = await studentExamAPI.analyzeExamResult(submission.studentId, homeworkId.value)
+            submission.analysisResult = analysisResult
+          } catch (error) {
+            console.warn(`获取学生 ${submission.studentId} 智能分析失败:`, error.message)
+            submission.analysisResult = null
+          }
+
+          // 获取学习建议（可选，失败不影响学生姓名显示）
+          try {
+            const learningAdvice = await studentExamAPI.generateLearningAdvice(submission.studentId, homeworkId.value)
+            submission.learningAdvice = learningAdvice
+          } catch (error) {
+            console.warn(`获取学生 ${submission.studentId} 学习建议失败:`, error.message)
+            submission.learningAdvice = null
+          }
 
         } catch (error) {
           console.warn(`获取学生 ${submission.studentId} 的详细信息失败:`, error.message)
           // 即使获取详细信息失败，也保留基础的提交数据
+          submission.studentName = `学生${submission.studentId}`
         }
 
         return submission
       })
 
-      // 等待所有详细信息获取完成
-      const enhancedSubmissions = await Promise.all(submissionPromises)
+      // 等待所有详细信息获取完成，使用 Promise.allSettled 确保不会因为单个失败而中断
+      const results = await Promise.allSettled(submissionPromises)
+      const enhancedSubmissions = results
+        .filter(result => result.status === 'fulfilled' && result.value)
+        .map(result => result.value)
+
+      // 记录失败的情况
+      const failedResults = results.filter(result => result.status === 'rejected')
+      if (failedResults.length > 0) {
+        console.warn(`${failedResults.length} 个学生信息处理失败:`, failedResults.map(r => r.reason))
+      }
+
       submissions.value = enhancedSubmissions
 
       console.log(`获取到 ${submissions.value.length} 个学生的提交情况（包含详细信息）`)
+
+      // 调试信息：打印每个学生的分数和姓名
+      submissions.value.forEach(submission => {
+        console.log(`学生 ${submission.studentId} (${submission.studentName}) 总分: ${submission.totalScore}, 答案数量: ${submission.answers.length}`)
+      })
+
+      // 验证并修正分数
+      validateAndFixScores()
+
+      // 计算并打印平均分调试信息
+      const validSubmissions = submissions.value.filter(s => s.totalScore !== null && s.totalScore !== undefined && s.totalScore >= 0)
+      if (validSubmissions.length > 0) {
+        const totalScore = validSubmissions.reduce((sum, s) => sum + (s.totalScore || 0), 0)
+        const average = totalScore / validSubmissions.length
+        console.log(`平均分计算: 总分=${totalScore}, 有效提交数=${validSubmissions.length}, 平均分=${average.toFixed(1)}`)
+      }
     } else {
       submissions.value = []
       console.log('暂无学生提交数据')
@@ -1899,7 +2023,26 @@ async function saveProblem(problemData) {
     }
   } catch (error) {
     console.error('保存题目失败:', error)
-    ElMessage.error(`保存题目失败: ${error.message || '请稍后重试'}`)
+
+    // 处理特定的后端验证错误
+    let errorMessage = '保存题目失败'
+
+    if (error.response && error.response.data) {
+      const responseData = error.response.data
+
+      // 检查是否是参考答案长度限制错误
+      if (responseData.message && responseData.message.includes('参考答案长度')) {
+        errorMessage = '后端限制：参考答案长度应在1到300个字符之间。如需更长答案，请联系管理员调整后端限制。'
+      } else if (responseData.message) {
+        errorMessage = responseData.message
+      } else if (typeof responseData === 'string') {
+        errorMessage = responseData
+      }
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
+    ElMessage.error(errorMessage)
   }
 }
 
@@ -2096,6 +2239,21 @@ onUnmounted(() => {
 /* 提交情况相关样式 */
 .submissions-container {
   padding: 20px;
+  width: 100%;
+}
+
+.submissions-container .el-table {
+  width: 100% !important;
+}
+
+.submissions-container .el-table th,
+.submissions-container .el-table td {
+  text-align: center;
+}
+
+.submissions-container .el-table th.el-table__cell:first-child,
+.submissions-container .el-table td.el-table__cell:first-child {
+  text-align: left;
 }
 
 .submissions-header {

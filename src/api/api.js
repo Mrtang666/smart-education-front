@@ -739,6 +739,18 @@ export const teacherAPI = {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.get(`/api/teacher/${id}`);
         return response.data;
+    },
+
+    /**
+     * 5.教师端根据学生ID获取学生信息（需要token）
+     * @param {number} studentId 学生ID
+     * @returns {Promise<Object>} 学生信息
+     * 返回字段：studentId, username, email, fullName, phone, grade, className, createdAt, updatedAt
+     */
+    async getStudentById(studentId) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get(`/api/student/${studentId}`);
+        return response.data;
     }
 };
 
@@ -2822,6 +2834,20 @@ export const studentExamAPI = {
     },
 
     /**
+     * 提交整个考试（正式提交考试，标记考试为已完成状态）
+     * @param {Object} examSubmissionData 考试提交数据
+     * @param {number} examSubmissionData.examId 考试ID
+     * @param {number} examSubmissionData.studentId 学生ID
+     * @param {string} [examSubmissionData.examTitle] 考试标题（可选）
+     * @returns {Promise<Object>} 提交结果，由后端返回
+     */
+    async submitExam(examSubmissionData) {
+        const axios = createStudentAuthorizedAxios();
+        const response = await axios.post('/api/student-exam/submit', examSubmissionData);
+        return response.data;
+    },
+
+    /**
      * 3.搜索考试及试题（需要token）
      * @param {number} studentId 学生ID
      * @param {string} keywords 关键词
@@ -2988,6 +3014,36 @@ export const studentExamAPI = {
         const axios = createStudentAuthorizedAxios();
         const response = await axios.get(`/api/student-exam/student/${studentId}/exam/title/analysis`, { params: { title } });
         return response.data;
+    },
+
+    /**
+     * 17.获取考试题目（学生版）（需要token）
+     * @param {number} examId 考试ID
+     * @returns {Promise<Array<Object>>} 题目列表
+     */
+    async getExamQuestions(examId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const examIdStr = String(examId);
+            console.log(`学生获取考试题目，考试ID: ${examIdStr}`);
+
+            const response = await axios.get(`/api/question/exam/${examIdStr}`);
+
+            // 确保返回的所有ID字段都是字符串类型
+            if (Array.isArray(response.data)) {
+                response.data.forEach(item => {
+                    if (item.questionId !== undefined) item.questionId = String(item.questionId);
+                    if (item.examId !== undefined) item.examId = String(item.examId);
+                    if (item.knowledgeId !== undefined) item.knowledgeId = String(item.knowledgeId);
+                });
+            }
+
+            console.log(`成功获取 ${response.data?.length || 0} 道题目`);
+            return response.data;
+        } catch (error) {
+            console.error('学生获取考试题目失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     },
 
     /**

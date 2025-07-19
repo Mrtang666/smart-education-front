@@ -895,7 +895,8 @@ function calculateQuestionStatistics() {
   }
 
   const totalCount = examQuestions.value.length
-  const totalScore = examQuestions.value.reduce((sum, q) => sum + (q.scorePoints || 0), 0)
+  // 修正：累加时强制转为数字，防止前导0
+  const totalScore = examQuestions.value.reduce((sum, q) => sum + Number(q.scorePoints || 0), 0)
   const averageScore = totalCount > 0 ? (totalScore / totalCount).toFixed(1) : 0
 
   // 统计题型分布
@@ -909,12 +910,13 @@ function calculateQuestionStatistics() {
       }
     }
     typeStatistics[type].count++
-    typeStatistics[type].totalScore += q.scorePoints || 0
+    // 修正：累加时强制转为数字
+    typeStatistics[type].totalScore += Number(q.scorePoints || 0)
   })
 
   questionStatistics.value = {
     totalCount,
-    totalScore,
+    totalScore, // 这里已经是数字
     averageScore: parseFloat(averageScore),
     typeStatistics
   }

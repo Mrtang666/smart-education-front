@@ -4,24 +4,72 @@
     <div v-if="loading" class="loading-container">
       <el-skeleton :rows="10" animated />
     </div>
-    
+
     <div v-else>
       <!-- 考试信息头部 -->
       <el-card class="exam-info-card">
         <div class="exam-header">
           <h2>{{ examInfo.title || '考试详情' }}</h2>
           <div class="exam-meta">
-            <span><el-icon><Calendar /></el-icon> 开始时间: {{ formatDateTime(examInfo.startTime) }}</span>
-            <span><el-icon><Timer /></el-icon> 结束时间: {{ formatDateTime(examInfo.endTime) }}</span>
-            <span><el-icon><Timer /></el-icon> 时长: {{ examInfo.durationMinutes || 0 }} 分钟</span>
-            <span><el-icon><Document /></el-icon> 总分: {{ examInfo.totalScore || 0 }} 分</span>
-          </div>
-          <div class="exam-description" v-if="examInfo.description">
-            {{ examInfo.description }}
+            <span><el-icon>
+                <Calendar />
+              </el-icon> 开始时间: {{ formatDateTime(examInfo.startTime) }}</span>
+            <span><el-icon>
+                <Timer />
+              </el-icon> 结束时间: {{ formatDateTime(examInfo.endTime) }}</span>
+            <span><el-icon>
+                <Timer />
+              </el-icon> 时长: {{ examInfo.durationMinutes || 0 }} 分钟</span>
+            <span><el-icon>
+                <Document />
+              </el-icon> 总分: {{ examInfo.totalScore || 0 }} 分</span>
+
+            <div class="exam-description" v-if="examInfo.description">
+              考试描述：{{ examInfo.description }}
+            </div>
           </div>
         </div>
       </el-card>
-      
+
+      <!-- 考试成绩卡片 - 只在考试结束且已提交后显示 -->
+      <el-card class="score-card" v-if="(examStatus === 'ENDED' || examStatus === 'SUBMITTED') && isExamCompleted">
+        <template #header>
+          <div class="card-header">
+            <span>考试成绩</span>
+            <el-button type="primary" size="small" @click="refreshScore">
+              <el-icon>
+                <Refresh />
+              </el-icon>
+              刷新成绩
+            </el-button>
+          </div>
+        </template>
+        <div class="score-content">
+          <div class="score-item">
+            <span class="label">总得分：</span>
+            <span class="value" :class="getScoreClass(totalScore, examInfo.totalScore)">
+              {{ totalScore }} / {{ examInfo.totalScore || 0 }} 分
+            </span>
+          </div>
+          <div class="score-item">
+            <span class="label">正确题数：</span>
+            <span class="value">{{ correctCount }} / {{ questions.length }} 题</span>
+          </div>
+          <div class="score-item">
+            <span class="label">正确率：</span>
+            <span class="value">{{ getAccuracyRate() }}%</span>
+          </div>
+          <div class="score-item" v-if="examScore && examScore.gradedAt">
+            <span class="label">批改时间：</span>
+            <span class="value">{{ formatDateTime(examScore.gradedAt) }}</span>
+          </div>
+          <div class="score-item" v-if="examScore && examScore.teacherName">
+            <span class="label">批改教师：</span>
+            <span class="value">{{ examScore.teacherName }}</span>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 考试计时器 -->
       <el-card class="timer-card" v-if="examStatus === 'ONGOING'">
         <div class="timer-container">
@@ -29,139 +77,230 @@
           <div class="timer-value">{{ formatTimeRemaining }}</div>
         </div>
       </el-card>
-      
+
       <!-- 题目列表 -->
       <el-card class="questions-card">
         <div v-if="questions.length === 0" class="empty-container">
           <el-empty description="暂无题目" />
         </div>
-        
+
         <div v-else class="questions-container">
-          <!-- 题目导航 -->
-          <div class="questions-nav">
-            <el-button-group>
-              <el-button
-                v-for="(q, index) in questions"
-                :key="q.questionId"
-                size="small"
-                :type="currentQuestionIndex === index ? 'primary' :
-                       answeredQuestions[q.questionId] ? 'success' : 'default'"
-                @click="currentQuestionIndex = index"
-              >{{ index + 1 }}</el-button>
-            </el-button-group>
-          </div>
-          
-          <!-- 当前题目 -->
-          <div class="current-question" v-if="currentQuestion">
+          <div
+            v-for="(question, qIndex) in questions"
+            :key="question.questionId"
+            class="question-box"
+            style="margin-bottom: 24px; border: 1px solid #e4e7ed; border-radius: 8px; background: #fff; padding: 20px;"
+          >
             <div class="question-header">
-              <span class="question-number">{{ currentQuestionIndex + 1 }}.</span>
-              <span class="question-type">
-                {{ getQuestionTypeText(currentQuestion.questionType) }}
-              </span>
-              <span class="question-score">({{ currentQuestion.scorePoints || 0 }}分)</span>
+              <span class="question-number">{{ qIndex + 1 }}.</span>
+              <span class="question-type">{{ getQuestionTypeText(question.questionType) }}</span>
+              <span class="question-score">({{ question.scorePoints || 0 }}分)</span>
             </div>
-            
             <div class="question-content">
-              {{ currentQuestion.content }}
+              <h4>题目内容：</h4>
+              <div class="question-text">{{ getQuestionMainContent(question) }}</div>
             </div>
-            
-            <!-- 答题区域 -->
+            <!-- 这里可以根据考试状态和题型，渲染答题区或结果区，参考你原有的 currentQuestion 逻辑，传 question 进去即可 -->
             <div class="answer-area" v-if="examStatus === 'ONGOING'">
               <!-- 单选题 -->
-              <div v-if="currentQuestion.questionType === 'SINGLE_CHOICE'" class="question-options">
-                <el-radio-group v-model="userAnswers[currentQuestion.questionId]">
-                  <div v-for="(option, optIndex) in getQuestionOptions(currentQuestion)" :key="optIndex" class="option-item">
-                    <el-radio :value="String.fromCharCode(65 + optIndex)">
-                      <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
-                      <span class="option-content">{{ option }}</span>
+              <div v-if="question.questionType === 'SINGLE_CHOICE'" class="question-options">
+                <el-radio-group v-model="userAnswers[question.questionId]" class="option-group">
+                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex"
+                    class="option-item">
+                    <el-radio :value="String.fromCharCode(65 + optIndex)" class="option-radio">
+                      <div class="option-wrapper">
+                        <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
+                        <span class="option-content">{{ option }}</span>
+                      </div>
                     </el-radio>
                   </div>
                 </el-radio-group>
               </div>
-              
+
               <!-- 多选题 -->
-              <div v-else-if="currentQuestion.questionType === 'MULTIPLE_CHOICE'" class="question-options">
-                <el-checkbox-group v-model="userAnswers[currentQuestion.questionId]">
-                  <div v-for="(option, optIndex) in getQuestionOptions(currentQuestion)" :key="optIndex" class="option-item">
-                    <el-checkbox :value="String.fromCharCode(65 + optIndex)">
-                      <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
-                      <span class="option-content">{{ option }}</span>
+              <div v-else-if="question.questionType === 'MULTIPLE_CHOICE'" class="question-options">
+                <el-checkbox-group v-model="userAnswers[question.questionId]" class="option-group">
+                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex"
+                    class="option-item">
+                    <el-checkbox :value="String.fromCharCode(65 + optIndex)" class="option-checkbox">
+                      <div class="option-wrapper">
+                        <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
+                        <span class="option-content">{{ option }}</span>
+                      </div>
                     </el-checkbox>
                   </div>
                 </el-checkbox-group>
               </div>
-              
+
+              <!-- 判断题 -->
+              <div v-else-if="question.questionType === 'TRUE_FALSE'" class="question-options">
+                <el-radio-group v-model="userAnswers[question.questionId]" class="option-group">
+                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex" class="option-item">
+                    <el-radio :value="String.fromCharCode(65 + optIndex)" class="option-radio">
+                      <div class="option-wrapper">
+                        <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
+                        <span class="option-content">{{ option }}</span>
+                      </div>
+                    </el-radio>
+                  </div>
+                </el-radio-group>
+              </div>
+
               <!-- 填空题 -->
-              <div v-else-if="currentQuestion.questionType === 'FILL_BLANK'" class="question-options">
-                <el-input 
-                  v-model="userAnswers[currentQuestion.questionId]" 
-                  type="textarea" 
-                  :rows="2" 
-                  placeholder="请输入您的答案"
-                ></el-input>
+              <div v-else-if="question.questionType === 'FILL_BLANK'" class="question-options">
+                <el-input v-model="userAnswers[question.questionId]" type="textarea" :rows="2"
+                  placeholder="请输入您的答案"></el-input>
               </div>
-              
+
               <!-- 主观题 -->
-              <div v-else-if="currentQuestion.questionType === 'SUBJECTIVE'" class="question-options">
-                <el-input 
-                  v-model="userAnswers[currentQuestion.questionId]" 
-                  type="textarea" 
-                  :rows="4" 
-                  placeholder="请输入您的答案"
-                ></el-input>
+              <div v-else-if="question.questionType === 'SUBJECTIVE'" class="question-options">
+                <el-input v-model="userAnswers[question.questionId]" type="textarea" :rows="4"
+                  placeholder="请输入您的答案"></el-input>
               </div>
-              
+
               <!-- 提交按钮 -->
               <div class="answer-actions">
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  @click="submitAnswer(currentQuestion)"
-                  :disabled="!isAnswerValid(currentQuestion)"
-                >提交答案</el-button>
-                
-                <el-button 
-                  v-if="currentQuestionIndex < questions.length - 1" 
-                  type="default" 
-                  size="small" 
-                  @click="nextQuestion"
-                >下一题</el-button>
-                
-                <el-button 
-                  v-if="currentQuestionIndex > 0" 
-                  type="default" 
-                  size="small" 
-                  @click="prevQuestion"
-                >上一题</el-button>
+                <el-button type="primary" size="small" @click="submitAnswer(question)"
+                  :disabled="!isAnswerValid(question)">提交答案</el-button>
+
+                <el-button v-if="qIndex < questions.length - 1" type="default" size="small"
+                  @click="nextQuestion(question)">下一题</el-button>
+
+                <el-button v-if="qIndex > 0" type="default" size="small"
+                  @click="prevQuestion(question)">上一题</el-button>
               </div>
             </div>
-            
-            <!-- 已结束或已提交的考试显示答案区域 -->
-            <div v-else-if="examStatus === 'ENDED' || examStatus === 'SUBMITTED'" class="result-area">
-              <div class="my-answer">
-                <div class="answer-label">我的答案:</div>
-                <div class="answer-content">{{ getDisplayAnswer(currentQuestion) }}</div>
+
+            <!-- 已结束或已提交的考试显示答案区域 - 只在考试完成后显示 -->
+            <div v-else-if="(examStatus === 'ENDED' || examStatus === 'SUBMITTED') && isExamCompleted"
+              class="result-area">
+              <div class="answer-section">
+                <div class="my-answer">
+                  <h4>我的答案：</h4>
+                  <div class="answer-content" :class="getAnswerClass(question)">
+                    {{ getDisplayAnswer(question) }}
+                  </div>
+                  <div class="answer-status">
+                    <el-tag :type="getAnswerTagType(question)" size="small">
+                      {{ getAnswerStatusText(question) }}
+                    </el-tag>
+                  </div>
+                </div>
+
+                <div v-if="showReferenceAnswer" class="correct-answer">
+                  <h4>参考答案：</h4>
+                  <div class="answer-content">{{ question.referenceAnswer }}</div>
+                </div>
+
+                <!-- 显示得分信息 -->
+                <div class="score-info" v-if="getCurrentQuestionAnswer(question)">
+                  <div class="score-item">
+                    <span class="label">得分：</span>
+                    <span class="score-value"
+                      :class="getScoreClass(getCurrentQuestionAnswer(question).score, question.scorePoints)">
+                      {{ getCurrentQuestionAnswer(question).score || 0 }} / {{ question.scorePoints || 0 }} 分
+                    </span>
+                  </div>
+                  <div class="feedback-item" v-if="getCurrentQuestionAnswer(question).feedback">
+                    <span class="label">教师反馈：</span>
+                    <div class="feedback-content">{{ getCurrentQuestionAnswer(question).feedback }}</div>
+                  </div>
+                  <div class="grading-info" v-if="getCurrentQuestionAnswer(question).gradedBy">
+                    <span class="label">批改信息：</span>
+                    <span class="grading-details">
+                      由 {{ getCurrentQuestionAnswer(question).teacherName || '教师' }}
+                      于 {{ formatDateTime(getCurrentQuestionAnswer(question).gradedAt) }} 批改
+                    </span>
+                  </div>
+                </div>
               </div>
-              
-              <div v-if="showReferenceAnswer" class="correct-answer">
-                <div class="answer-label">参考答案:</div>
-                <div class="answer-content">{{ currentQuestion.referenceAnswer }}</div>
-              </div>
-              
-              <div v-if="answeredQuestions[currentQuestion.questionId] && answeredQuestions[currentQuestion.questionId].score !== undefined" class="score-info">
-                <div class="answer-label">得分:</div>
-                <div class="answer-content">{{ answeredQuestions[currentQuestion.questionId].score }} / {{ currentQuestion.scorePoints }}</div>
-              </div>
+            </div>
+
+            <!-- 考试进行中或未完成时的提示 -->
+            <div v-else-if="examStatus !== '进行中' " class="exam-pending">
+              <el-empty description="考试已结束，等待批改完成后查看结果" />
             </div>
           </div>
         </div>
       </el-card>
-      
+
+      <!-- 智能分析和学习建议 - 只在考试完成后显示 -->
+      <div v-if="(examStatus === 'ENDED' || examStatus === 'SUBMITTED') && isExamCompleted" class="analysis-section">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-card class="analysis-card">
+              <template #header>
+                <div class="card-header">
+                  <span>智能分析</span>
+                  <el-button type="primary" size="small" @click="loadAnalysis" :loading="analysisLoading">
+                    <el-icon>
+                      <DataAnalysis />
+                    </el-icon>
+                    {{ analysisResult ? '刷新分析' : '获取分析' }}
+                  </el-button>
+                </div>
+              </template>
+              <div v-if="analysisLoading" class="loading-content">
+                <el-skeleton :rows="3" animated />
+              </div>
+              <div v-else-if="analysisResult" class="analysis-content">
+                <div class="analysis-item" v-if="analysisResult.strengths">
+                  <h4>优势分析</h4>
+                  <ul>
+                    <li v-for="strength in analysisResult.strengths" :key="strength">{{ strength }}</li>
+                  </ul>
+                </div>
+                <div class="analysis-item" v-if="analysisResult.weaknesses">
+                  <h4>薄弱环节</h4>
+                  <ul>
+                    <li v-for="weakness in analysisResult.weaknesses" :key="weakness">{{ weakness }}</li>
+                  </ul>
+                </div>
+                <div class="analysis-item" v-if="analysisResult.summary">
+                  <h4>总体评价</h4>
+                  <p>{{ analysisResult.summary }}</p>
+                </div>
+              </div>
+              <div v-else class="empty-content">
+                <el-empty description="暂无分析数据" />
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="12">
+            <el-card class="advice-card">
+              <template #header>
+                <div class="card-header">
+                  <span>学习建议</span>
+                  <el-button type="success" size="small" @click="loadAdvice" :loading="adviceLoading">
+                    <el-icon>
+                      <Lightbulb />
+                    </el-icon>
+                    {{ learningAdvice.length > 0 ? '刷新建议' : '获取建议' }}
+                  </el-button>
+                </div>
+              </template>
+              <div v-if="adviceLoading" class="loading-content">
+                <el-skeleton :rows="3" animated />
+              </div>
+              <div v-else-if="learningAdvice.length > 0" class="advice-content">
+                <div class="advice-item" v-for="(advice, index) in learningAdvice" :key="index">
+                  <div class="advice-number">{{ index + 1 }}</div>
+                  <div class="advice-text">{{ advice }}</div>
+                </div>
+              </div>
+              <div v-else class="empty-content">
+                <el-empty description="暂无学习建议" />
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+
       <!-- 提交考卷按钮 -->
       <div class="submit-exam-container" v-if="examStatus === 'ONGOING'">
         <el-button type="primary" @click="submitExam" :loading="submitting">提交考卷</el-button>
       </div>
-      
+
       <!-- 考试结果 -->
       <el-card v-if="examStatus === 'ENDED' || examStatus === 'SUBMITTED'" class="result-card">
         <div class="result-header">
@@ -170,21 +309,21 @@
             总得分: <span class="score-value">{{ totalScore }}</span> / {{ examInfo.totalScore }}
           </div>
         </div>
-        
+
         <div class="result-stats">
           <el-progress :percentage="scorePercentage" :format="percentFormat" :status="scoreStatus"></el-progress>
-          
+
           <div class="stats-items">
             <div class="stats-item">
               <div class="stats-label">已答题数:</div>
               <div class="stats-value">{{ answeredCount }} / {{ questions.length }}</div>
             </div>
-            
+
             <div class="stats-item">
               <div class="stats-label">正确题数:</div>
               <div class="stats-value">{{ correctCount }}</div>
             </div>
-            
+
             <div class="stats-item">
               <div class="stats-label">错误题数:</div>
               <div class="stats-value">{{ questions.length - correctCount - unansweredCount }}</div>
@@ -197,11 +336,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Calendar, Timer, Document } from '@element-plus/icons-vue'
-import { studentExamAPI } from '@/api/api'
+import { Calendar, Timer, Document, Refresh, DataAnalysis, Lightbulb } from '@element-plus/icons-vue'
+import { studentExamAPI, questionAPI, examAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
 const route = useRoute()
@@ -213,7 +352,7 @@ const submitting = ref(false)
 const examId = ref(null)
 const examInfo = ref({})
 const questions = ref([])
-const currentQuestionIndex = ref(0)
+
 const userAnswers = ref({})
 const answeredQuestions = ref({})
 const remainingTime = ref(0)
@@ -223,23 +362,41 @@ const totalScore = ref(0)
 const correctCount = ref(0)
 const showReferenceAnswer = ref(false)
 
+// 新增的响应式数据
+const examScore = ref(null) // 考试成绩详情
+const analysisResult = ref(null) // 智能分析结果
+const learningAdvice = ref([]) // 学习建议
+const analysisLoading = ref(false) // 分析加载状态
+const adviceLoading = ref(false) // 建议加载状态
+const studentAnswers = ref([]) // 学生答案详情
+
 // 获取用户信息
 const userInfo = getUserInfo()
 const studentId = userInfo?.studentId
 
-// 计算属性
-const currentQuestion = computed(() => {
-  if (questions.value.length === 0) return null
-  return questions.value[currentQuestionIndex.value]
+
+
+// 判断考试是否已完成（已提交且已批改）
+const isExamCompleted = computed(() => {
+  // 如果考试状态是已提交，且有学生答案记录，且至少有一个答案已被批改
+  if (examStatus.value === 'SUBMITTED' && studentAnswers.value.length > 0) {
+    return studentAnswers.value.some(answer => answer.graded === true || answer.score !== null)
+  }
+  // 如果考试状态是已结束，且有成绩记录
+  if (examStatus.value === 'ENDED' && examScore.value) {
+    return true
+  }
+  return false
 })
 
 const formatTimeRemaining = computed(() => {
   if (remainingTime.value <= 0) return '00:00:00'
-  
-  const hours = Math.floor(remainingTime.value / 3600)
-  const minutes = Math.floor((remainingTime.value % 3600) / 60)
-  const seconds = remainingTime.value % 60
-  
+
+  const totalSeconds = Math.floor(remainingTime.value)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
   return [
     hours.toString().padStart(2, '0'),
     minutes.toString().padStart(2, '0'),
@@ -266,26 +423,26 @@ const scoreStatus = computed(() => {
   return 'exception'
 })
 
-// 方法定义 - 必须在watch之前定义
-const parseOptions = (options) => {
-  if (typeof options === 'string') {
-    try {
-      return JSON.parse(options)
-    } catch (e) {
-      return []
-    }
-  }
-  return Array.isArray(options) ? options : []
-}
+// // 方法定义 - 必须在watch之前定义
+// const parseOptions = (options) => {
+//   if (typeof options === 'string') {
+//     try {
+//       return JSON.parse(options)
+//     } catch (e) {
+//       return []
+//     }
+//   }
+//   return Array.isArray(options) ? options : []
+// }
 
 const initUserAnswers = (answers) => {
   const userAnswersData = {}
   const answeredQuestionsData = {}
-  
+
   answers.forEach(answer => {
     const questionId = answer.questionId
     const questionType = answer.questionType
-    
+
     // 如果已有答案
     if (answer.studentAnswer) {
       if (questionType === 'MULTIPLE_CHOICE') {
@@ -297,7 +454,7 @@ const initUserAnswers = (answers) => {
       } else {
         userAnswersData[questionId] = answer.studentAnswer
       }
-      
+
       // 标记为已答题
       answeredQuestionsData[questionId] = {
         answered: true,
@@ -313,20 +470,116 @@ const initUserAnswers = (answers) => {
       }
     }
   })
-  
+
   userAnswers.value = userAnswersData
   answeredQuestions.value = answeredQuestionsData
 }
 
+// 初始化空的用户答案（当没有答案记录时）
+const initEmptyUserAnswers = () => {
+  const userAnswersData = {}
+  const answeredQuestionsData = {}
+
+  questions.value.forEach(question => {
+    const questionId = question.questionId
+    const questionType = question.questionType
+
+    // 根据题目类型初始化空答案
+    if (questionType === 'MULTIPLE_CHOICE') {
+      userAnswersData[questionId] = []
+    } else {
+      userAnswersData[questionId] = ''
+    }
+
+    // 标记为未答题
+    answeredQuestionsData[questionId] = {
+      answered: false,
+      score: null,
+      graded: false
+    }
+  })
+
+  userAnswers.value = userAnswersData
+  answeredQuestions.value = answeredQuestionsData
+
+  console.log('初始化空用户答案:', userAnswersData)
+}
+
 const determineExamStatus = () => {
+  // 优先使用后端返回的状态
+  if (examInfo.value.status) {
+    console.log('使用后端返回的考试状态:', examInfo.value.status)
+
+    // 将后端状态映射到前端状态
+    const statusMap = {
+      '未开始': 'NOT_STARTED',
+      '进行中': 'ONGOING',
+      '已结束': 'ENDED',
+      '已提交': 'SUBMITTED'
+    }
+
+    const mappedStatus = statusMap[examInfo.value.status] || 'ONGOING'
+    examStatus.value = mappedStatus
+    console.log('映射后的考试状态:', examStatus.value)
+    return
+  }
+
+  // 如果后端没有返回状态，则使用时间判断
+  // 检查考试信息是否完整
+  if (!examInfo.value.startTime || !examInfo.value.endTime) {
+    console.warn('考试时间信息不完整:', examInfo.value)
+    examStatus.value = 'ONGOING' // 默认为进行中
+    return
+  }
+
   const now = new Date()
-  const startTime = new Date(examInfo.value.startTime)
-  const endTime = new Date(examInfo.value.endTime)
-  
+
+  // 处理时间字符串，确保正确解析
+  let startTime, endTime
+  try {
+    // 如果时间字符串包含 'T'，说明是 ISO 格式
+    if (examInfo.value.startTime.includes('T')) {
+      startTime = new Date(examInfo.value.startTime)
+      endTime = new Date(examInfo.value.endTime)
+    } else {
+      // 如果是其他格式，尝试直接解析
+      startTime = new Date(examInfo.value.startTime.replace(' ', 'T'))
+      endTime = new Date(examInfo.value.endTime.replace(' ', 'T'))
+    }
+  } catch (error) {
+    console.error('时间解析失败:', error)
+    examStatus.value = 'ONGOING'
+    return
+  }
+
+  console.log('=== 考试时间调试信息 ===')
+  console.log('原始考试信息:', examInfo.value)
+  console.log('当前时间:', now.toLocaleString(), '时间戳:', now.getTime())
+  console.log('开始时间原始:', examInfo.value.startTime)
+  console.log('开始时间解析后:', startTime.toLocaleString(), '时间戳:', startTime.getTime())
+  console.log('结束时间原始:', examInfo.value.endTime)
+  console.log('结束时间解析后:', endTime.toLocaleString(), '时间戳:', endTime.getTime())
+  console.log('时间比较结果:')
+  console.log('  now < startTime:', now < startTime, '(考试未开始)')
+  console.log('  now > endTime:', now > endTime, '(考试已结束)')
+  console.log('  在考试时间内:', now >= startTime && now <= endTime)
+  console.log('学生答案数量:', studentAnswers.value.length)
+
+  if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    console.error('时间解析结果无效')
+    examStatus.value = 'ONGOING'
+    return
+  }
+
   if (now < startTime) {
     examStatus.value = 'NOT_STARTED'
   } else if (now > endTime) {
-    examStatus.value = 'ENDED'
+    // 检查是否有提交记录
+    if (studentAnswers.value.length > 0) {
+      examStatus.value = 'SUBMITTED'
+    } else {
+      examStatus.value = 'ENDED'
+    }
   } else {
     // 检查是否所有题目都已提交
     const allAnswered = questions.value.every(q => answeredQuestions.value[q.questionId])
@@ -336,28 +589,82 @@ const determineExamStatus = () => {
       examStatus.value = 'ONGOING'
     }
   }
+
+  console.log('最终考试状态:', examStatus.value)
 }
 
 const startTimer = () => {
-  const endTime = new Date(examInfo.value.endTime).getTime()
+  // 使用考试时长而不是结束时间
+  if (!examInfo.value.durationMinutes) {
+    console.warn('考试时长不存在，无法启动计时器')
+    return
+  }
+
+  // 检查是否有保存的剩余时间
+  const savedTimeKey = `exam_${examId.value}_remaining_time`
+  const savedStartTimeKey = `exam_${examId.value}_start_time`
+
+  let savedRemainingTime = localStorage.getItem(savedTimeKey)
+  let savedStartTime = localStorage.getItem(savedStartTimeKey)
+
+  if (savedRemainingTime && savedStartTime) {
+    // 计算从保存时间到现在过去了多少秒
+    const now = Date.now()
+    const timePassed = Math.floor((now - parseInt(savedStartTime)) / 1000)
+    const calculatedRemainingTime = parseInt(savedRemainingTime) - timePassed
+
+    if (calculatedRemainingTime > 0) {
+      remainingTime.value = calculatedRemainingTime
+      console.log('恢复考试计时器，剩余时间:', calculatedRemainingTime, '秒')
+    } else {
+      // 时间已到，直接设置为0
+      remainingTime.value = 0
+    }
+  } else {
+    // 首次开始考试，使用完整时长
+    const totalSeconds = examInfo.value.durationMinutes * 60
+    remainingTime.value = totalSeconds
+
+    // 保存开始时间
+    localStorage.setItem(savedStartTimeKey, Date.now().toString())
+
+    console.log('首次启动计时器，总时长:', examInfo.value.durationMinutes, '分钟 =', totalSeconds, '秒')
+  }
+
   const updateTimer = () => {
-    const now = new Date().getTime()
-    const diff = Math.max(0, Math.floor((endTime - now) / 1000))
-    
-    remainingTime.value = diff
-    
+    remainingTime.value = Math.max(0, remainingTime.value - 1)
+
+    // 每10秒保存一次剩余时间
+    if (remainingTime.value % 10 === 0) {
+      localStorage.setItem(savedTimeKey, remainingTime.value.toString())
+      localStorage.setItem(savedStartTimeKey, Date.now().toString())
+    }
+
     // 如果时间到了，自动提交考卷
-    if (diff <= 0) {
+    if (remainingTime.value <= 0) {
       clearInterval(timerInterval.value)
+      // 清除保存的时间
+      localStorage.removeItem(savedTimeKey)
+      localStorage.removeItem(savedStartTimeKey)
+
       examStatus.value = 'ENDED'
       ElMessage.warning('考试时间已结束，系统将自动提交您的答卷')
-      submitExam()
+
+      // 自动提交考卷
+      submitExam().then(() => {
+        // 自动提交成功后也跳转回首页
+        setTimeout(() => {
+          router.push('/student')
+        }, 3000) // 给用户更多时间看到提示
+      }).catch(error => {
+        console.error('自动提交失败:', error)
+      })
     }
   }
-  
+
   // 立即更新一次
   updateTimer()
-  
+
   // 设置定时器，每秒更新一次
   timerInterval.value = setInterval(updateTimer, 1000)
 }
@@ -365,28 +672,138 @@ const startTimer = () => {
 const calculateResults = (answers) => {
   let total = 0
   let correct = 0
-  
+
   answers.forEach(answer => {
     if (answer.score !== undefined && answer.score !== null) {
       total += parseFloat(answer.score)
-      
+
       // 如果得分等于题目满分，则认为是正确的
       if (answer.score === answer.scorePoints) {
         correct++
       }
     }
   })
-  
+
   totalScore.value = total
   correctCount.value = correct
 }
 
+// // 新增的方法
+// const getExamStatusText = (status) => {
+//   const statusMap = {
+//     'NOT_STARTED': '未开始',
+//     'ONGOING': '进行中',
+//     'ENDED': '已结束',
+//     'SUBMITTED': '已提交'
+//   }
+//   return statusMap[status] || '未知状态'
+// }
+
+const getScoreClass = (score, maxScore) => {
+  if (!score || !maxScore) return ''
+  const percentage = (score / maxScore) * 100
+  if (percentage >= 90) return 'excellent'
+  if (percentage >= 80) return 'good'
+  if (percentage >= 60) return 'average'
+  return 'poor'
+}
+
+const getAccuracyRate = () => {
+  if (questions.value.length === 0) return 0
+  return Math.round((correctCount.value / questions.value.length) * 100)
+}
+
+const getCurrentQuestionAnswer = (question) => {
+  if (!question) return null
+  return studentAnswers.value.find(answer =>
+    answer.questionId === question.questionId
+  )
+}
+
+const getAnswerClass = (question) => {
+  const answer = getCurrentQuestionAnswer(question)
+  if (!answer) return ''
+
+  const isCorrect = answer.score === question.scorePoints
+  return isCorrect ? 'correct-answer' : 'wrong-answer'
+}
+
+const getAnswerTagType = (question) => {
+  const answer = getCurrentQuestionAnswer(question)
+  if (!answer) return 'info'
+
+  const isCorrect = answer.score === question.scorePoints
+  return isCorrect ? 'success' : 'danger'
+}
+
+const getAnswerStatusText = (question) => {
+  const answer = getCurrentQuestionAnswer(question)
+  if (!answer) return '未作答'
+
+  const isCorrect = answer.score === question.scorePoints
+  return isCorrect ? '正确' : '错误'
+}
+
+// 刷新成绩
+const refreshScore = async () => {
+  try {
+    const sid = String(studentId)
+    const eid = String(examId.value)
+
+    const scoreResponse = await studentExamAPI.getExamScore(sid, eid)
+    examScore.value = scoreResponse
+
+    ElMessage.success('成绩刷新成功')
+  } catch (error) {
+    console.error('刷新成绩失败:', error)
+    ElMessage.error('刷新成绩失败')
+  }
+}
+
+// 加载智能分析
+const loadAnalysis = async () => {
+  try {
+    analysisLoading.value = true
+    const sid = String(studentId)
+    const eid = String(examId.value)
+
+    const analysisResponse = await studentExamAPI.analyzeExamResult(sid, eid)
+    analysisResult.value = analysisResponse
+
+    ElMessage.success('分析加载成功')
+  } catch (error) {
+    console.error('加载分析失败:', error)
+    ElMessage.error('加载分析失败，请稍后再试')
+  } finally {
+    analysisLoading.value = false
+  }
+}
+
+// 加载学习建议
+const loadAdvice = async () => {
+  try {
+    adviceLoading.value = true
+    const sid = String(studentId)
+    const eid = String(examId.value)
+
+    const adviceResponse = await studentExamAPI.generateLearningAdvice(sid, eid)
+    learningAdvice.value = Array.isArray(adviceResponse) ? adviceResponse : [adviceResponse]
+
+    ElMessage.success('建议加载成功')
+  } catch (error) {
+    console.error('加载建议失败:', error)
+    ElMessage.error('加载建议失败，请稍后再试')
+  } finally {
+    adviceLoading.value = false
+  }
+}
+
 const fetchExamDetail = async () => {
   loading.value = true
-  
+
   try {
     console.log('开始获取考试详情，examId:', examId.value, 'studentId:', studentId)
-    
+
     if (!studentId) {
       ElMessage.error('用户信息获取失败，请重新登录')
       router.push('/login')
@@ -395,52 +812,139 @@ const fetchExamDetail = async () => {
 
     const sid = String(studentId)
     const eid = String(examId.value)
-    
+
     // 获取考试信息
     console.log('获取考试信息...')
-    const examInfoResponse = await studentExamAPI.getExamDetail(sid, eid)
-    console.log('考试信息:', examInfoResponse)
-    examInfo.value = examInfoResponse || {}
-    
-    // 获取考试题目和作答
-    console.log('获取考试题目和作答...')
-    const answersResponse = await studentExamAPI.getStudentExamAnswers(sid, eid)
-    console.log('题目和作答信息:', answersResponse)
-    
-    // 处理题目和答案
-    if (Array.isArray(answersResponse)) {
-      // 提取题目信息
-      const questionsData = answersResponse.map(answer => ({
-        questionId: answer.questionId,
-        content: answer.questionContent,
-        questionType: answer.questionType,
-        options: parseOptions(answer.options),
-        scorePoints: answer.scorePoints,
-        referenceAnswer: answer.referenceAnswer
-      }))
-      
-      questions.value = questionsData
-      console.log('处理后的题目:', questionsData)
-      
+    try {
+      const examInfoResponse = await examAPI.getExamById(eid)
+      console.log('考试信息:', examInfoResponse)
+      examInfo.value = examInfoResponse || {}
+    } catch (error) {
+      console.warn('通过examAPI获取考试信息失败，尝试studentExamAPI:', error)
+      try {
+        const examInfoResponse = await studentExamAPI.getExamDetail(sid, eid)
+        console.log('学生考试信息:', examInfoResponse)
+        examInfo.value = examInfoResponse || {}
+      } catch (studentError) {
+        console.error('获取考试信息失败:', studentError)
+        ElMessage.error('获取考试信息失败')
+        examInfo.value = {}
+      }
+    }
+
+    // 获取考试题目
+    console.log('获取考试题目...')
+    let questionsData = []
+    try {
+      const questionsResponse = await studentExamAPI.getExamQuestions(eid)
+      console.log('题目信息:', questionsResponse)
+
+      if (Array.isArray(questionsResponse)) {
+        questionsData = questionsResponse.map(question => ({
+          questionId: question.questionId,
+          content: question.content,
+          questionType: question.questionType,
+          options: question.options || [], // 保留原始options字段，但主要从content解析
+          scorePoints: question.scorePoints,
+          referenceAnswer: question.referenceAnswer,
+          difficulty: question.difficulty,
+          knowledgeId: question.knowledgeId
+        }))
+      }
+    } catch (error) {
+      console.warn('获取题目失败，尝试使用教师API:', error)
+      // 如果学生API失败，尝试使用教师API
+      try {
+        const questionsResponse = await questionAPI.getQuestionsByExamId(eid)
+        console.log('通过教师API获取题目信息:', questionsResponse)
+
+        if (Array.isArray(questionsResponse)) {
+          questionsData = questionsResponse.map(question => ({
+            questionId: question.questionId,
+            content: question.content,
+            questionType: question.questionType,
+            options: question.options || [], // 保留原始options字段，但主要从content解析
+            scorePoints: question.scorePoints,
+            referenceAnswer: question.referenceAnswer,
+            difficulty: question.difficulty,
+            knowledgeId: question.knowledgeId
+          }))
+        }
+      } catch (teacherError) {
+        console.warn('教师API也失败，尝试从答案中提取:', teacherError)
+        // 如果都失败，尝试从学生答案中提取题目信息
+        try {
+          const answersResponse = await studentExamAPI.getStudentExamAnswers(sid, eid)
+          if (Array.isArray(answersResponse) && answersResponse.length > 0) {
+            questionsData = answersResponse.map(answer => ({
+              questionId: answer.questionId,
+              content: answer.questionContent,
+              questionType: answer.questionType,
+              options: answer.options || [], // 保留原始options字段，但主要从content解析
+              scorePoints: answer.scorePoints,
+              referenceAnswer: answer.referenceAnswer
+            }))
+          }
+        } catch (answerError) {
+          console.error('从答案中提取题目也失败:', answerError)
+        }
+      }
+    }
+
+    questions.value = questionsData
+    console.log('处理后的题目:', questionsData)
+
+    // 如果没有题目，显示提示信息
+    if (questionsData.length === 0) {
+      console.warn('未获取到任何题目')
+      ElMessage.warning('该考试暂无题目，请联系教师')
+    }
+
+    // 获取学生答案
+    console.log('获取学生答案...')
+    try {
+      const answersResponse = await studentExamAPI.getStudentExamAnswers(sid, eid)
+      console.log('学生答案信息:', answersResponse)
+
+      // 保存学生答案详情
+      studentAnswers.value = Array.isArray(answersResponse) ? answersResponse : []
+
       // 初始化用户答案和已答题状态
-      initUserAnswers(answersResponse)
-      
-      // 设置考试状态
-      determineExamStatus()
-      
-      // 如果考试正在进行中，启动计时器
-      if (examStatus.value === 'ONGOING') {
-        startTimer()
+      if (Array.isArray(answersResponse) && answersResponse.length > 0) {
+        initUserAnswers(answersResponse)
+      } else {
+        // 如果没有答案记录，初始化空的用户答案
+        initEmptyUserAnswers()
       }
-      
-      // 如果考试已结束，计算总分和正确题数
-      if (examStatus.value === 'ENDED' || examStatus.value === 'SUBMITTED') {
-        calculateResults(answersResponse)
-        showReferenceAnswer.value = true
+    } catch (error) {
+      console.warn('获取学生答案失败:', error)
+      studentAnswers.value = []
+      // 初始化空的用户答案
+      initEmptyUserAnswers()
+    }
+
+    // 设置考试状态
+    determineExamStatus()
+
+    // 如果考试正在进行中，启动计时器
+    if (examStatus.value === 'ONGOING') {
+      startTimer()
+    }
+
+    // 如果考试已结束，计算总分和正确题数
+    if (examStatus.value === 'ENDED' || examStatus.value === 'SUBMITTED') {
+      if (studentAnswers.value.length > 0) {
+        calculateResults(studentAnswers.value)
       }
-    } else {
-      console.warn('题目数据格式不正确:', answersResponse)
-      questions.value = []
+      showReferenceAnswer.value = true
+
+      // 自动加载考试成绩
+      try {
+        const scoreResponse = await studentExamAPI.getExamScore(sid, eid)
+        examScore.value = scoreResponse
+      } catch (error) {
+        console.warn('获取考试成绩失败:', error)
+      }
     }
   } catch (error) {
     console.error('获取考试详情失败:', error)
@@ -453,12 +957,12 @@ const fetchExamDetail = async () => {
 const submitAnswer = async (question) => {
   const questionId = question.questionId
   const answer = userAnswers.value[questionId]
-  
+
   if (!isAnswerValid(question)) {
     ElMessage.warning('请完成答题后再提交')
     return
   }
-  
+
   try {
     const answerData = {
       examId: String(examId.value),
@@ -469,7 +973,7 @@ const submitAnswer = async (question) => {
       questionContent: question.content,
       questionType: question.questionType
     }
-    
+
     await studentExamAPI.submitAnswer(answerData)
 
     // 标记为已答题
@@ -479,7 +983,7 @@ const submitAnswer = async (question) => {
     ElMessage.success('答案已提交')
 
     // 自动前进到下一题
-    nextQuestion()
+    nextQuestion(question)
   } catch (error) {
     console.error('提交答案失败:', error)
     ElMessage.error('提交答案失败，请稍后再试')
@@ -488,7 +992,7 @@ const submitAnswer = async (question) => {
 
 const submitExam = async () => {
   if (submitting.value) return
-  
+
   // 确认提交
   try {
     await ElMessageBox.confirm('确认提交整份考卷吗？提交后将无法修改答案', '提交确认', {
@@ -499,15 +1003,15 @@ const submitExam = async () => {
   } catch (e) {
     return // 用户取消提交
   }
-  
+
   submitting.value = true
-  
+
   try {
     // 准备批量提交的答案
     const answerList = questions.value.map(question => {
       const questionId = question.questionId
       const answer = userAnswers.value[questionId]
-      
+
       return {
         examId: String(examId.value),
         questionId: String(questionId),
@@ -518,18 +1022,48 @@ const submitExam = async () => {
         questionType: question.questionType
       }
     })
-    
+
     // 批量提交答案
     await studentExamAPI.batchSubmitAnswers(answerList)
-    
+
+    // 正式提交考试（标记考试为已完成状态）
+    await studentExamAPI.submitExam({
+      examId: String(examId.value),
+      studentId: String(studentId),
+      examTitle: examInfo.value.title
+    })
+
     // 更新考试状态
     examStatus.value = 'SUBMITTED'
-    
+
+    // 清除保存的计时器数据
+    const savedTimeKey = `exam_${examId.value}_remaining_time`
+    const savedStartTimeKey = `exam_${examId.value}_start_time`
+    localStorage.removeItem(savedTimeKey)
+    localStorage.removeItem(savedStartTimeKey)
+
     // 重新获取考试结果
     await fetchExamDetail()
-    
+
     // 显示提交成功提示
     ElMessage.success('考卷已成功提交')
+
+    // 显示跳转提示并跳转
+    ElMessageBox.confirm(
+      '考卷已成功提交！是否返回学生端首页？',
+      '提交成功',
+      {
+        confirmButtonText: '返回首页',
+        cancelButtonText: '留在此页',
+        type: 'success',
+        showClose: false
+      }
+    ).then(() => {
+      router.push('/student')
+    }).catch(() => {
+      // 用户选择留在当前页面
+      console.log('用户选择留在当前页面')
+    })
   } catch (error) {
     console.error('提交考卷失败:', error)
     ElMessage.error('提交考卷失败，请稍后再试')
@@ -538,22 +1072,50 @@ const submitExam = async () => {
   }
 }
 
-const nextQuestion = () => {
-  if (currentQuestionIndex.value < questions.value.length - 1) {
-    currentQuestionIndex.value++
+const nextQuestion = (question) => {
+  if (question.questionId === questions.value[questions.value.length - 1].questionId) {
+    // 如果是最后一题，则提交考卷
+    submitExam()
+  } else {
+    // 找到当前题目的下一个题目
+    const questionIndex = questions.value.findIndex(q => q.questionId === question.questionId)
+    if (questionIndex < questions.value.length - 1) {
+      // 滚动到下一题
+      scrollToQuestion(questionIndex + 1)
+    }
   }
 }
 
-const prevQuestion = () => {
-  if (currentQuestionIndex.value > 0) {
-    currentQuestionIndex.value--
+const prevQuestion = (question) => {
+  if (question.questionId === questions.value[0].questionId) {
+    // 如果是第一题，则不跳转
+    return
   }
+  const questionIndex = questions.value.findIndex(q => q.questionId === question.questionId)
+  if (questionIndex > 0) {
+    // 滚动到上一题
+    scrollToQuestion(questionIndex - 1)
+  }
+}
+
+// 滚动到指定题目
+const scrollToQuestion = (questionIndex) => {
+  nextTick(() => {
+    const questionElements = document.querySelectorAll('.question-box')
+    if (questionElements[questionIndex]) {
+      questionElements[questionIndex].scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      })
+    }
+  })
 }
 
 const getQuestionTypeText = (type) => {
   const typeMap = {
     'SINGLE_CHOICE': '单选题',
     'MULTIPLE_CHOICE': '多选题',
+    'TRUE_FALSE': '判断题',
     'FILL_BLANK': '填空题',
     'SUBJECTIVE': '主观题'
   }
@@ -561,36 +1123,106 @@ const getQuestionTypeText = (type) => {
 }
 
 const getQuestionOptions = (question) => {
-  return Array.isArray(question.options) ? question.options : []
+  // 如果有options字段，直接使用
+  if (Array.isArray(question.options) && question.options.length > 0) {
+    return question.options
+  }
+
+  // 从题目内容中解析选项
+  if (!question.content) return []
+
+  const content = question.content
+  const options = []
+
+  // 按换行符分割内容
+  const lines = content.split('\n').map(line => line.trim()).filter(line => line)
+
+  // 查找选项行（以 A. B. C. D. 等开头的行）
+  for (const line of lines) {
+    const optionMatch = line.match(/^([A-H])\.\s*(.+)$/)
+    if (optionMatch && optionMatch[2].trim()) {
+      options.push(optionMatch[2].trim())
+    }
+  }
+
+  return options
+}
+
+// 获取题目主体内容（不包含选项）
+const getQuestionMainContent = (question) => {
+  if (!question.content) return ''
+
+  const content = question.content
+
+  // 对于选择题和判断题，需要分离题目主体和选项
+  if (question.questionType === 'SINGLE_CHOICE' ||
+      question.questionType === 'MULTIPLE_CHOICE' ||
+      question.questionType === 'TRUE_FALSE') {
+
+    // 按换行符分割内容
+    const lines = content.split('\n').map(line => line.trim()).filter(line => line)
+
+    // 找到第一个选项行的索引
+    let firstOptionIndex = -1
+    for (let i = 0; i < lines.length; i++) {
+      if (/^[A-H]\.\s*/.test(lines[i])) {
+        firstOptionIndex = i
+        break
+      }
+    }
+
+    // 如果找到了选项，返回选项之前的所有行作为题目主体
+    if (firstOptionIndex > 0) {
+      return lines.slice(0, firstOptionIndex).join('\n').trim()
+    } else if (firstOptionIndex === 0) {
+      // 如果第一行就是选项，说明没有题目主体，返回题型名称
+      return question.questionType === 'SINGLE_CHOICE' ? '单选题' :
+             question.questionType === 'MULTIPLE_CHOICE' ? '多选题' :
+             question.questionType === 'TRUE_FALSE' ? '判断题' : '题目'
+    }
+  }
+
+  // 对于其他题型，返回完整内容
+  return content
 }
 
 const isAnswerValid = (question) => {
   const answer = userAnswers.value[question.questionId]
-  
+
   if (question.questionType === 'MULTIPLE_CHOICE') {
     return Array.isArray(answer) && answer.length > 0
-  } else if (question.questionType === 'SINGLE_CHOICE') {
+  } else if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'TRUE_FALSE') {
     return answer && answer.trim() !== ''
   } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE') {
     return answer && answer.trim() !== ''
   }
-  
+
   return false
 }
 
 const getDisplayAnswer = (question) => {
   const answer = userAnswers.value[question.questionId]
   if (!answer) return '未作答'
-  
+
   if (question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer)) {
     return answer.join(', ')
+  } else if (question.questionType === 'TRUE_FALSE') {
+    // 对于判断题，如果答案是A或B，显示对应的选项内容
+    const options = getQuestionOptions(question)
+    if (answer === 'A' && options.length > 0) {
+      return `A. ${options[0]}`
+    } else if (answer === 'B' && options.length > 1) {
+      return `B. ${options[1]}`
+    }
+    // 兼容旧格式
+    return answer === 'true' ? '正确' : answer === 'false' ? '错误' : answer
   }
   return answer
 }
 
 const formatDateTime = (dateString) => {
   if (!dateString) return ''
-  
+
   const date = new Date(dateString)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
@@ -620,6 +1252,14 @@ onUnmounted(() => {
   if (timerInterval.value) {
     clearInterval(timerInterval.value)
   }
+
+  // 保存当前剩余时间（如果考试还在进行中）
+  if (examStatus.value === 'ONGOING' && remainingTime.value > 0) {
+    const savedTimeKey = `exam_${examId.value}_remaining_time`
+    const savedStartTimeKey = `exam_${examId.value}_start_time`
+    localStorage.setItem(savedTimeKey, remainingTime.value.toString())
+    localStorage.setItem(savedStartTimeKey, Date.now().toString())
+  }
 })
 </script>
 
@@ -641,8 +1281,124 @@ onUnmounted(() => {
 .exam-info-card,
 .timer-card,
 .questions-card,
-.result-card {
+.result-card,
+.score-card,
+.analysis-section {
   margin-bottom: 20px;
+}
+
+.score-card .score-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.score-card .score-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-card .label {
+  font-weight: 500;
+  color: #606266;
+}
+
+.score-card .value {
+  font-weight: 600;
+}
+
+.score-card .value.excellent {
+  color: #67c23a;
+}
+
+.score-card .value.good {
+  color: #409eff;
+}
+
+.score-card .value.average {
+  color: #e6a23c;
+}
+
+.score-card .value.poor {
+  color: #f56c6c;
+}
+
+.analysis-section {
+  margin-top: 30px;
+}
+
+.analysis-card,
+.advice-card {
+  height: 400px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.analysis-content,
+.advice-content {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.analysis-item {
+  margin-bottom: 20px;
+}
+
+.analysis-item h4 {
+  margin: 0 0 10px 0;
+  color: #303133;
+  font-size: 16px;
+}
+
+.analysis-item ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.analysis-item li {
+  margin-bottom: 5px;
+  color: #606266;
+}
+
+.advice-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.advice-number {
+  width: 24px;
+  height: 24px;
+  background-color: #409eff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.advice-text {
+  flex: 1;
+  color: #303133;
+  line-height: 1.5;
+}
+
+.loading-content,
+.empty-content {
+  padding: 20px;
+  text-align: center;
 }
 
 .exam-header {
@@ -718,21 +1474,104 @@ onUnmounted(() => {
 
 .question-content {
   margin-bottom: 20px;
+}
+
+.question-content h4 {
+  margin: 0 0 8px 0;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.question-text {
+  margin: 0;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  font-size: 16px;
   line-height: 1.6;
+  color: #303133;
 }
 
 .question-options {
-  margin-left: 20px;
+  margin-top: 15px;
   margin-bottom: 20px;
 }
 
+.option-group {
+  width: 100%;
+}
+
 .option-item {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  border: 2px solid #e4e7ed;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.option-item:hover {
+  border-color: #409EFF;
+  background-color: #f0f9ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.option-radio,
+.option-checkbox {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.option-radio .el-radio__input,
+.option-checkbox .el-checkbox__input {
+  margin-right: 12px;
+}
+
+.option-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  width: 100%;
+  min-height: 50px;
 }
 
 .option-label {
-  margin-right: 8px;
-  min-width: 20px;
+  font-weight: 600;
+  font-size: 16px;
+  color: #409EFF;
+  margin-right: 12px;
+  min-width: 24px;
+}
+
+.option-content {
+  color: #303133;
+  font-size: 15px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* 选中状态样式 */
+.option-item:has(.el-radio__input.is-checked),
+.option-item:has(.el-checkbox__input.is-checked) {
+  border-color: #409EFF;
+  background-color: #f0f9ff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+}
+
+.option-item:has(.el-radio__input.is-checked) .option-label,
+.option-item:has(.el-checkbox__input.is-checked) .option-label {
+  color: #409EFF;
+  font-weight: 700;
+}
+
+.option-item:has(.el-radio__input.is-checked) .option-content,
+.option-item:has(.el-checkbox__input.is-checked) .option-content {
+  color: #409EFF;
+  font-weight: 500;
 }
 
 .answer-actions {
@@ -746,6 +1585,126 @@ onUnmounted(() => {
   padding: 15px;
   background-color: #f8f8f8;
   border-radius: 4px;
+}
+
+.answer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.my-answer,
+.correct-answer {
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  margin-bottom: 16px;
+}
+
+.my-answer h4,
+.correct-answer h4 {
+  margin: 0 0 8px 0;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.my-answer {
+  background-color: #fff;
+  position: relative;
+}
+
+.my-answer.correct-answer {
+  border-color: #67c23a;
+  background-color: #f0f9ff;
+}
+
+.my-answer.wrong-answer {
+  border-color: #f56c6c;
+  background-color: #fef0f0;
+}
+
+.correct-answer {
+  background-color: #f0f9ff;
+  border-color: #409eff;
+}
+
+.answer-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.score-info {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.score-info .score-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.score-info .label {
+  font-weight: 500;
+  color: #606266;
+  margin-right: 8px;
+}
+
+.score-value.excellent {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.score-value.good {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.score-value.average {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+.score-value.poor {
+  color: #f56c6c;
+  font-weight: 600;
+}
+
+.feedback-item {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.feedback-content {
+  margin-top: 8px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  color: #303133;
+  line-height: 1.5;
+}
+
+.grading-info {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.grading-details {
+  font-style: italic;
+}
+
+.exam-pending {
+  padding: 40px;
+  text-align: center;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin: 20px 0;
 }
 
 .my-answer,

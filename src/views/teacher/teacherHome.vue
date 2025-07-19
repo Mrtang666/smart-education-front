@@ -75,8 +75,8 @@
       </div>
 
       <!-- 最近的课程和考试 -->
-      <div class="recent-section">
-        <!-- 最近的课程 -->
+      <div class="recent-section-row">
+        <!-- 我的课程 -->
         <el-card shadow="hover" class="recent-card">
           <template #header>
             <div class="card-header">
@@ -120,8 +120,7 @@
             </div>
           </div>
         </el-card>
-
-        <!-- 最近的考试 -->
+        <!-- 近期考试 -->
         <el-card shadow="hover" class="recent-card">
           <template #header>
             <div class="card-header">
@@ -148,12 +147,12 @@
                   <div class="item-subtitle">
                     <span class="deadline-info">
                       <el-icon><Timer /></el-icon>
-                      {{ exam.courseName || '未知课程' }} · 时长: {{ exam.durationMinutes || '--' }}分钟
+                      {{ getCourseNameById(exam.courseId) }} · 时长: {{ exam.durationMinutes || '--' }}分钟
                     </span>
                   </div>
                   <div class="item-details">
                     <span class="item-time">开始: {{ formatDate(exam.startTime) }}</span>
-                    <span class="item-score">总分: {{ exam.totalScore || '--' }}</span>
+                    <span class="item-score">总分: {{ Number(exam.totalScore) || '--' }}分</span>
                   </div>
                 </div>
                 <div class="item-status">
@@ -165,10 +164,7 @@
             </div>
           </div>
         </el-card>
-      </div>
-
-      <!-- 最近的作业 -->
-      <div class="recent-section-full">
+        <!-- 近期作业 -->
         <el-card shadow="hover" class="recent-card">
           <template #header>
             <div class="card-header">
@@ -194,11 +190,11 @@
                   <div class="item-subtitle">
                     <span class="deadline-info">
                       <el-icon><Timer /></el-icon>
-                      {{ homework.courseName || '未知课程' }}
+                      {{ homework.courseName || homework.courseId || '未知课程' }}
                     </span>
                   </div>
                   <div class="item-details">
-                    <span class="item-score">总分: {{ homework.totalScore || '--' }}</span>
+                    <span class="item-score">总分: {{ Number(homework.totalScore) || '--' }}分</span>
                     <span v-if="homework.description" class="item-description">{{ homework.description }}</span>
                   </div>
                 </div>
@@ -677,7 +673,8 @@ async function fetchExams(isRetry = false) {
       return {
         examId: examId,
         title: exam.title || '未命名考试',
-        courseName: exam.courseName || '未知课程',
+        courseId: exam.courseId, // 新增 courseId 字段
+        courseName: exam.courseName || exam.courseId || '未知课程', // 优先显示 courseName，没有就用 courseId
         startTime: exam.startTime,
         endTime: exam.endTime,
         status: exam.status,
@@ -941,6 +938,12 @@ onUnmounted(() => {
   // 移除事件监听器
   window.removeEventListener('refresh-courses', fetchTeacherCourses)
 })
+
+// 根据课程ID获取课程名称
+function getCourseNameById(courseId) {
+  const course = courses.value.find(c => c.id == courseId || c.courseId == courseId)
+  return course ? course.name : (courseId ? `课程ID:${courseId}` : '未知课程')
+}
 </script>
 
 <style scoped>
@@ -1332,6 +1335,25 @@ onUnmounted(() => {
 /* 添加作业相关的样式 */
 .homework-icon {
   background-color: #67C23A;
+}
+
+/* 新增横向布局样式 */
+.recent-section-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.recent-section-row .recent-card {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 1200px) {
+  .recent-section-row {
+    flex-direction: column;
+    gap: 16px;
+  }
 }
 </style>
 

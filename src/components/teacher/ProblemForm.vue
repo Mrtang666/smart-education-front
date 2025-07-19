@@ -25,6 +25,20 @@
         <el-input-number v-model="form.score" :min="1" :max="100" />
       </el-form-item>
 
+      <!-- 选择题的题目内容和选项输入 -->
+      <template v-if="['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.type)">
+        <el-form-item label="题目内容" required>
+          <el-input
+            v-model="questionStem"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入题目的主要内容（题干）"
+            @input="updateFormContent"
+          />
+          <div class="form-tip">题目的主要内容，选项将自动添加到题目内容后面</div>
+        </el-form-item>
+      </template>
+
       <!-- 选择题的选项输入 -->
       <el-form-item
         v-if="['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.type)"
@@ -134,6 +148,19 @@
               </el-checkbox>
             </el-checkbox-group>
             <div class="form-tip">多选题可以选择多个正确答案</div>
+            <div class="answer-preview" v-if="selectedAnswers.length > 0">
+              <span class="preview-label">当前选择：</span>
+              <el-tag
+                v-for="answer in selectedAnswers"
+                :key="answer"
+                type="primary"
+                size="small"
+                style="margin-right: 5px;"
+              >
+                {{ answer }}
+              </el-tag>
+              <span class="preview-text">（将保存为：{{ selectedAnswers.join(',') }}）</span>
+            </div>
           </div>
         </el-form-item>
       </template>
@@ -141,12 +168,25 @@
       <!-- 填空题和简答题答案 -->
       <template v-if="['FILL_BLANK', 'ESSAY_QUESTION'].includes(form.type)">
         <el-form-item label="参考答案" required>
-          <el-input 
-            v-model="form.expectedAnswer" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="请输入参考答案" 
+          <el-input
+            v-model="form.expectedAnswer"
+            type="textarea"
+            :rows="getAnswerRows()"
+            :placeholder="getAnswerPlaceholder()"
+            show-word-limit
           />
+          <div class="form-tip">{{ getAnswerTip() }}</div>
+          <div class="form-warning" v-if="form.expectedAnswer && form.expectedAnswer.length > 300">
+            <el-alert
+              title="注意"
+              type="warning"
+              :closable="false"
+              show-icon
+            >
+              当前参考答案长度为 {{ form.expectedAnswer.length }} 字符，超过后端限制（300字符）。
+              保存时可能会失败，建议精简答案内容或联系管理员调整后端限制。
+            </el-alert>
+          </div>
         </el-form-item>
       </template>
       
@@ -213,6 +253,9 @@ const form = ref({
 
 // 多选题的选中答案数组
 const selectedAnswers = ref([])
+
+// 选择题的题干内容（独立于完整content）
+const questionStem = ref('')
 
 // 选项管理
 const options = ref([
@@ -322,7 +365,9 @@ function getContentTip() {
 // 监听多选题答案变化
 watch(selectedAnswers, (newVal) => {
   if (form.value.type === 'MULTI_CHOICE') {
-    form.value.expectedAnswer = newVal.join(',')
+    // 确保答案按字母顺序排序，并以逗号分隔的字符串格式存储
+    const sortedAnswers = [...newVal].sort()
+    form.value.expectedAnswer = sortedAnswers.join(',')
   }
 }, { deep: true })
 
@@ -350,7 +395,27 @@ function initFormData(data) {
 
   // 初始化选项数组（针对选择题）
   if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(data.type)) {
-    initOptionsFromContent(data.content)
+    // 如果是选择题，需要分离题干和选项
+    if (data.content) {
+      const firstOptionMatch = data.content.match(/\s*A\.\s*/)
+      if (firstOptionMatch) {
+        questionStem.value = data.content.substring(0, firstOptionMatch.index).trim()
+        // 解析选项
+        const optionText = data.content.substring(firstOptionMatch.index)
+        const parsedOptions = parseOptionsFromContent(optionText)
+        if (parsedOptions.length > 0) {
+          options.value = parsedOptions.map(option => ({
+            key: option.value,
+            content: option.content
+          }))
+        }
+      } else {
+        questionStem.value = data.content
+        initOptionsFromContent(data.content)
+      }
+    } else {
+      initOptionsFromContent(data.content)
+    }
   }
 
   // 初始化多选题的答案数组
@@ -361,49 +426,23 @@ function initFormData(data) {
       selectedAnswers.value = Array.isArray(answers) ? answers : []
     } catch (e) {
       // 如果不是JSON格式，按分隔符分割
-      selectedAnswers.value = data.expectedAnswer.split(/[,;，；\s]+/)
-        .map(a => a.trim().toUpperCase())
-        .filter(a => a.length > 0)
+      const answerString = String(data.expectedAnswer).trim()
+      if (answerString) {
+        selectedAnswers.value = answerString.split(/[,;，；\s]+/)
+          .map(a => a.trim().toUpperCase())
+          .filter(a => a.length > 0 && /^[A-H]$/.test(a)) // 只保留有效的选项标识
+      } else {
+        selectedAnswers.value = []
+      }
     }
   } else {
     selectedAnswers.value = []
   }
 }
 
-// 添加选项
-function addOption() {
-  const keys = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-  if (options.value.length < keys.length) {
-    const nextKey = keys[options.value.length]
-    options.value.push({ key: nextKey, content: '' })
-    updateFormContent()
-  }
-}
 
-// 删除选项
-function removeOption(index) {
-  if (options.value.length > 2) {
-    options.value.splice(index, 1)
-    // 重新分配选项标签
-    options.value.forEach((option, idx) => {
-      option.key = String.fromCharCode(65 + idx) // A, B, C, D...
-    })
-    updateFormContent()
 
-    // 清理可能无效的答案
-    cleanupAnswers()
-  }
-}
 
-// 更新form.content字段（将选项数组转换为文本格式）
-function updateFormContent() {
-  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
-    const contentLines = options.value
-      .filter(option => option.content.trim())
-      .map(option => `${option.key}. ${option.content.trim()}`)
-    form.value.content = contentLines.join('\n')
-  }
-}
 
 // 从文本内容初始化选项数组
 function initOptionsFromContent(content) {
@@ -521,6 +560,53 @@ function saveProblem() {
   emit('save', submitData)
 }
 
+// 更新form.content字段（将题干和选项组合）
+function updateFormContent() {
+  if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type)) {
+    // 获取题干内容
+    const mainContent = questionStem.value.trim()
+
+    // 生成选项文本
+    const optionLines = options.value
+      .filter(option => option.content.trim())
+      .map(option => `${option.key}. ${option.content.trim()}`)
+
+    // 组合题干和选项
+    if (mainContent && optionLines.length > 0) {
+      form.value.content = mainContent + ' ' + optionLines.join(' ')
+    } else if (optionLines.length > 0) {
+      form.value.content = optionLines.join(' ')
+    } else {
+      form.value.content = mainContent
+    }
+  }
+}
+
+// 添加选项
+function addOption() {
+  const keys = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+  if (options.value.length < keys.length) {
+    const nextKey = keys[options.value.length]
+    options.value.push({ key: nextKey, content: '' })
+    updateFormContent()
+  }
+}
+
+// 删除选项
+function removeOption(index) {
+  if (options.value.length > 2) {
+    options.value.splice(index, 1)
+    // 重新分配选项标签
+    options.value.forEach((option, idx) => {
+      option.key = String.fromCharCode(65 + idx) // A, B, C, D...
+    })
+    updateFormContent()
+
+    // 清理可能无效的答案
+    cleanupAnswers()
+  }
+}
+
 // 监听题目类型变化
 watch(() => form.value.type, (newType) => {
   // 根据新的题目类型自动设置自动评分
@@ -536,6 +622,10 @@ watch(() => form.value.type, (newType) => {
     }
   }
 })
+
+
+
+
 
 // 组件挂载时初始化
 onMounted(() => {
@@ -700,5 +790,55 @@ onMounted(() => {
 .add-option-section .form-tip {
   margin-top: 10px;
   text-align: center;
+}
+
+/* 题型提示样式 */
+.fill-blank-tips,
+.essay-tips,
+.true-false-tips {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fill-blank-tips p,
+.essay-tips p,
+.true-false-tips p {
+  margin: 5px 0;
+}
+
+.fill-blank-tips strong,
+.essay-tips strong,
+.true-false-tips strong {
+  color: #409eff;
+}
+
+/* 表单警告样式 */
+.form-warning {
+  margin-top: 10px;
+}
+
+.form-warning .el-alert {
+  margin-bottom: 0;
+}
+
+/* 答案预览样式 */
+.answer-preview {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+}
+
+.preview-label {
+  font-weight: 600;
+  color: #409eff;
+  margin-right: 8px;
+}
+
+.preview-text {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 8px;
 }
 </style>

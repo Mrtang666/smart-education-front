@@ -3707,6 +3707,8 @@ async function publishHomework(homework) {
     ElMessage.error(`发布作业失败: ${error.message || '请稍后重试'}`)
   }
 }
+
+
 </script>
 
 <style scoped>
@@ -3725,7 +3727,7 @@ async function publishHomework(homework) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+ /* overflow: hidden;  */
 }
 
 .course-header {

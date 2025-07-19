@@ -164,6 +164,7 @@
       :show-close="false"
       class="invite-code-dialog"
       top="8vh"
+      append-to-body
     >
       <!-- 自定义头部 -->
       <template #header>
