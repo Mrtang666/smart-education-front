@@ -47,11 +47,36 @@
                         :class="{ 'chat-message-user': msg.role === 'user', 'chat-message-ai': msg.role === 'assistant' }">
                         <div class="chat-message-content">
                             <span v-if="msg.role === 'assistant'" class="chat-role">AI：</span>
-                            <span>{{ msg.content }}</span>
+                            <div class="message-text" v-html="formatMessage(msg.content)"></div>
+                            <!-- AI消息操作按钮 -->
+                            <div v-if="msg.role === 'assistant'" class="message-actions">
+                                <el-button size="small" type="text" @click="copyMessage(msg.content)">
+                                    <el-icon><DocumentCopy /></el-icon>
+                                    复制
+                                </el-button>
+                                <el-button size="small" type="text" @click="regenerateMessage(idx)">
+                                    <el-icon><Refresh /></el-icon>
+                                    重新生成
+                                </el-button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 流式输出状态 -->
+                    <div v-if="isStreaming" class="chat-message chat-message-ai">
+                        <div class="chat-message-content">
+                            <span class="chat-role">AI：</span>
+                            <div class="message-text" v-html="formatMessage(streamingContent)"></div>
+                            <div class="streaming-indicator">
+                                <span class="typing-dots">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <!-- 加载状态 -->
-                    <div v-if="isChatLoading" class="chat-message chat-message-ai">
+                    <div v-if="isChatLoading && !isStreaming" class="chat-message chat-message-ai">
                         <div class="chat-message-content">
                             <span class="chat-role">AI：</span>
                             <span class="typing-indicator">正在思考中...</span>
@@ -97,7 +122,9 @@ import {
     // Document,
     DataAnalysis,
     Setting,
-    HomeFilled
+    HomeFilled,
+    DocumentCopy,
+    Refresh
 } from '@element-plus/icons-vue'
 import { getUserInfo, clearAuth } from '@/utils/auth'
 import { courseSelectionAPI, studentAssistantAPI } from '@/api/api'
@@ -113,6 +140,8 @@ const chatMessages = ref([
     { role: 'assistant', content: '你好，我是你的学习助手，有什么可以帮你？' }
 ])
 const isChatLoading = ref(false) // 聊天加载状态
+const isStreaming = ref(false) // 流式输出状态
+const streamingContent = ref('') // 流式输出内容
 
 // 对话框宽度相关
 const chatWidth = ref(400) // 初始宽度
@@ -317,7 +346,7 @@ function handleSearch(value) {
 }
 
 async function sendChat() {
-    if (!chatInput.value.trim()) return
+    if (!chatInput.value.trim() || isChatLoading.value || isStreaming.value) return
 
     const userMessage = chatInput.value.trim()
     chatInput.value = ''
@@ -347,59 +376,131 @@ async function sendChat() {
             valid: true
         }
 
-        // 调用带历史的问答接口
-        const response = await studentAssistantAPI.askWithHistory(studentInfo.studentId, historyData)
-
-        // 添加AI回复到聊天记录
-        if (response && response.answer) {
-            chatMessages.value.push({
-                role: 'assistant',
-                content: response.answer
-            })
-            // 滚动到底部显示新消息
-            scrollToBottom()
-        } else {
-            throw new Error('AI回复格式错误')
+        // 尝试使用流式聊天
+        try {
+            await handleStreamChat(historyData)
+        } catch (streamError) {
+            console.warn('流式聊天失败，回退到普通聊天:', streamError)
+            // 回退到普通聊天接口
+            await handleNormalChat(studentInfo.studentId, historyData)
         }
 
     } catch (error) {
         console.error('AI聊天失败:', error)
-
-        // 根据错误类型提供不同的处理
-        let errorMessage = 'AI聊天服务暂时不可用'
-        let fallbackResponse = '抱歉，我现在无法回答您的问题。请稍后再试。'
-
-        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-            errorMessage = 'AI响应超时，请稍后重试'
-            fallbackResponse = '您的问题我收到了，但由于网络或服务繁忙，响应时间较长。请稍后重试，或者尝试简化您的问题。'
-        } else if (error.response?.status === 401) {
-            errorMessage = '登录已过期，请重新登录'
-            fallbackResponse = '您的登录状态已过期，请重新登录后继续使用AI助手。'
-        } else if (error.response?.status >= 500) {
-            errorMessage = '服务器暂时不可用'
-            fallbackResponse = '服务器正在维护中，请稍后再试。如果问题持续存在，请联系管理员。'
-        }
-
-        try {
-            // 添加友好的错误回复
-            chatMessages.value.push({
-                role: 'assistant',
-                content: fallbackResponse
-            })
-
-            // 滚动到底部
-            scrollToBottom()
-
-        } catch (fallbackError) {
-            console.error('添加错误回复失败:', fallbackError)
-        }
-
-        // 显示错误提示
-        ElMessage.error(errorMessage)
+        await handleChatError(error)
     } finally {
         // 关闭加载状态
         isChatLoading.value = false
+        isStreaming.value = false
+        streamingContent.value = ''
     }
+}
+
+// 处理流式聊天
+async function handleStreamChat(historyData) {
+    isChatLoading.value = false
+    isStreaming.value = true
+    streamingContent.value = ''
+
+    try {
+        const stream = await studentAssistantAPI.streamChatHistory(historyData)
+
+        // 处理流式响应
+        const reader = stream.getReader()
+        const decoder = new TextDecoder()
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+            const { done, value } = await reader.read()
+
+            if (done) break
+
+            const chunk = decoder.decode(value, { stream: true })
+            const lines = chunk.split('\n')
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6).trim()
+                    if (data === '[DONE]') {
+                        // 流式输出完成
+                        chatMessages.value.push({
+                            role: 'assistant',
+                            content: streamingContent.value
+                        })
+                        return
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data)
+                        if (parsed.content) {
+                            streamingContent.value += parsed.content
+                            scrollToBottom()
+                        }
+                    } catch (parseError) {
+                        console.warn('解析流数据失败:', parseError)
+                    }
+                }
+            }
+        }
+
+        // 如果没有收到[DONE]信号，也要保存内容
+        if (streamingContent.value) {
+            chatMessages.value.push({
+                role: 'assistant',
+                content: streamingContent.value
+            })
+        }
+
+    } catch (error) {
+        console.error('流式聊天处理失败:', error)
+        throw error
+    }
+}
+
+// 处理普通聊天
+async function handleNormalChat(studentId, historyData) {
+    const response = await studentAssistantAPI.askWithHistory(studentId, historyData)
+
+    if (response && response.answer) {
+        chatMessages.value.push({
+            role: 'assistant',
+            content: response.answer
+        })
+        scrollToBottom()
+    } else {
+        throw new Error('AI回复格式错误')
+    }
+}
+
+// 处理聊天错误
+async function handleChatError(error) {
+    let errorMessage = 'AI聊天服务暂时不可用'
+    let fallbackResponse = '抱歉，我现在无法回答您的问题。请稍后再试。'
+
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'AI响应超时，请稍后重试'
+        fallbackResponse = '您的问题我收到了，但由于网络或服务繁忙，响应时间较长。请稍后重试，或者尝试简化您的问题。'
+    } else if (error.response?.status === 401) {
+        errorMessage = '登录已过期，请重新登录'
+        fallbackResponse = '您的登录状态已过期，请重新登录后继续使用AI助手。'
+    } else if (error.response?.status >= 500) {
+        errorMessage = '服务器暂时不可用'
+        fallbackResponse = '服务器正在维护中，请稍后再试。如果问题持续存在，请联系管理员。'
+    }
+
+    try {
+        // 添加友好的错误回复
+        chatMessages.value.push({
+            role: 'assistant',
+            content: fallbackResponse
+        })
+        scrollToBottom()
+    } catch (fallbackError) {
+        console.error('添加错误回复失败:', fallbackError)
+    }
+
+    // 显示错误提示
+    ElMessage.error(errorMessage)
 }
 
 // 添加fetchStudentData函数实现
@@ -422,30 +523,112 @@ function fetchStudentData() {
     return userInfo
 }
 
+// 格式化消息内容
+function formatMessage(content) {
+    if (!content) return ''
+
+    // 将换行符转换为HTML换行
+    let formatted = content.replace(/\n/g, '<br>')
+
+    // 处理代码块（简单的```包围的代码）
+    formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+
+    // 处理行内代码（`包围的代码）
+    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>')
+
+    // 处理粗体文本（**包围的文本）
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+
+    return formatted
+}
+
+// 复制消息内容
+function copyMessage(content) {
+    if (!content) return
+
+    // 使用现代的Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(content).then(() => {
+            ElMessage.success('已复制到剪贴板')
+        }).catch(err => {
+            console.error('复制失败:', err)
+            fallbackCopy(content)
+        })
+    } else {
+        fallbackCopy(content)
+    }
+}
+
+// 备用复制方法
+function fallbackCopy(content) {
+    const textArea = document.createElement('textarea')
+    textArea.value = content
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    try {
+        document.execCommand('copy')
+        ElMessage.success('已复制到剪贴板')
+    } catch (err) {
+        console.error('复制失败:', err)
+        ElMessage.error('复制失败，请手动复制')
+    }
+
+    document.body.removeChild(textArea)
+}
+
+// 重新生成消息
+async function regenerateMessage(messageIndex) {
+    if (messageIndex <= 0 || messageIndex >= chatMessages.value.length) {
+        ElMessage.error('无法重新生成此消息')
+        return
+    }
+
+    // 找到对应的用户问题
+    const userMessageIndex = messageIndex - 1
+    const userMessage = chatMessages.value[userMessageIndex]
+
+    if (!userMessage || userMessage.role !== 'user') {
+        ElMessage.error('无法找到对应的问题')
+        return
+    }
+
+    // 移除当前AI回答及之后的所有消息
+    chatMessages.value.splice(messageIndex)
+
+    // 重新发送问题
+    chatInput.value = userMessage.content
+    await sendChat()
+}
+
 // 添加处理邀请码的函数
 function handleJoinCourse(code) {
     console.log('收到邀请码:', code)
-    
+
     if (!userInfo.value || !userInfo.value.studentId) {
         ElMessage.error('无法获取学生信息，请重新登录')
         return
     }
-    
+
     // 显示加载中提示
     const loading = ElLoading.service({
         lock: true,
         text: '正在加入课程...',
         background: 'rgba(0, 0, 0, 0.7)'
     })
-    
+
     // 调用API通过邀请码加入课程
     courseSelectionAPI.joinByInviteCode(userInfo.value.studentId, code)
         .then(response => {
             loading.close()
             ElMessage.success('成功加入课程!')
             console.log(response);
-            
-            
+
+
             // 如果当前在首页，刷新课程列表
             if (router.currentRoute.value.path === '/student/home') {
                 // 触发课程列表刷新
@@ -755,6 +938,94 @@ function handleJoinCourse(code) {
     border: 1px solid rgba(0, 0, 0, 0.03);
     position: relative;
     word-break: break-word;
+}
+
+.message-text {
+    line-height: 1.6;
+    word-wrap: break-word;
+}
+
+.message-text :deep(pre) {
+    background: #f5f5f5;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.message-text :deep(code) {
+    background: #f0f0f0;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.message-text :deep(strong) {
+    font-weight: 600;
+}
+
+.message-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.chat-message-content:hover .message-actions {
+    opacity: 1;
+}
+
+.message-actions .el-button {
+    padding: 2px 6px;
+    font-size: 12px;
+    height: auto;
+    color: #909399;
+}
+
+.message-actions .el-button:hover {
+    color: #409eff;
+}
+
+.streaming-indicator {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.typing-dots {
+    display: inline-flex;
+    gap: 3px;
+}
+
+.typing-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #409eff;
+    animation: typing-dots 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typing-dots {
+    0%, 80%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+    40% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .chat-message-user {

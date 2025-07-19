@@ -47,6 +47,11 @@
         <i class="el-icon-document"></i>
         <span>文档</span>
       </div>
+
+      <div class="nav-item" :class="{ active: activeSection === 'ai-assistant' }" @click="setActiveSection('ai-assistant')">
+        <i class="el-icon-chat-dot-round"></i>
+        <span>AI助手</span>
+      </div>
     </div>
     
     <!-- 右侧内容区 -->
@@ -485,7 +490,7 @@
               />
             </div>
           </div>
-          
+
           <el-skeleton :loading="documentLoading" animated :rows="3">
             <template #default>
               <el-empty v-if="filteredDocuments.length === 0" description="暂无课程文档"></el-empty>
@@ -506,6 +511,133 @@
               </div>
             </template>
           </el-skeleton>
+        </div>
+
+        <!-- AI助手部分 -->
+        <div v-if="activeSection === 'ai-assistant'" class="ai-assistant-content">
+          <div class="ai-assistant-container">
+            <!-- AI助手头部 -->
+            <div class="ai-assistant-header">
+              <div class="ai-assistant-title">
+                <i class="el-icon-chat-dot-round"></i>
+                <h3>AI学习助手</h3>
+              </div>
+              <div class="ai-assistant-subtitle">
+                <span>针对《{{ courseName }}》课程为您提供智能问答服务</span>
+              </div>
+            </div>
+
+            <!-- 聊天消息区域 -->
+            <div class="ai-chat-container">
+              <div class="ai-chat-messages" ref="chatMessages">
+                <!-- 欢迎消息 -->
+                <div v-if="aiMessages.length === 0" class="welcome-message">
+                  <div class="ai-message">
+                    <div class="ai-avatar">
+                      <i class="el-icon-chat-dot-round"></i>
+                    </div>
+                    <div class="ai-message-content">
+                      <div class="ai-message-text">
+                        您好！我是您的AI学习助手，可以帮助您解答关于《{{ courseName }}》课程的问题。
+                        <br>您可以问我：
+                        <ul>
+                          <li>课程相关的知识点问题</li>
+                          <li>学习方法和建议</li>
+                          <li>作业和考试相关问题</li>
+                          <li>其他学习困惑</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 聊天消息列表 -->
+                <div v-for="(message, index) in aiMessages" :key="index" class="message-item">
+                  <!-- 用户消息 -->
+                  <div v-if="message.type === 'user'" class="user-message">
+                    <div class="user-message-content">
+                      <div class="user-message-text">{{ message.content }}</div>
+                    </div>
+                    <div class="user-avatar">
+                      <i class="el-icon-user"></i>
+                    </div>
+                  </div>
+
+                  <!-- AI消息 -->
+                  <div v-else class="ai-message">
+                    <div class="ai-avatar">
+                      <i class="el-icon-chat-dot-round"></i>
+                    </div>
+                    <div class="ai-message-content">
+                      <div class="ai-message-text">{{ message.content }}</div>
+                      <div class="ai-message-actions">
+                        <el-button type="text" size="small" @click="copyMessage(message.content)">
+                          <i class="el-icon-document-copy"></i> 复制
+                        </el-button>
+                        <el-button type="text" size="small" @click="regenerateResponse(index)">
+                          <i class="el-icon-refresh"></i> 重新生成
+                        </el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 加载状态 -->
+                <div v-if="aiLoading" class="ai-loading">
+                  <div class="ai-avatar">
+                    <i class="el-icon-loading"></i>
+                  </div>
+                  <div class="ai-message-content">
+                    <div class="ai-message-text">AI正在思考中...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 快捷问题 -->
+              <div v-if="aiMessages.length === 0" class="quick-questions">
+                <div class="quick-questions-title">快捷问题：</div>
+                <div class="quick-questions-list">
+                  <el-button
+                    v-for="(question, index) in quickQuestions"
+                    :key="index"
+                    type="primary"
+                    plain
+                    size="small"
+                    @click="askQuickQuestion(question)"
+                    :disabled="aiLoading"
+                  >
+                    {{ question }}
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- 输入区域 -->
+              <div class="ai-input-container">
+                <div class="ai-input-wrapper">
+                  <el-input
+                    v-model="currentQuestion"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="请输入您的问题..."
+                    :disabled="aiLoading"
+                    @keydown.ctrl.enter="sendQuestion"
+                    @keydown.meta.enter="sendQuestion"
+                  />
+                  <div class="ai-input-actions">
+                    <div class="input-tip">Ctrl+Enter 发送</div>
+                    <el-button
+                      type="primary"
+                      @click="sendQuestion"
+                      :loading="aiLoading"
+                      :disabled="!currentQuestion.trim()"
+                    >
+                      <i class="el-icon-s-promotion"></i> 发送
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -634,6 +766,18 @@ export default {
       documents: [],
       documentLoading: false,
       documentSearchKeyword: '',
+
+      // AI助手相关数据
+      aiMessages: [],
+      currentQuestion: '',
+      aiLoading: false,
+      quickQuestions: [
+        '这门课程的主要内容是什么？',
+        '如何提高学习效率？',
+        '作业提交的注意事项有哪些？',
+        '考试重点是什么？',
+        '有什么好的学习方法推荐？'
+      ],
     }
   },
   computed: {
@@ -2209,6 +2353,161 @@ export default {
       }
 
       return false;
+    },
+
+    // ===== AI助手相关方法 =====
+
+    // 发送问题
+    async sendQuestion() {
+      if (!this.currentQuestion.trim() || this.aiLoading) {
+        return;
+      }
+
+      const question = this.currentQuestion.trim();
+      this.currentQuestion = '';
+
+      // 添加用户消息
+      this.addAIMessage('user', question);
+
+      // 显示加载状态
+      this.aiLoading = true;
+
+      try {
+        // 获取用户信息
+        const userInfo = getUserInfo();
+        if (!userInfo || !userInfo.studentId) {
+          throw new Error('无法获取学生信息，请重新登录');
+        }
+
+        // 准备请求数据
+        const askData = {
+          question: question,
+          courseId: this.courseId
+        };
+
+        // 调用AI问答接口
+        const response = await studentAssistantAPI.askQuestion(userInfo.studentId, askData);
+
+        // 添加AI回复
+        if (response && response.answer) {
+          this.addAIMessage('ai', response.answer);
+        } else {
+          this.addAIMessage('ai', '抱歉，我暂时无法回答这个问题，请稍后再试。');
+        }
+
+      } catch (error) {
+        console.error('AI问答失败:', error);
+
+        // 根据错误类型提供不同的提示
+        let errorMessage = '抱歉，服务暂时不可用，请稍后再试。';
+        let toastMessage = 'AI助手暂时不可用，请稍后再试';
+
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          errorMessage = '抱歉，AI正在深度思考中，响应时间较长。请稍后再试，或者尝试提出更简洁的问题。';
+          toastMessage = 'AI响应超时，请稍后再试或简化问题';
+        } else if (error.response?.status === 500) {
+          errorMessage = '抱歉，AI服务暂时繁忙，请稍后再试。';
+          toastMessage = 'AI服务繁忙，请稍后再试';
+        }
+
+        this.addAIMessage('ai', errorMessage);
+        this.$message.error(toastMessage);
+      } finally {
+        this.aiLoading = false;
+      }
+    },
+
+    // 添加AI消息
+    addAIMessage(type, content) {
+      this.aiMessages.push({
+        type,
+        content,
+        timestamp: new Date()
+      });
+
+      // 滚动到底部
+      this.$nextTick(() => {
+        this.scrollChatToBottom();
+      });
+    },
+
+    // 滚动聊天区域到底部
+    scrollChatToBottom() {
+      const chatMessages = this.$refs.chatMessages;
+      if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    },
+
+    // 快捷问题
+    askQuickQuestion(question) {
+      this.currentQuestion = question;
+      this.sendQuestion();
+    },
+
+    // 复制消息
+    copyMessage(content) {
+      // 创建临时文本区域
+      const textArea = document.createElement('textarea');
+      textArea.value = content;
+      document.body.appendChild(textArea);
+      textArea.select();
+
+      try {
+        document.execCommand('copy');
+        this.$message.success('已复制到剪贴板');
+      } catch (err) {
+        this.$message.error('复制失败');
+      }
+
+      document.body.removeChild(textArea);
+    },
+
+    // 重新生成回复
+    async regenerateResponse(messageIndex) {
+      if (messageIndex <= 0 || messageIndex >= this.aiMessages.length) {
+        return;
+      }
+
+      // 找到对应的用户问题
+      const userMessage = this.aiMessages[messageIndex - 1];
+      if (!userMessage || userMessage.type !== 'user') {
+        this.$message.error('无法找到对应的问题');
+        return;
+      }
+
+      const userQuestion = userMessage.content;
+
+      // 移除当前AI回答
+      this.aiMessages.splice(messageIndex, 1);
+
+      // 重新发送请求
+      this.aiLoading = true;
+      try {
+        const userInfo = getUserInfo();
+        if (!userInfo || !userInfo.studentId) {
+          throw new Error('无法获取学生信息，请重新登录');
+        }
+
+        const askData = {
+          question: userQuestion,
+          courseId: this.courseId
+        };
+
+        const response = await studentAssistantAPI.askQuestion(userInfo.studentId, askData);
+
+        if (response && response.answer) {
+          this.addAIMessage('ai', response.answer);
+        } else {
+          this.addAIMessage('ai', '抱歉，我暂时无法回答这个问题，请稍后再试。');
+        }
+      } catch (error) {
+        console.error('重新生成失败:', error);
+        this.addAIMessage('ai', '抱歉，重新生成失败，请稍后再试。');
+        this.$message.error('重新生成失败');
+      } finally {
+        this.aiLoading = false;
+      }
     }
 
   }
@@ -2770,6 +3069,223 @@ export default {
 .ai-assistant-content {
   height: calc(100vh - 120px);
   overflow: hidden;
+}
+
+.ai-assistant-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ai-assistant-header {
+  padding: 20px;
+  border-bottom: 1px solid #e4e7ed;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.ai-assistant-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.ai-assistant-title i {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.ai-assistant-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ai-assistant-subtitle {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.ai-chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: #f8f9fa;
+}
+
+.welcome-message {
+  margin-bottom: 20px;
+}
+
+.message-item {
+  margin-bottom: 20px;
+}
+
+.user-message {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.user-message-content {
+  max-width: 70%;
+  background: #409eff;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.user-message-text {
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #409eff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.ai-message {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.ai-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.ai-message-content {
+  max-width: 70%;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 4px 18px 18px 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e4e7ed;
+}
+
+.ai-message-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.ai-message-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.ai-message-actions .el-button {
+  padding: 4px 8px;
+  font-size: 12px;
+  height: auto;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.ai-loading .ai-avatar {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.quick-questions {
+  padding: 20px;
+  border-top: 1px solid #e4e7ed;
+  background: white;
+}
+
+.quick-questions-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.quick-questions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-questions-list .el-button {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 16px;
+}
+
+.ai-input-container {
+  padding: 20px;
+  border-top: 1px solid #e4e7ed;
+  background: white;
+}
+
+.ai-input-wrapper {
+  position: relative;
+}
+
+.ai-input-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.input-tip {
+  font-size: 12px;
+  color: #909399;
+}
+
+.ai-input-actions .el-button {
+  padding: 8px 20px;
 }
 
 /* 作业部分样式 */

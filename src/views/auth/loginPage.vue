@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <div class="login-container">
-      <h2 class="login-title">基于AI的教学实训平台</h2>
+      <h2 class="login-title">慧课</h2>
       <login-form />
     </div>
   </div>

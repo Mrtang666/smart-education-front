@@ -3097,16 +3097,102 @@ export const studentAssistantAPI = {
     /**
      * 向智能助理提问（需要token）
      * @param {number} studentId 学生ID
-     * @param {string} question 问题内容
-     * @param {number} [courseId] 课程ID（可选）
+     * @param {Object} askData 问答数据
+     * @param {string} askData.question 问题内容
+     * @param {number} [askData.courseId] 课程ID（可选）
      * @returns {Promise<Object>} 答复，由后端返回
      */
-    async askQuestion(studentId, question, courseId) {
+    async askQuestion(studentId, askData) {
         const axios = createStudentAuthorizedAxios();
-        const params = { question };
-        if (courseId !== undefined) params.courseId = courseId;
-        const response = await axios.post(`/api/student-assistant/student/${studentId}/ask`, null, { params });
-        return response.data;
+        try {
+            console.log('AI问答请求，学生ID:', studentId, '数据:', askData);
+
+            // 准备query参数
+            const params = {
+                question: askData.question
+            };
+
+            // 如果有课程ID，添加到参数中
+            if (askData.courseId !== undefined) {
+                params.courseId = askData.courseId;
+            }
+
+            const response = await axios.post(`/api/student-assistant/student/${studentId}/ask`, null, {
+                params: params,
+                timeout: 60000 // 60秒超时
+            });
+
+            console.log('AI问答响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('AI问答失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI助手功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
+    },
+
+    /**
+     * 流式聊天历史记录接口
+     * @param {Object} historyData 历史消息数据
+     * @param {Array} historyData.messages 消息数组
+     * @param {boolean} historyData.valid 是否有效
+     * @returns {Promise<ReadableStream>} 流式响应
+     */
+    async streamChatHistory(historyData) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            console.log('流式聊天请求，数据:', historyData);
+
+            const response = await axios.post('/api/student-assistant/stream/chat/history', historyData, {
+                timeout: 60000, // 60秒超时
+                responseType: 'stream'
+            });
+
+            console.log('流式聊天响应:', response);
+            return response.data;
+        } catch (error) {
+            console.error('流式聊天失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 带历史记录的AI问答接口
+     * @param {number} studentId 学生ID
+     * @param {Object} historyData 历史消息数据
+     * @param {Array} historyData.messages 消息数组，格式：[{role: 'user'|'assistant', content: 'string'}]
+     * @param {boolean} historyData.valid 是否有效
+     * @returns {Promise<Object>} AI回复
+     */
+    async askWithHistory(studentId, historyData) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            console.log('AI历史问答请求，学生ID:', studentId, '数据:', historyData);
+
+            const response = await axios.post(`/api/student-assistant/student/${studentId}/ask/history`, historyData, {
+                timeout: 60000, // 60秒超时
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('AI历史问答响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('AI历史问答失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，说明后端不支持这个接口
+            if (error.response && error.response.status === 405) {
+                throw new Error('AI助手功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
     },
 
     /**
