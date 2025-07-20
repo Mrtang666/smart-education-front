@@ -188,6 +188,16 @@
                 ></el-input>
               </div>
 
+              <!-- 简答题 -->
+              <div v-else-if="currentProblem.type === 'ESSAY_QUESTION'" class="problem-options">
+                <el-input
+                  v-model="userAnswers[currentProblem.problemId]"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="请输入您的答案"
+                ></el-input>
+              </div>
+
               <!-- 主观题 -->
               <div v-else-if="currentProblem.type === 'SUBJECTIVE'" class="problem-options">
                 <el-input
@@ -811,6 +821,7 @@ export default {
         'MULTI_CHOICE': '多选题',
         'TRUE_FALSE': '判断题',
         'FILL_BLANK': '填空题',
+        'ESSAY_QUESTION': '简答题',
         'SUBJECTIVE': '主观题'
       };
       return typeMap[type] || '未知类型';

@@ -514,22 +514,29 @@ function enterCourse(course) {
   showMessage('success', `正在管理课程: ${course.name}`)
 }
 
-// 管理考试
+// 管理考试 - 跳转到考试成绩页面作为详情页面
 function manageExam(exam) {
   // 确保考试ID是有效的数字
   if (!exam || !exam.examId || isNaN(Number(exam.examId))) {
     showMessage('error', '无效的考试ID，无法访问考试详情')
     return
   }
-  
+
   // 更新左侧导航栏选中状态
   if (setActiveMenu) {
     setActiveMenu('考试')
   }
-  
-  // 使用教师专用路由
-  router.push(`/teacher/exam/${exam.examId}`)
-  showMessage('success', `正在管理考试: ${exam.title}`)
+
+  // 跳转到考试成绩页面作为详情页面
+  router.push({
+    path: `/teacher/exam/scores/${exam.examId}`,
+    query: {
+      title: exam.title,
+      courseId: exam.courseId,
+      from: 'home' // 标记来源页面
+    }
+  })
+  showMessage('success', `正在查看考试详情: ${exam.title}`)
 }
 
 // 管理作业

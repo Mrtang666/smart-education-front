@@ -585,30 +585,92 @@ const filteredQuestions = computed(() => {
 
 // 计算统计数据
 const averageScore = computed(() => {
-  const completedStudents = examStudents.value.filter(s => s.status === '已完成' && s.score !== undefined && s.score !== null)
+  const completedStudents = examStudents.value.filter(s => {
+    if (s.status !== '已完成') return false
+    let score = s.score
+    if (score === null || score === undefined || score === '') return false
+    if (typeof score === 'string') {
+      score = parseFloat(score.trim())
+    }
+    return !isNaN(score) && isFinite(score) && score >= 0
+  })
+
   if (completedStudents.length === 0) return 0
-  const sum = completedStudents.reduce((acc, student) => acc + (student.score || 0), 0)
+
+  const sum = completedStudents.reduce((acc, student) => {
+    let score = student.score
+    if (typeof score === 'string') {
+      score = parseFloat(score.trim())
+    }
+    return acc + Number(score)
+  }, 0)
+
   return (sum / completedStudents.length).toFixed(1)
 })
 
 const maxScore = computed(() => {
   const scores = examStudents.value
-    .filter(s => s.status === '已完成' && s.score !== undefined && s.score !== null)
-    .map(s => s.score || 0)
+    .filter(s => {
+      if (s.status !== '已完成') return false
+      let score = s.score
+      if (score === null || score === undefined || score === '') return false
+      if (typeof score === 'string') {
+        score = parseFloat(score.trim())
+      }
+      return !isNaN(score) && isFinite(score) && score >= 0
+    })
+    .map(s => {
+      let score = s.score
+      if (typeof score === 'string') {
+        score = parseFloat(score.trim())
+      }
+      return Number(score)
+    })
   return scores.length > 0 ? Math.max(...scores) : 0
 })
 
 const minScore = computed(() => {
   const scores = examStudents.value
-    .filter(s => s.status === '已完成' && s.score !== undefined && s.score !== null)
-    .map(s => s.score || 0)
+    .filter(s => {
+      if (s.status !== '已完成') return false
+      let score = s.score
+      if (score === null || score === undefined || score === '') return false
+      if (typeof score === 'string') {
+        score = parseFloat(score.trim())
+      }
+      return !isNaN(score) && isFinite(score) && score >= 0
+    })
+    .map(s => {
+      let score = s.score
+      if (typeof score === 'string') {
+        score = parseFloat(score.trim())
+      }
+      return Number(score)
+    })
   return scores.length > 0 ? Math.min(...scores) : 0
 })
 
 const passRate = computed(() => {
-  const completedStudents = examStudents.value.filter(s => s.status === '已完成' && s.score !== undefined && s.score !== null)
+  const completedStudents = examStudents.value.filter(s => {
+    if (s.status !== '已完成') return false
+    let score = s.score
+    if (score === null || score === undefined || score === '') return false
+    if (typeof score === 'string') {
+      score = parseFloat(score.trim())
+    }
+    return !isNaN(score) && isFinite(score) && score >= 0
+  })
+
   if (completedStudents.length === 0) return 0
-  const passedStudents = completedStudents.filter(s => (s.score || 0) >= 60)
+
+  const passedStudents = completedStudents.filter(s => {
+    let score = s.score
+    if (typeof score === 'string') {
+      score = parseFloat(score.trim())
+    }
+    return Number(score) >= 60
+  })
+
   return ((passedStudents.length / completedStudents.length) * 100).toFixed(1)
 })
 
@@ -664,6 +726,7 @@ async function fetchExamStudents() {
         ...student,
         studentId: String(student.studentId),
         fullName: student.fullName || student.name || `学生${student.studentId}`,
+        score: typeof student.score === 'number' ? student.score : parseFloat(student.score) || null,
         status: student.status || '已完成'
       }))
     }
@@ -723,14 +786,22 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
 
     // 创建已作答学生的成绩映射（以studentId为key）
     const scoresMap = new Map()
-    scoreStudents.forEach(scoreData => {
+    console.log('开始创建成绩映射，成绩数据:', scoreStudents)
+    scoreStudents.forEach((scoreData, index) => {
       if (scoreData && scoreData.studentId) {
         const studentId = String(scoreData.studentId)
         scoresMap.set(studentId, scoreData)
-        console.log('添加成绩映射:', studentId, scoreData)
+        console.log(`成绩映射${index}:`, {
+          原始studentId: scoreData.studentId,
+          转换后studentId: studentId,
+          成绩数据: scoreData
+        })
+      } else {
+        console.warn(`成绩数据${index}缺少studentId:`, scoreData)
       }
     })
-    console.log('成绩映射表:', scoresMap)
+    console.log('最终成绩映射表:', scoresMap)
+    console.log('成绩映射表的所有key:', Array.from(scoresMap.keys()))
 
     // 合并数据：以课程学生为基础，添加成绩信息
     if (courseStudents.length > 0) {
@@ -740,7 +811,41 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
 
         // 使用数据库ID作为内部标识
         const internalId = String(student.studentId)
-        const scoreData = scoresMap.get(internalId)
+        let scoreData = scoresMap.get(internalId)
+
+        // 如果直接匹配失败，尝试其他可能的匹配方式
+        if (!scoreData) {
+          // 尝试使用用户名匹配
+          if (student.username) {
+            for (const [, value] of scoresMap.entries()) {
+              if (value.fullName === student.username || value.studentName === student.username) {
+                scoreData = value
+                console.log(`通过用户名匹配到成绩:`, student.username, value)
+                break
+              }
+            }
+          }
+
+          // 尝试使用邮箱匹配
+          if (!scoreData && student.email) {
+            for (const [, value] of scoresMap.entries()) {
+              if (value.email === student.email) {
+                scoreData = value
+                console.log(`通过邮箱匹配到成绩:`, student.email, value)
+                break
+              }
+            }
+          }
+        }
+
+        console.log(`学生${index}ID匹配:`, {
+          原始studentId: student.studentId,
+          转换后internalId: internalId,
+          用户名: student.username,
+          邮箱: student.email,
+          找到成绩数据: !!scoreData,
+          成绩数据: scoreData
+        })
 
         const result = {
           // 使用用户名作为学号显示（因为没有真正的学号字段）
@@ -757,9 +862,16 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
           // 内部ID用于成绩匹配
           _internalId: internalId,
           // 成绩相关信息
-          score: scoreData ? scoreData.score : null,
+          score: scoreData ? (() => {
+            let score = scoreData.score
+            if (score === null || score === undefined || score === '') return null
+            if (typeof score === 'string') {
+              score = parseFloat(score.trim())
+            }
+            return !isNaN(score) && isFinite(score) ? Number(score) : null
+          })() : null,
           submitTime: scoreData ? scoreData.submitTime : null,
-          status: scoreData ? (scoreData.status || '已完成') : '未完成'
+          status: normalizeStatus(scoreData ? (scoreData.status || '已完成') : '未完成')
         }
 
         console.log(`学生${index}处理后数据:`, result)
@@ -772,7 +884,15 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
         ...student,
         studentId: String(student.studentId),
         fullName: student.fullName || student.name || `学生${student.studentId}`,
-        status: student.status || '已完成'
+        score: (() => {
+          let score = student.score
+          if (score === null || score === undefined || score === '') return null
+          if (typeof score === 'string') {
+            score = parseFloat(score.trim())
+          }
+          return !isNaN(score) && isFinite(score) ? Number(score) : null
+        })(),
+        status: normalizeStatus(student.status || '已完成')
       }))
     } else {
       console.log('没有任何学生数据')
@@ -795,25 +915,44 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
 
 
 
-// 获取考试统计信息
+// 获取考试统计信息（基于现有数据计算）
 async function fetchExamStatistics(examIdStr) {
-  try {
-    const statistics = await examAPI.getExamStatistics(examIdStr)
-    console.log('获取到的考试统计信息:', statistics)
-
-    // 可以将统计信息存储到响应式变量中，用于显示
-    examStatistics.value = statistics
-  } catch (error) {
-    console.warn('getExamStatistics API不存在，使用计算的统计信息:', error)
-    // 基于学生成绩数据计算统计信息
-    calculateStatisticsFromStudentData()
-  }
+  console.log('计算考试统计信息，examId:', examIdStr)
+  // 直接基于学生成绩数据计算统计信息
+  calculateStatisticsFromStudentData()
 }
 
 // 基于学生数据计算统计信息
 function calculateStatisticsFromStudentData() {
-  const completedStudents = examStudents.value.filter(s => s.status === '已完成' && s.score !== undefined && s.score !== null)
-  const scores = completedStudents.map(s => s.score)
+  console.log('开始计算统计信息，学生数据:', examStudents.value)
+
+  const completedStudents = examStudents.value.filter(s => {
+    // 更严格的数据验证
+    if (s.status !== '已完成') return false
+
+    let score = s.score
+    if (score === null || score === undefined || score === '') return false
+
+    // 处理字符串类型的分数
+    if (typeof score === 'string') {
+      score = parseFloat(score.trim())
+    }
+
+    // 确保是有效数字
+    return !isNaN(score) && isFinite(score) && score >= 0
+  })
+
+  console.log('已完成考试的学生:', completedStudents)
+
+  const scores = completedStudents.map(s => {
+    let score = s.score
+    if (typeof score === 'string') {
+      score = parseFloat(score.trim())
+    }
+    return Number(score)
+  }).filter(score => !isNaN(score) && isFinite(score))
+
+  console.log('有效分数列表:', scores)
 
   examStatistics.value = {
     totalStudents: examStudents.value.length,
@@ -823,6 +962,8 @@ function calculateStatisticsFromStudentData() {
     minScore: scores.length > 0 ? Math.min(...scores) : 0,
     scoreDistribution: []
   }
+
+  console.log('计算完成的统计信息:', examStatistics.value)
 }
 
 // 获取题型分析数据
@@ -832,16 +973,76 @@ async function fetchQuestionTypeAnalysis(examIdStr) {
     const analysis = await examAPI.getExamQuestionTypeAnalysis(examIdStr)
     console.log('获取到的题型分析数据:', analysis)
 
-    if (Array.isArray(analysis)) {
+    if (Array.isArray(analysis) && analysis.length > 0) {
       questionTypeData.value = analysis
     } else {
-      questionTypeData.value = []
+      // 如果API返回空数据，尝试基于现有数据生成简化的题型分析
+      console.log('API返回空数据，尝试基于现有数据生成题型分析')
+      generateQuestionTypeAnalysisFromLocalData()
     }
   } catch (error) {
-    console.warn('获取题型分析失败，后端可能没有实现此接口:', error)
-    questionTypeData.value = []
-    // 不显示错误消息，因为这个接口可能后端没有实现
+    console.warn('获取题型分析失败，尝试基于现有数据生成:', error)
+    // 如果API失败，基于现有数据生成简化的题型分析
+    generateQuestionTypeAnalysisFromLocalData()
   }
+}
+
+// 基于现有数据生成题型分析
+function generateQuestionTypeAnalysisFromLocalData() {
+  if (!examQuestions.value || examQuestions.value.length === 0) {
+    console.log('没有题目数据，清空题型分析数据')
+    // 如果没有题目数据，清空数据，让图表显示无数据状态
+    questionTypeData.value = []
+    return
+  }
+
+  // 统计题型分布
+  const typeStats = {}
+  examQuestions.value.forEach(question => {
+    const type = question.questionType || 'UNKNOWN'
+    if (!typeStats[type]) {
+      typeStats[type] = {
+        questionType: type,
+        count: 0,
+        totalPossibleScore: 0,
+        averageScore: 0
+      }
+    }
+    typeStats[type].count++
+    typeStats[type].totalPossibleScore += Number(question.scorePoints || 0)
+  })
+
+  // 计算每种题型的平均分（基于已完成的学生）
+  const completedStudents = examStudents.value.filter(s => {
+    const score = typeof s.score === 'number' ? s.score : parseFloat(s.score);
+    return s.status === '已完成' && !isNaN(score) && score !== null && score !== undefined;
+  })
+
+  Object.keys(typeStats).forEach(type => {
+    // 只有当有学生完成考试时才计算平均得分
+    if (completedStudents.length > 0) {
+      const totalExamScore = examQuestions.value.reduce((sum, q) => sum + Number(q.scorePoints || 0), 0)
+      const avgExamScore = completedStudents.reduce((sum, s) => {
+        const score = typeof s.score === 'number' ? s.score : parseFloat(s.score) || 0
+        return sum + score
+      }, 0) / completedStudents.length
+
+      // 按题型分数比例计算平均得分
+      const scoreRatio = totalExamScore > 0 ? avgExamScore / totalExamScore : 0
+      typeStats[type].averageScore = Math.round(typeStats[type].totalPossibleScore * scoreRatio * 10) / 10
+    } else {
+      // 如果没有完成的学生，平均得分为0，不显示虚假数据
+      typeStats[type].averageScore = 0
+    }
+  })
+
+  questionTypeData.value = Object.values(typeStats)
+  console.log('基于现有数据生成的题型分析:', questionTypeData.value)
+
+  // 重新渲染题型图表
+  nextTick(() => {
+    initQuestionTypeChart()
+  })
 }
 
 // 获取题目列表和统计信息
@@ -873,6 +1074,12 @@ async function fetchExamQuestions() {
 
     // 计算题目统计信息
     calculateQuestionStatistics()
+
+    // 如果题型分析数据为空，尝试基于题目数据重新生成
+    if (!questionTypeData.value || questionTypeData.value.length === 0) {
+      console.log('题目数据加载完成，重新生成题型分析')
+      generateQuestionTypeAnalysisFromLocalData()
+    }
 
   } catch (error) {
     console.error('获取题目列表失败:', error)
@@ -1094,10 +1301,13 @@ function initScoreDistributionChart() {
   }
   scoreDistributionChart = echarts.init(chartDom)
   // 检查是否有学生数据
-  const validStudents = examStudents.value.filter(s =>
-    s.score !== undefined && s.score !== null && typeof s.score === 'number'
-  )
+  const validStudents = examStudents.value.filter(s => {
+    const score = typeof s.score === 'number' ? s.score : parseFloat(s.score);
+    return !isNaN(score) && score !== null && score !== undefined;
+  })
   console.log('有效学生数据数量:', validStudents.length)
+  console.log('所有学生数据:', examStudents.value.map(s => ({ studentId: s.studentId, score: s.score, scoreType: typeof s.score })))
+  console.log('有效学生数据:', validStudents.map(s => ({ studentId: s.studentId, score: s.score, scoreType: typeof s.score })))
   if (validStudents.length === 0) {
     // 显示无数据状态
     console.log('显示成绩分布无数据状态')
@@ -1115,9 +1325,10 @@ function initScoreDistributionChart() {
   const distribution = scoreRanges.map(range => {
     return {
       range: range.label,
-      count: validStudents.filter(s =>
-        s.score >= range.min && s.score <= range.max
-      ).length
+      count: validStudents.filter(s => {
+        const score = typeof s.score === 'number' ? s.score : parseFloat(s.score);
+        return score >= range.min && score <= range.max;
+      }).length
     }
   })
   const option = {
@@ -1189,58 +1400,103 @@ function initQuestionTypeChart() {
 
   // 检查是否有题型数据
   console.log('题型数据:', questionTypeData.value)
-  if (!questionTypeData.value || questionTypeData.value.length === 0) {
-    // 显示无数据状态
-    console.log('显示题型分析无数据状态')
-    questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有学生完成'))
+  console.log('题型数据长度:', questionTypeData.value ? questionTypeData.value.length : 0)
+  console.log('题目数据长度:', examQuestions.value ? examQuestions.value.length : 0)
+
+  // 如果没有题目数据或题型数据，直接显示无数据状态
+  if (!examQuestions.value || examQuestions.value.length === 0) {
+    console.log('没有题目数据，显示题型分析无数据状态')
+    questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有题目数据'))
     return
+  }
+
+  // 如果没有题型数据，尝试生成
+  if (!questionTypeData.value || questionTypeData.value.length === 0) {
+    console.log('题型数据为空，尝试基于题目数据生成')
+    generateQuestionTypeAnalysisFromLocalData()
+
+    // 如果生成后仍然没有数据，显示无数据状态
+    if (!questionTypeData.value || questionTypeData.value.length === 0) {
+      console.log('生成题型数据失败，显示无数据状态')
+      questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有题目数据'))
+      return
+    }
   }
 
   // 使用真实的题型数据
   const questionTypes = questionTypeData.value.map(item => ({
-    type: item.questionType || '未知题型',
-    totalScore: item.totalScore || 0,
-    avgScore: item.averageScore || 0
+    type: getQuestionTypeText(item.questionType) || '未知题型',
+    totalScore: item.totalScore || item.totalPossibleScore || 0,
+    avgScore: item.averageScore || 0,
+    count: item.count || 0
   }))
+
+  console.log('处理后的题型数据:', questionTypes)
+
+  // 如果没有有效数据，显示提示
+  if (questionTypes.length === 0 || questionTypes.every(t => t.totalScore === 0 && t.avgScore === 0)) {
+    console.log('题型数据为空或无效，显示无数据状态')
+    questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有学生完成'))
+    return
+  }
 
   const option = {
     title: {
       text: '题型得分分析',
-      left: 'center'
+      left: 'center',
+      textStyle: {
+        fontSize: 16,
+        fontWeight: 'bold'
+      }
     },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
         type: 'shadow'
+      },
+      formatter: function(params) {
+        let result = params[0].name + '<br/>'
+        params.forEach(param => {
+          result += `${param.seriesName}: ${param.value}分<br/>`
+        })
+        return result
       }
     },
     legend: {
-      data: ['总分', '平均得分'],
+      data: ['满分', '平均得分'],
       top: 30
     },
     grid: {
       left: '3%',
       right: '4%',
       bottom: '3%',
-      top: '15%',
+      top: '20%',
       containLabel: true
     },
     xAxis: {
       type: 'category',
-      data: questionTypes.map(item => item.type)
+      data: questionTypes.map(item => item.type),
+      axisLabel: {
+        interval: 0,
+        rotate: questionTypes.length > 3 ? 45 : 0
+      }
     },
     yAxis: {
       type: 'value',
-      name: '分数'
+      name: '分数',
+      nameTextStyle: {
+        color: '#666'
+      }
     },
     series: [
       {
-        name: '总分',
+        name: '满分',
         type: 'bar',
         data: questionTypes.map(item => item.totalScore),
         itemStyle: {
           color: '#E6A23C'
-        }
+        },
+        barWidth: '30%'
       },
       {
         name: '平均得分',
@@ -1248,7 +1504,8 @@ function initQuestionTypeChart() {
         data: questionTypes.map(item => item.avgScore),
         itemStyle: {
           color: '#67C23A'
-        }
+        },
+        barWidth: '30%'
       }
     ]
   }
@@ -1533,11 +1790,23 @@ function createNoDataOption(title, message = '暂时没有学生完成') {
 // 统一初始化所有图表
 function initAllCharts() {
   console.log('开始初始化所有图表，学生数据数量:', examStudents.value.length)
+  console.log('题目数据数量:', examQuestions.value.length)
+  console.log('题型数据数量:', questionTypeData.value.length)
+
   // 确保DOM元素存在后再初始化图表
   nextTick(() => {
     try {
       initScoreDistributionChart()
+
+      // 处理题型图表数据
+      if (questionTypeData.value.length === 0 && examQuestions.value.length > 0) {
+        console.log('题型数据为空但有题目数据，先生成题型分析')
+        generateQuestionTypeAnalysisFromLocalData()
+      }
+
+      // 初始化题型图表
       initQuestionTypeChart()
+
       initPassRateChart()
       initScoreRangeChart()
       initCompletionChart()
@@ -1546,15 +1815,16 @@ function initAllCharts() {
       console.error('图表初始化失败:', error)
     }
   })
-  // 响应窗口大小变化
-  window.addEventListener('resize', () => {
-    if (scoreDistributionChart) scoreDistributionChart.resize()
-    if (questionTypeChart) questionTypeChart.resize()
-    if (passRateChart) passRateChart.resize()
-    if (scoreRangeChart) scoreRangeChart.resize()
-    if (completionChart) completionChart.resize()
-  })
 }
+
+// 响应窗口大小变化
+window.addEventListener('resize', () => {
+  if (scoreDistributionChart) scoreDistributionChart.resize()
+  if (questionTypeChart) questionTypeChart.resize()
+  if (passRateChart) passRateChart.resize()
+  if (scoreRangeChart) scoreRangeChart.resize()
+  if (completionChart) completionChart.resize()
+})
 
 // 处理搜索输入
 function handleSearchInput() {
@@ -1588,14 +1858,35 @@ function getDetailScoreClass(score, totalScore) {
   return 'score-excellent'
 }
 
+// 标准化状态显示
+function normalizeStatus(status) {
+  switch(status) {
+    case '未参与':
+    case '未完成':
+    case '未开始':
+      return '未完成'
+    case '已完成':
+    case 'completed':
+    case 'finished':
+      return '已完成'
+    case '进行中':
+    case 'in_progress':
+    case 'ongoing':
+      return '进行中'
+    default:
+      return status || '未完成'
+  }
+}
+
 // 获取状态类型
 function getStatusType(status) {
-  switch(status) {
+  const normalizedStatus = normalizeStatus(status)
+  switch(normalizedStatus) {
     case '已完成':
       return 'success'
     case '进行中':
       return 'warning'
-    case '未开始':
+    case '未完成':
       return 'info'
     default:
       return 'info'

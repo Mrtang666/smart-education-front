@@ -134,11 +134,20 @@
                   ></el-input>
                 </div>
                 
+                <div v-else-if="question.questionType === 'ESSAY_QUESTION'" class="question-options">
+                  <el-input
+                    v-model="userAnswers[question.questionId]"
+                    type="textarea"
+                    :rows="4"
+                    placeholder="请输入您的答案"
+                  ></el-input>
+                </div>
+
                 <div v-else-if="question.questionType === 'SUBJECTIVE'" class="question-options">
-                  <el-input 
-                    v-model="userAnswers[question.questionId]" 
-                    type="textarea" 
-                    :rows="4" 
+                  <el-input
+                    v-model="userAnswers[question.questionId]"
+                    type="textarea"
+                    :rows="4"
                     placeholder="请输入您的答案"
                   ></el-input>
                 </div>

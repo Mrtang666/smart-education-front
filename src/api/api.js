@@ -2184,17 +2184,47 @@ export const examAPI = {
             const examIdStr = String(examId);
             console.log(`获取考试学生成绩列表，考试ID: ${examIdStr}`);
 
-            const response = await axios.get(`/api/student-exam/exam/${examIdStr}/score`);
-
-            // 确保返回的学生ID都是字符串类型
-            if (Array.isArray(response.data)) {
-                return response.data.map(student => ({
-                    ...student,
-                    studentId: String(student.studentId)
-                }));
+            // 新逻辑：先获取参加考试的学生列表，然后为每个学生获取成绩
+            // 1. 获取参加考试的学生ID列表
+            let studentIds = [];
+            try {
+                const studentsResponse = await axios.get(`/api/student-exam/exam/${examIdStr}/students`);
+                studentIds = Array.isArray(studentsResponse.data) ? studentsResponse.data : [];
+                console.log(`获取到参加考试的学生ID列表:`, studentIds);
+            } catch (studentsError) {
+                console.warn('获取参加考试的学生列表失败:', studentsError);
+                return []; // 如果获取不到学生列表，返回空数组
             }
 
-            return response.data;
+            // 2. 为每个学生获取成绩
+            const studentScores = [];
+            for (const studentId of studentIds) {
+                try {
+                    const studentIdStr = String(studentId);
+                    const scoreResponse = await axios.get(`/api/student-exam/student/${studentIdStr}/exam/${examIdStr}/score`);
+
+                    if (scoreResponse.data) {
+                        // 确保数据格式正确，包含必要的字段
+                        const scoreData = scoreResponse.data;
+                        studentScores.push({
+                            studentId: studentIdStr,
+                            fullName: scoreData.fullName || scoreData.studentName || `学生${studentIdStr}`,
+                            score: typeof scoreData.score === 'number' ? scoreData.score : parseFloat(scoreData.score) || 0,
+                            submitTime: scoreData.submitTime || scoreData.submittedAt || null,
+                            status: scoreData.status || '已完成',
+                            // 保留原始数据的其他字段
+                            ...scoreData
+                        });
+                    }
+                } catch (scoreError) {
+                    console.warn(`获取学生 ${studentId} 的成绩失败:`, scoreError);
+                    // 继续处理其他学生，不中断整个流程
+                }
+            }
+
+            console.log(`成功获取 ${studentScores.length} 个学生的成绩`);
+            return studentScores;
+
         } catch (error) {
             console.error('获取考试学生成绩列表失败:', error.response ? error.response.data : error.message);
             throw error;
@@ -2222,12 +2252,108 @@ export const examAPI = {
             const studentIdStr = String(studentId);
             console.log(`获取学生答题详情，考试ID: ${examIdStr}, 学生ID: ${studentIdStr}`);
 
-            const response = await axios.get(`/api/student-exam/exam/${examIdStr}/student/${studentIdStr}/answers`);
+            // 修改接口路径：使用正确的接口 /api/student-exam/student/{studentId}/exam/{examId}
+            const response = await axios.get(`/api/student-exam/student/${studentIdStr}/exam/${examIdStr}`);
 
             return response.data;
         } catch (error) {
             console.error('获取学生答题详情失败:', error.response ? error.response.data : error.message);
             throw error;
+        }
+    },
+
+    /**
+     * 11.获取考试的题型分析数据（教师视角）
+     * @param {string|number} examId 考试ID
+     * @returns {Promise<Array<Object>>} 题型分析列表
+     * 返回字段：
+     * - questionType: 题目类型
+     * - totalScore: 该题型总分
+     * - averageScore: 该题型平均得分
+     * - count: 该题型题目数量
+     */
+    async getExamQuestionTypeAnalysis(examId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const examIdStr = String(examId);
+            console.log(`获取考试题型分析，考试ID: ${examIdStr}`);
+
+            // 1. 获取考试题目 - 使用正确的接口
+            const questionsResponse = await axios.get(`/api/question/exam/${examIdStr}`);
+            const questions = questionsResponse.data || [];
+
+            // 2. 获取参加考试的学生列表
+            let studentIds = [];
+            try {
+                const studentsResponse = await axios.get(`/api/student-exam/exam/${examIdStr}/students`);
+                studentIds = Array.isArray(studentsResponse.data) ? studentsResponse.data : [];
+            } catch (error) {
+                console.warn('获取学生列表失败，无法计算题型分析');
+                return [];
+            }
+
+            // 3. 统计每种题型的数据
+            const typeStats = {};
+
+            // 初始化题型统计
+            questions.forEach(question => {
+                const type = question.questionType || 'UNKNOWN';
+                if (!typeStats[type]) {
+                    typeStats[type] = {
+                        questionType: type,
+                        totalScore: 0,
+                        totalPossibleScore: 0,
+                        count: 0,
+                        studentScores: []
+                    };
+                }
+                typeStats[type].count++;
+                typeStats[type].totalPossibleScore += Number(question.scorePoints || 0);
+            });
+
+            // 4. 收集学生在各题型上的得分
+            for (const studentId of studentIds) {
+                try {
+                    const studentIdStr = String(studentId);
+                    // 修改接口路径：使用正确的接口 /api/student-exam/student/{studentId}/exam/{examId}
+                    const answersResponse = await axios.get(`/api/student-exam/student/${studentIdStr}/exam/${examIdStr}`);
+                    const answers = answersResponse.data || [];
+
+                    answers.forEach(answer => {
+                        const question = questions.find(q => String(q.questionId) === String(answer.questionId));
+                        if (question) {
+                            const type = question.questionType || 'UNKNOWN';
+                            if (typeStats[type]) {
+                                const score = Number(answer.score || 0);
+                                typeStats[type].studentScores.push(score);
+                                typeStats[type].totalScore += score;
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.warn(`获取学生 ${studentId} 答题详情失败:`, error);
+                }
+            }
+
+            // 5. 计算平均分并返回结果
+            const result = Object.values(typeStats).map(stat => ({
+                questionType: stat.questionType,
+                totalScore: stat.totalPossibleScore, // 该题型的总可能分数
+                averageScore: stat.studentScores.length > 0
+                    ? Math.round((stat.totalScore / stat.studentScores.length) * 10) / 10
+                    : 0, // 该题型的平均得分
+                actualTotalScore: stat.totalScore, // 该题型的实际总得分
+                count: stat.count,
+                studentCount: stat.studentScores.length // 参与答题的学生数量
+            }));
+
+            console.log('计算得到的题型分析数据:', result);
+            return result;
+
+        } catch (error) {
+            console.error('获取考试题型分析失败:', error.response ? error.response.data : error.message);
+            // 如果计算失败，返回空数组而不是抛出错误
+            return [];
         }
     },
 

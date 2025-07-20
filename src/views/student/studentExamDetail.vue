@@ -95,7 +95,7 @@
               </div>
 
               <!-- 多选题 -->
-              <div v-else-if="question.questionType === 'MULTIPLE_CHOICE'" class="question-options">
+              <div v-else-if="question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE'" class="question-options">
                 <el-checkbox-group v-model="userAnswers[question.questionId]" class="option-group">
                   <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex"
                     class="option-item">
@@ -129,10 +129,25 @@
                   placeholder="请输入您的答案"></el-input>
               </div>
 
-              <!-- 主观题 -->
+              <!-- 简答题 -->
+              <div v-else-if="question.questionType === 'ESSAY_QUESTION'" class="question-options">
+                <el-input v-model="userAnswers[question.questionId]" type="textarea" :rows="4"
+                  placeholder="请输入您的答案"></el-input>
+              </div>
+
+              <!-- 主观题（兼容旧版本） -->
               <div v-else-if="question.questionType === 'SUBJECTIVE'" class="question-options">
                 <el-input v-model="userAnswers[question.questionId]" type="textarea" :rows="4"
                   placeholder="请输入您的答案"></el-input>
+              </div>
+
+              <!-- 未知题型的调试信息 -->
+              <div v-else class="question-options">
+                <div class="debug-info">
+                  ⚠️ 未识别的题型: {{ question.questionType }}
+                </div>
+                <el-input v-model="userAnswers[question.questionId]" type="textarea" :rows="4"
+                  placeholder="请输入您的答案（默认文本输入）"></el-input>
               </div>
 
               <!-- 提交按钮 -->
@@ -297,7 +312,7 @@ const initUserAnswers = (answers) => {
 
     // 如果已有答案
     if (answer.studentAnswer) {
-      if (questionType === 'MULTIPLE_CHOICE') {
+      if (questionType === 'MULTIPLE_CHOICE' || questionType === 'MULTI_CHOICE') {
         try {
           userAnswersData[questionId] = answer.studentAnswer.split(',').map(item => item.trim())
         } catch (e) {
@@ -337,7 +352,7 @@ const initEmptyUserAnswers = () => {
     const questionType = question.questionType
 
     // 根据题目类型初始化空答案
-    if (questionType === 'MULTIPLE_CHOICE') {
+    if (questionType === 'MULTIPLE_CHOICE' || questionType === 'MULTI_CHOICE') {
       userAnswersData[questionId] = []
     } else {
       userAnswersData[questionId] = ''
@@ -738,13 +753,7 @@ const fetchExamDetail = async () => {
       }
       showReferenceAnswer.value = true
 
-      // 自动加载考试成绩
-      try {
-        const scoreResponse = await studentExamAPI.getExamScore(sid, eid)
-        examScore.value = scoreResponse
-      } catch (error) {
-        console.warn('获取考试成绩失败:', error)
-      }
+      // 考试成绩加载功能已移除
     }
   } catch (error) {
     console.error('获取考试详情失败:', error)
@@ -765,19 +774,45 @@ const submitAnswer = async (question) => {
 
   try {
     // 使用 student-exam/submit 接口提交答案（请求体格式）
-    const formattedAnswer = question.questionType === 'MULTIPLE_CHOICE' ? answer.join(',') : answer
+    const formattedAnswer = (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') ? answer.join(',') : answer
+
+    // 获取当前时间作为提交时间
+    const submitTime = new Date().toISOString()
+
+    // 计算客观题成绩
+    let score = null
+    if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'MULTIPLE_CHOICE') {
+      // 客观题自动评分
+      const correctAnswer = question.referenceAnswer || question.correctAnswer
+      if (correctAnswer && formattedAnswer) {
+        // 单选题比较
+        if (question.questionType === 'SINGLE_CHOICE') {
+          score = formattedAnswer.trim() === correctAnswer.trim() ? Number(question.scorePoints || 0) : 0
+        }
+        // 多选题比较（需要排序后比较）
+        else if (question.questionType === 'MULTIPLE_CHOICE') {
+          const userAnswerSorted = formattedAnswer.split(',').map(a => a.trim()).sort().join(',')
+          const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
+          score = userAnswerSorted === correctAnswerSorted ? Number(question.scorePoints || 0) : 0
+        }
+      }
+    }
 
     const answerData = {
-      examId: String(examId.value),
-      questionId: String(questionId),
-      studentId: String(studentId),
+      examId: Number(examId.value),
+      questionId: Number(questionId),
+      studentId: Number(studentId),
       studentAnswer: formattedAnswer,
+      score: score, // 客观题自动评分，主观题为null等待教师批改
       examTitle: examInfo.value.title,
       questionContent: question.content,
       questionType: question.questionType,
-      graded: false
+      createdAt: submitTime,
+      updatedAt: submitTime,
+      graded: score !== null // 客观题标记为已批改，主观题为未批改
     }
 
+    console.log('提交单个答案数据:', answerData)
     await studentExamAPI.submitAnswer(answerData)
 
     // 标记为已答题
@@ -811,26 +846,68 @@ const submitExam = async () => {
   submitting.value = true
 
   try {
+    // 获取当前时间作为提交时间
+    const submitTime = new Date().toISOString()
+
     // 准备批量提交的答案
     const answerList = questions.value.map(question => {
       const questionId = question.questionId
       const answer = userAnswers.value[questionId]
 
+      // 格式化答案
+      let formattedAnswer = ''
+      if (question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer)) {
+        formattedAnswer = answer.join(',')
+      } else {
+        formattedAnswer = answer || ''
+      }
+
+      // 计算客观题成绩
+      let score = null
+      if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'MULTIPLE_CHOICE') {
+        // 客观题自动评分
+        const correctAnswer = question.referenceAnswer || question.correctAnswer
+        if (correctAnswer && formattedAnswer) {
+          // 单选题比较
+          if (question.questionType === 'SINGLE_CHOICE') {
+            score = formattedAnswer.trim() === correctAnswer.trim() ? Number(question.scorePoints || 0) : 0
+          }
+          // 多选题比较（需要排序后比较）
+          else if (question.questionType === 'MULTIPLE_CHOICE') {
+            const userAnswerSorted = formattedAnswer.split(',').map(a => a.trim()).sort().join(',')
+            const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
+            score = userAnswerSorted === correctAnswerSorted ? Number(question.scorePoints || 0) : 0
+          }
+        }
+      }
+
       return {
-        examId: String(examId.value),
-        questionId: String(questionId),
-        studentId: String(studentId),
-        studentAnswer: question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer) ? answer.join(',') : (answer || ''),
+        examId: Number(examId.value),
+        questionId: Number(questionId),
+        studentId: Number(studentId),
+        studentAnswer: formattedAnswer,
+        score: score, // 客观题自动评分，主观题为null等待教师批改
         examTitle: examInfo.value.title,
         questionContent: question.content,
-        questionType: question.questionType
+        questionType: question.questionType,
+        createdAt: submitTime,
+        updatedAt: submitTime,
+        graded: score !== null // 客观题标记为已批改，主观题为未批改
       }
     })
 
-    // 使用 student-exam/submit 接口逐个提交答案（请求体格式）
-    for (const answerData of answerList) {
-      await studentExamAPI.submitAnswer(answerData)
-    }
+    console.log('准备提交的答案数据:', answerList)
+
+    // 使用批量提交接口
+    await studentExamAPI.batchSubmitAnswers(answerList)
+
+    // 计算总成绩
+    const totalCalculatedScore = answerList.reduce((sum, answer) => {
+      return sum + (answer.score || 0)
+    }, 0)
+
+    console.log('考试提交完成，总成绩:', totalCalculatedScore)
+    console.log('提交时间:', submitTime)
 
     // 更新考试状态
     examStatus.value = 'SUBMITTED'
@@ -917,9 +994,11 @@ const scrollToQuestion = (questionIndex) => {
 const getQuestionTypeText = (type) => {
   const typeMap = {
     'SINGLE_CHOICE': '单选题',
+    'MULTI_CHOICE': '多选题',
     'MULTIPLE_CHOICE': '多选题',
     'TRUE_FALSE': '判断题',
     'FILL_BLANK': '填空题',
+    'ESSAY_QUESTION': '简答题',
     'SUBJECTIVE': '主观题'
   }
   return typeMap[type] || type
@@ -992,11 +1071,11 @@ const getQuestionMainContent = (question) => {
 const isAnswerValid = (question) => {
   const answer = userAnswers.value[question.questionId]
 
-  if (question.questionType === 'MULTIPLE_CHOICE') {
+  if (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') {
     return Array.isArray(answer) && answer.length > 0
   } else if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'TRUE_FALSE') {
     return answer && answer.trim() !== ''
-  } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE') {
+  } else if (question.questionType === 'FILL_BLANK' || question.questionType === 'SUBJECTIVE' || question.questionType === 'ESSAY_QUESTION') {
     return answer && answer.trim() !== ''
   }
 
@@ -1249,6 +1328,44 @@ onUnmounted(() => {
 .question-options {
   margin-top: 15px;
   margin-bottom: 20px;
+}
+
+/* 简答题和填空题的文本输入框样式 */
+.question-options .el-textarea {
+  width: 100%;
+}
+
+.question-options .el-textarea__inner {
+  border: 2px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.question-options .el-textarea__inner:focus {
+  border-color: #409EFF;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+}
+
+.question-options .el-textarea__inner::placeholder {
+  color: #c0c4cc;
+  font-style: italic;
+}
+
+/* 调试信息样式 */
+.question-options .debug-info {
+  color: #f56c6c;
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .option-group {

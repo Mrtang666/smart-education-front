@@ -12,36 +12,75 @@
             <el-progress :percentage="currentPlan.progress || 0" :status="getProgressStatus(currentPlan.progress || 0)"></el-progress>
           </div>
           
-          <h3 class="section-title">今日学习任务</h3>
-          <el-empty v-if="!todayActivities || todayActivities.length === 0" description="暂无今日任务"></el-empty>
-          <div v-else class="daily-activities">
-            <el-timeline>
-              <el-timeline-item
-                v-for="activity in todayActivities"
-                :key="activity.activityId"
-                :type="getStatusType(activity.status)"
-              >
-                <el-card class="activity-card">
-                  <div class="activity-header">
-                    <h4>{{ activity.title }}</h4>
-                    <el-tag :type="getActivityTypeTag(activity.type)">{{ getActivityTypeText(activity.type) }}</el-tag>
-                  </div>
-                  <p>{{ activity.description }}</p>
-                  <p><strong>预计用时：</strong>{{ activity.duration }}分钟</p>
-                  <el-tag :type="getStatusTagType(activity.status)">{{ getStatusText(activity.status) }}</el-tag>
-                  
-                  <div class="activity-actions" v-if="activity.status !== 'completed'">
-                    <el-button 
-                      type="primary" 
-                      size="small"
-                      @click="updateActivityStatus(activity.activityId, 'completed')"
-                    >
-                      标记为已完成
-                    </el-button>
-                  </div>
-                </el-card>
-              </el-timeline-item>
-            </el-timeline>
+          <div class="daily-section">
+            <div class="section-header">
+              <h3 class="section-title">今日学习任务</h3>
+              <div class="date-selector">
+                <el-date-picker
+                  v-model="selectedDate"
+                  type="date"
+                  placeholder="选择日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  @change="fetchActivitiesByDate"
+                  size="small"
+                />
+                <el-button size="small" @click="goToToday">今天</el-button>
+              </div>
+            </div>
+
+            <div v-if="loadingStates.dailyActivities" class="loading-container">
+              <el-skeleton :rows="2" animated />
+            </div>
+
+            <el-empty v-else-if="!todayActivities || todayActivities.length === 0" description="暂无学习任务">
+              <template #description>
+                <span v-if="selectedDate">{{ selectedDate }} 暂无学习任务</span>
+                <span v-else>今日暂无学习任务</span>
+              </template>
+            </el-empty>
+
+            <div v-else class="daily-activities">
+              <el-timeline>
+                <el-timeline-item
+                  v-for="activity in todayActivities"
+                  :key="activity.activityId"
+                  :type="getStatusType(activity.status)"
+                >
+                  <el-card class="activity-card">
+                    <div class="activity-header">
+                      <h4>{{ activity.title }}</h4>
+                      <el-tag :type="getActivityTypeTag(activity.type)">{{ getActivityTypeText(activity.type) }}</el-tag>
+                    </div>
+                    <p>{{ activity.description }}</p>
+                    <div class="activity-meta">
+                      <p v-if="activity.duration"><strong>预计用时：</strong>{{ activity.duration }}分钟</p>
+                      <p v-if="activity.difficulty"><strong>难度：</strong>{{ activity.difficulty }}</p>
+                      <p v-if="activity.priority"><strong>优先级：</strong>{{ activity.priority }}</p>
+                    </div>
+                    <el-tag :type="getStatusTagType(activity.status)">{{ getStatusText(activity.status) }}</el-tag>
+
+                    <div class="activity-actions" v-if="activity.status !== 'completed'">
+                      <el-button
+                        type="primary"
+                        size="small"
+                        @click="updateActivityStatus(activity.activityId, 'completed')"
+                      >
+                        标记为已完成
+                      </el-button>
+                      <el-button
+                        v-if="activity.status === 'pending'"
+                        type="warning"
+                        size="small"
+                        @click="updateActivityStatus(activity.activityId, 'in_progress')"
+                      >
+                        开始学习
+                      </el-button>
+                    </div>
+                  </el-card>
+                </el-timeline-item>
+              </el-timeline>
+            </div>
           </div>
           
           <h3 class="section-title">推荐学习资源</h3>
@@ -142,24 +181,56 @@
       
       <el-tab-pane label="搜索资源" name="search">
         <div class="search-container">
+          <div class="search-options">
+            <el-radio-group v-model="searchType" class="search-type-group">
+              <el-radio value="keyword">关键词搜索</el-radio>
+              <el-radio value="planName">按计划名称</el-radio>
+            </el-radio-group>
+          </div>
+
           <el-input
             v-model="searchKeyword"
-            placeholder="输入关键词搜索学习资源"
+            :placeholder="searchType === 'keyword' ? '输入关键词搜索学习资源' : '输入学习计划名称'"
             class="search-input"
+            @keyup.enter="searchResources"
           >
             <template #append>
-              <el-button @click="searchResources">搜索</el-button>
+              <el-button @click="searchResources" :loading="loadingStates.search">
+                {{ searchType === 'keyword' ? '搜索' : '查找' }}
+              </el-button>
             </template>
           </el-input>
-          
-          <el-empty v-if="!searchResults || searchResults.length === 0" description="暂无搜索结果"></el-empty>
+
+          <div v-if="loadingStates.search" class="loading-container">
+            <el-skeleton :rows="3" animated />
+          </div>
+
+          <el-empty v-else-if="!searchResults || searchResults.length === 0" description="暂无搜索结果">
+            <template #description>
+              <span v-if="searchKeyword">没有找到与"{{ searchKeyword }}"相关的资源</span>
+              <span v-else>请输入搜索内容</span>
+            </template>
+          </el-empty>
+
           <div v-else class="search-results">
+            <div class="results-header">
+              <span class="results-count">找到 {{ searchResults.length }} 个相关资源</span>
+            </div>
             <el-card v-for="resource in searchResults" :key="resource.resourceId" class="resource-card">
-              <h4>{{ resource.title }}</h4>
-              <p>{{ resource.description }}</p>
-              <p><strong>类型：</strong>{{ resource.resourceType }}</p>
-              <p><strong>相关课程：</strong>{{ resource.courseName }}</p>
-              <el-button type="primary" size="small" @click="openResource(resource.url)">查看资源</el-button>
+              <div class="resource-header">
+                <h4>{{ resource.title }}</h4>
+                <el-tag :type="getResourceTypeTag(resource.resourceType)">{{ resource.resourceType }}</el-tag>
+              </div>
+              <p class="resource-description">{{ resource.description }}</p>
+              <div class="resource-meta">
+                <p v-if="resource.courseName"><strong>相关课程：</strong>{{ resource.courseName }}</p>
+                <p v-if="resource.difficulty"><strong>难度：</strong>{{ resource.difficulty }}</p>
+                <p v-if="resource.duration"><strong>预计时长：</strong>{{ resource.duration }}分钟</p>
+              </div>
+              <div class="resource-actions">
+                <el-button type="primary" size="small" @click="openResource(resource.url)">查看资源</el-button>
+                <el-button v-if="resource.downloadUrl" type="success" size="small" @click="downloadResource(resource.downloadUrl)">下载</el-button>
+              </div>
             </el-card>
           </div>
         </div>
@@ -217,7 +288,8 @@ export default {
       resources: false,
       history: false,
       search: false,
-      courses: false
+      courses: false,
+      dailyActivities: false
     });
     
     // 从认证信息中获取当前学生ID
@@ -245,8 +317,10 @@ export default {
     
     const searchKeyword = ref('');
     const searchResults = ref([]);
+    const searchType = ref('keyword'); // 'keyword' 或 'planName'
     const planDetailsVisible = ref(false);
     const selectedPlan = ref(null);
+    const selectedDate = ref(''); // 选择的日期
     
     // 计算当前是计划的第几天
     const currentDay = computed(() => {
@@ -309,12 +383,43 @@ export default {
         if (currentPlan.value) {
           // 获取推荐资源
           fetchRecommendedResources();
+          // 获取今日学习活动
+          fetchTodayActivities();
         }
       } catch (error) {
         console.error('获取当前学习计划失败:', error);
         ElMessage.error('获取当前学习计划失败，请检查网络连接后重试');
       } finally {
         loadingStates.currentPlan = false;
+      }
+    };
+
+    // 获取今日学习活动
+    const fetchTodayActivities = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD格式
+        const response = await learningPlanAPI.getDailyPlanActivities(studentId.value, today);
+
+        // 如果当前计划存在，更新今日活动
+        if (currentPlan.value && response) {
+          // 将今日活动添加到当前计划中
+          if (!currentPlan.value.dailyActivities) {
+            currentPlan.value.dailyActivities = [];
+          }
+
+          // 查找或创建今日活动记录
+          let todayRecord = currentPlan.value.dailyActivities.find(day => day.day === currentDay.value);
+          if (!todayRecord) {
+            todayRecord = { day: currentDay.value, activities: [] };
+            currentPlan.value.dailyActivities.push(todayRecord);
+          }
+
+          // 更新今日活动
+          todayRecord.activities = response;
+        }
+      } catch (error) {
+        console.error('获取今日学习活动失败:', error);
+        // 不显示错误消息，因为这不是关键功能
       }
     };
     
@@ -612,22 +717,86 @@ export default {
     // 搜索资源
     const searchResources = async () => {
       if (!searchKeyword.value) {
-        ElMessage.warning('请输入搜索关键词');
+        ElMessage.warning(searchType.value === 'keyword' ? '请输入搜索关键词' : '请输入学习计划名称');
         return;
       }
-      
+
+      loadingStates.search = true;
       try {
-        const response = await learningPlanAPI.searchPlanResources(studentId.value, searchKeyword.value);
+        let response;
+
+        if (searchType.value === 'planName') {
+          // 按计划名称搜索资源
+          response = await learningPlanAPI.getPlanResourcesByName(studentId.value, searchKeyword.value);
+        } else {
+          // 按关键词搜索资源
+          response = await learningPlanAPI.searchPlanResources(studentId.value, searchKeyword.value);
+        }
+
         searchResults.value = response || [];
-        
+
         if (!response || searchResults.value.length === 0) {
-          ElMessage.info('没有找到相关资源');
+          ElMessage.info(`没有找到与"${searchKeyword.value}"相关的资源`);
+        } else {
+          ElMessage.success(`找到 ${searchResults.value.length} 个相关资源`);
         }
       } catch (error) {
         console.error('搜索资源失败:', error);
         ElMessage.error('搜索资源失败: ' + (error.message || '未知错误'));
         searchResults.value = [];
+      } finally {
+        loadingStates.search = false;
       }
+    };
+
+    // 根据计划名称获取资源的功能已集成到searchResources中
+
+    // 按日期获取学习活动
+    const fetchActivitiesByDate = async (date) => {
+      if (!date) return;
+
+      loadingStates.dailyActivities = true;
+      try {
+        const response = await learningPlanAPI.getDailyPlanActivities(studentId.value, date);
+
+        // 更新今日活动显示
+        if (currentPlan.value) {
+          if (!currentPlan.value.dailyActivities) {
+            currentPlan.value.dailyActivities = [];
+          }
+
+          // 计算选择日期对应的天数
+          const startDate = new Date(currentPlan.value.createdAt);
+          const selectedDateObj = new Date(date);
+          startDate.setHours(0, 0, 0, 0);
+          selectedDateObj.setHours(0, 0, 0, 0);
+
+          const diffTime = selectedDateObj.getTime() - startDate.getTime();
+          const dayNumber = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+          // 查找或创建对应日期的活动记录
+          let dayRecord = currentPlan.value.dailyActivities.find(day => day.day === dayNumber);
+          if (!dayRecord) {
+            dayRecord = { day: dayNumber, activities: [] };
+            currentPlan.value.dailyActivities.push(dayRecord);
+          }
+
+          // 更新活动
+          dayRecord.activities = response || [];
+        }
+      } catch (error) {
+        console.error('获取指定日期学习活动失败:', error);
+        ElMessage.error('获取学习活动失败');
+      } finally {
+        loadingStates.dailyActivities = false;
+      }
+    };
+
+    // 回到今天
+    const goToToday = () => {
+      const today = new Date().toISOString().split('T')[0];
+      selectedDate.value = today;
+      fetchActivitiesByDate(today);
     };
     
     // 查看计划详情
@@ -716,6 +885,33 @@ export default {
         default: return '未知状态';
       }
     };
+
+    // 获取资源类型标签
+    const getResourceTypeTag = (type) => {
+      switch (type) {
+        case 'video': return 'success';
+        case 'document': return 'info';
+        case 'exercise': return 'warning';
+        case 'quiz': return 'danger';
+        case 'link': return 'primary';
+        default: return 'info';
+      }
+    };
+
+    // 下载资源
+    const downloadResource = (url) => {
+      if (url) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = '';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        ElMessage.success('开始下载资源');
+      } else {
+        ElMessage.warning('下载链接不可用');
+      }
+    };
     
     // 处理ResizeObserver错误
     const handleResizeObserverError = () => {
@@ -736,13 +932,16 @@ export default {
     };
 
     onMounted(() => {
+      // 初始化选择的日期为今天
+      selectedDate.value = new Date().toISOString().split('T')[0];
+
       fetchCurrentPlan();
       fetchPlanHistory();
       fetchCourses();
-      
+
       // 添加ResizeObserver错误处理
       const cleanupErrorHandler = handleResizeObserverError();
-      
+
       // 在组件卸载前恢复原始的错误处理
       onBeforeUnmount(() => {
         cleanupErrorHandler();
@@ -764,14 +963,18 @@ export default {
       loadingStates,
       searchKeyword,
       searchResults,
+      searchType,
       planDetailsVisible,
       selectedPlan,
+      selectedDate,
       currentDay,
       generatePlan,
       resetForm,
       handleCourseChange,
       updateActivityStatus,
       searchResources,
+      fetchActivitiesByDate,
+      goToToday,
       viewPlanDetails,
       openResource,
       formatDate,
@@ -780,7 +983,9 @@ export default {
       getStatusText,
       getProgressStatus,
       getActivityTypeTag,
-      getActivityTypeText
+      getActivityTypeText,
+      getResourceTypeTag,
+      downloadResource
     };
   }
 }
@@ -817,6 +1022,23 @@ export default {
   margin-bottom: 20px;
 }
 
+.daily-section {
+  margin: 20px 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.date-selector {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .daily-activities {
   margin: 20px 0;
 }
@@ -833,8 +1055,20 @@ export default {
   margin-bottom: 10px;
 }
 
+.activity-meta {
+  margin: 10px 0;
+}
+
+.activity-meta p {
+  margin: 5px 0;
+  color: #909399;
+  font-size: 14px;
+}
+
 .activity-actions {
-  margin-top: 10px;
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
 }
 
 .resources-list {
@@ -871,14 +1105,73 @@ export default {
   margin-top: 20px;
 }
 
+.search-options {
+  margin-bottom: 15px;
+}
+
+.search-type-group {
+  display: flex;
+  gap: 20px;
+}
+
 .search-input {
   margin-bottom: 20px;
+}
+
+.loading-container {
+  margin: 20px 0;
+}
+
+.results-header {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.results-count {
+  font-weight: 500;
+  color: #606266;
 }
 
 .search-results {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.resource-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.resource-header h4 {
+  margin: 0;
+  flex: 1;
+  margin-right: 10px;
+}
+
+.resource-description {
+  color: #606266;
+  line-height: 1.5;
+  margin-bottom: 15px;
+}
+
+.resource-meta {
+  margin-bottom: 15px;
+}
+
+.resource-meta p {
+  margin: 5px 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.resource-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .plan-details-dialog {
