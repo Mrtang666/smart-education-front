@@ -18,6 +18,21 @@ const routes = [
     meta: { requiresAuth: false }
   },
   {
+    path: "/test/download",
+    component: () => import("@/views/test/DownloadTest.vue"),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: "/test/file-download",
+    component: () => import("@/views/test/FileDownloadTest.vue"),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: "/test/document-download",
+    component: () => import("@/views/test/DocumentDownloadTest.vue"),
+    meta: { requiresAuth: false }
+  },
+  {
     path: "/teacher",
     component: () => import("@/views/teacher/teacherCenter.vue"),
     redirect: "/teacher/center",

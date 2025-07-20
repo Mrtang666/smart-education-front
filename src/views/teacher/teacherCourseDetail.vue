@@ -810,6 +810,7 @@ import { ArrowLeft, Edit,  Search } from '@element-plus/icons-vue'
 import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI, docAPI, assignmentAPI, problemAPI } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import { getExamStatus, updateExamsStatus, formatDateTime } from '@/utils/examManager'
+import fileDownloadService from '@/services/fileDownloadService'
 
 // 导入组件
 import CourseContent from '@/components/teacher/CourseContent.vue'
@@ -3477,30 +3478,90 @@ function removeAttendance(attendance) {
 
 // 下载文档
 async function downloadDoc(filename) {
+  if (!filename || typeof filename !== 'string') {
+    ElMessage.error('文件名无效')
+    return
+  }
+
   try {
-    ElMessage.info('文档下载中，请稍候...')
-    
-    // 使用API下载文档
-    const blob = await docAPI.downloadDoc(filename)
-    
+    ElMessage.info('开始下载文档...')
+
+    // 使用GET请求，参数通过查询参数传递
+    const apiUrl = `http://118.89.136.119:8000/docs/download?filename=${encodeURIComponent(filename)}`
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/octet-stream'
+      }
+    })
+
+    if (!response.ok) {
+      let errorMessage = `下载失败: ${response.status} ${response.statusText}`
+
+      try {
+        const errorData = await response.json()
+        if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map(err => err.msg || err).join(', ')
+          }
+        }
+      } catch (e) {
+        // 如果无法解析JSON，使用默认错误消息
+      }
+
+      throw new Error(errorMessage)
+    }
+
+    // 获取文件内容
+    const blob = await response.blob()
+
+    if (!blob || blob.size === 0) {
+      throw new Error('下载的文件为空')
+    }
+
     // 创建下载链接
-    const url = URL.createObjectURL(blob)
+    const downloadUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = url
+    link.href = downloadUrl
     link.download = filename
+    link.style.display = 'none'
+
     document.body.appendChild(link)
     link.click()
-    
-    // 清理
+
+    // 清理DOM和URL对象
     setTimeout(() => {
-      URL.revokeObjectURL(url)
-      document.body.removeChild(link)
+      if (document.body.contains(link)) {
+        document.body.removeChild(link)
+      }
+      URL.revokeObjectURL(downloadUrl)
     }, 100)
-    
+
     ElMessage.success('文档下载成功')
+
   } catch (error) {
     console.error('下载文档失败:', error)
-    ElMessage.error('下载文档失败，请稍后重试')
+
+    // 根据错误类型提供不同的提示
+    let userMessage = '下载文档失败，请稍后重试'
+
+    if (error.message.includes('404')) {
+      userMessage = '文档不存在或已被删除'
+    } else if (error.message.includes('403')) {
+      userMessage = '没有权限访问该文档'
+    } else if (error.message.includes('422')) {
+      userMessage = '请求参数错误'
+    } else if (error.message.includes('网络')) {
+      userMessage = '网络连接异常，请检查网络设置'
+    } else if (error.message.includes('timeout')) {
+      userMessage = '下载超时，请稍后重试'
+    } else if (error.message) {
+      userMessage = error.message
+    }
+
+    ElMessage.error(userMessage)
   }
 }
 
