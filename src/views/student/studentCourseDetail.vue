@@ -57,14 +57,7 @@
     <!-- 右侧内容区 -->
     <div class="content-area">
       <!-- 顶部筛选栏 -->
-      <div class="filter-bar" v-if="showFilterBar">
-        <div class="filter-label">筛选：</div>
-        <el-radio-group v-model="filterType" size="small">
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="completed">已完成</el-radio-button>
-          <el-radio-button value="uncompleted">未完成</el-radio-button>
-        </el-radio-group>
-      </div>
+
       
       <!-- 内容区域 -->
       <div class="section-content">
@@ -84,17 +77,12 @@
               <el-empty v-if="knowledgePoints.length === 0" description="暂无知识点数据"></el-empty>
               <div v-else class="knowledge-grid">
                 <!-- 知识点卡片循环 -->
-                <div v-for="(point, index) in knowledgePoints" :key="index" 
+                <div v-for="(point, index) in knowledgePoints" :key="index"
                     class="knowledge-card"
-                    :class="{ 'knowledge-card-completed': point.completed }"
                     @click="handleKnowledgeCardClick(point)">
                   <div class="knowledge-card-header">
                     <div class="knowledge-card-icon" :style="{ backgroundColor: getKnowledgeDifficultyColor(point.difficultyLevel) }">
                       {{ getKnowledgeIcon(point) }}
-                    </div>
-                    <div class="knowledge-card-status">
-                      <el-tag v-if="point.completed" size="small" type="success">已完成</el-tag>
-                      <el-tag v-else size="small" type="info">未完成</el-tag>
                     </div>
                   </div>
                   <div class="knowledge-card-content">
@@ -103,31 +91,12 @@
                   </div>
                   <div class="knowledge-card-footer">
                     <el-button
-                      v-if="!point.completed"
                       type="primary"
                       size="small"
                       plain
                       @click.stop="startLearning(point)"
                     >
                       开始学习
-                    </el-button>
-                    <el-button
-                      v-if="!point.completed"
-                      type="success"
-                      size="small"
-                      @click.stop="markAsCompleted(point)"
-                      :loading="point.updating"
-                    >
-                      标记完成
-                    </el-button>
-                    <el-button
-                      v-if="point.completed"
-                      type="info"
-                      size="small"
-                      plain
-                      @click.stop="reviewKnowledge(point)"
-                    >
-                      复习
                     </el-button>
                   </div>
                 </div>
@@ -704,8 +673,7 @@ export default {
       // 当前激活的部分
       activeSection: 'knowledge',
       
-      // 筛选类型
-      filterType: 'all',
+
       
       // 当前日期
       currentDate: new Date(),
@@ -783,24 +751,12 @@ export default {
   computed: {
     // 根据筛选条件过滤作业
     filteredAssignments() {
-      if (this.filterType === 'all') {
-        return this.assignments;
-      } else if (this.filterType === 'completed') {
-        return this.assignments.filter(item => item.status === '已提交');
-      } else {
-        return this.assignments.filter(item => item.status !== '已提交');
-      }
+      return this.assignments;
     },
-    
+
     // 根据筛选条件过滤考试
     filteredExams() {
-      if (this.filterType === 'all') {
-        return this.exams;
-      } else if (this.filterType === 'completed') {
-        return this.exams.filter(item => item.status === '已完成');
-      } else {
-        return this.exams.filter(item => item.status !== '已完成');
-      }
+      return this.exams;
     },
     
     // 根据筛选条件过滤考勤记录
@@ -813,7 +769,7 @@ export default {
     
     // 是否显示筛选栏
     showFilterBar() {
-      return ['assignment', 'exam', 'knowledge'].includes(this.activeSection);
+      return ['assignment', 'exam'].includes(this.activeSection);
     },
     
     // 考勤统计
@@ -905,39 +861,9 @@ export default {
 
 
 
-    // 标记知识点为已完成
-    async markAsCompleted(point) {
-      try {
-        // 设置更新状态
-        point.updating = true;
-
-        const userInfo = getUserInfo();
-        if (!userInfo || !userInfo.studentId) {
-          this.$message.error('无法获取学生信息，请重新登录');
-          return;
-        }
-
-        // 更新本地状态
-        point.completed = true;
-        this.$message.success('知识点已标记为完成！');
-
-      } catch (error) {
-        console.error('标记完成失败:', error);
-        this.$message.error('标记完成失败: ' + (error.message || '未知错误'));
-      } finally {
-        point.updating = false;
-      }
-    },
-
     // 开始学习知识点
     startLearning(point) {
       // 跳转到知识点详情页面开始学习
-      this.handleKnowledgeCardClick(point);
-    },
-
-    // 复习知识点
-    reviewKnowledge(point) {
-      // 跳转到知识点详情页面进行复习
       this.handleKnowledgeCardClick(point);
     },
     
@@ -1094,9 +1020,7 @@ export default {
       // 直接使用API返回的知识点列表，不再按章节分组
       this.knowledgePoints = knowledgeList.map(item => {
         return {
-          ...item,
-          completed: false, // 默认未完成
-          updating: false // 用于按钮加载状态
+          ...item
         };
       });
     },
@@ -1641,30 +1565,90 @@ export default {
     
     // 下载文档
     async downloadDocument(filename) {
+      if (!filename || typeof filename !== 'string') {
+        this.$message.error('文件名无效')
+        return
+      }
+
       try {
-        this.$message.info('文档下载中，请稍候...');
-        
-        // 使用API下载文档
-        const blob = await docAPI.downloadDoc(filename);
-        
+        this.$message.info('开始下载文档...')
+
+        // 使用GET请求，参数通过查询参数传递
+        const apiUrl = `http://118.89.136.119:8000/docs/download?filename=${encodeURIComponent(filename)}`
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/octet-stream'
+          }
+        })
+
+        if (!response.ok) {
+          let errorMessage = `下载失败: ${response.status} ${response.statusText}`
+
+          try {
+            const errorData = await response.json()
+            if (errorData.detail) {
+              if (typeof errorData.detail === 'string') {
+                errorMessage = errorData.detail
+              } else if (Array.isArray(errorData.detail)) {
+                errorMessage = errorData.detail.map(err => err.msg || err).join(', ')
+              }
+            }
+          } catch (e) {
+            // 如果无法解析JSON，使用默认错误消息
+          }
+
+          throw new Error(errorMessage)
+        }
+
+        // 获取文件内容
+        const blob = await response.blob()
+
+        if (!blob || blob.size === 0) {
+          throw new Error('下载的文件为空')
+        }
+
         // 创建下载链接
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        
-        // 清理
+        const downloadUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = filename
+        link.style.display = 'none'
+
+        document.body.appendChild(link)
+        link.click()
+
+        // 清理DOM和URL对象
         setTimeout(() => {
-          URL.revokeObjectURL(url);
-          document.body.removeChild(link);
-        }, 100);
-        
-        this.$message.success('文档下载成功');
+          if (document.body.contains(link)) {
+            document.body.removeChild(link)
+          }
+          URL.revokeObjectURL(downloadUrl)
+        }, 100)
+
+        this.$message.success('文档下载成功')
+
       } catch (error) {
-        console.error('下载文档失败:', error);
-        this.$message.error('下载文档失败，请稍后重试');
+        console.error('下载文档失败:', error)
+
+        // 根据错误类型提供不同的提示
+        let userMessage = '下载文档失败，请稍后重试'
+
+        if (error.message.includes('404')) {
+          userMessage = '文档不存在或已被删除'
+        } else if (error.message.includes('403')) {
+          userMessage = '没有权限访问该文档'
+        } else if (error.message.includes('422')) {
+          userMessage = '请求参数错误'
+        } else if (error.message.includes('网络')) {
+          userMessage = '网络连接异常，请检查网络设置'
+        } else if (error.message.includes('timeout')) {
+          userMessage = '下载超时，请稍后重试'
+        } else if (error.message) {
+          userMessage = error.message
+        }
+
+        this.$message.error(userMessage)
       }
     },
 
@@ -2832,9 +2816,7 @@ export default {
   font-weight: bold;
 }
 
-.knowledge-card-status {
-  margin-left: auto;
-}
+
 
 .knowledge-card-content {
   margin-bottom: 8px;
@@ -2877,9 +2859,7 @@ export default {
   flex: 0 0 auto;
 }
 
-.knowledge-card-completed {
-  background-color: #f0f7ff;
-}
+
 
 /* 考勤样式 */
 .attendance-content {

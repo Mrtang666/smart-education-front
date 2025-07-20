@@ -4288,14 +4288,20 @@ export const docAPI = {
     },
 
     /**
-     * 删除文档
+     * 删除文档（根据接口文档更新为POST方法）
      * @param {string} filename 文件名
      * @returns {Promise<Object>} 删除结果
      */
     async deleteDoc(filename) {
         const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.delete(`http://118.89.136.119:8000/docs/delete/${encodeURIComponent(filename)}`);
+            const response = await axios.post('http://118.89.136.119:8000/docs/delete', {
+                filename: filename
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
             return response.data;
         } catch (error) {
             console.error('删除文档失败:', error.response ? error.response.data : error.message);
@@ -4309,14 +4315,33 @@ export const docAPI = {
      * @returns {Promise<Blob>} 文件Blob对象
      */
     async downloadDoc(filename) {
-        const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.get(`http://118.89.136.119:8000/docs/download/${encodeURIComponent(filename)}`, {
-                responseType: 'blob'
+            console.log(`开始下载文档: ${filename}`);
+
+            // 使用新的下载接口 - POST请求和JSON请求体
+            const response = await fetch('http://118.89.136.119:8000/docs/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/octet-stream'
+                },
+                body: JSON.stringify({
+                    filename: filename
+                })
             });
-            return response.data;
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('下载响应错误:', response.status, errorText);
+                throw new Error(`下载失败: ${response.status} ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+            console.log(`文档下载成功: ${filename}, 大小: ${blob.size} bytes`);
+            return blob;
+
         } catch (error) {
-            console.error('下载文档失败:', error.response ? error.response.data : error.message);
+            console.error('下载文档失败:', error);
             throw error;
         }
     }
