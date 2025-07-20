@@ -655,16 +655,23 @@ const fetchExamDetail = async () => {
       console.log('题目信息:', questionsResponse)
 
       if (Array.isArray(questionsResponse)) {
-        questionsData = questionsResponse.map(question => ({
-          questionId: question.questionId,
-          content: question.content,
-          questionType: question.questionType,
-          options: question.options || [], // 保留原始options字段，但主要从content解析
-          scorePoints: question.scorePoints,
-          referenceAnswer: question.referenceAnswer,
-          difficulty: question.difficulty,
-          knowledgeId: question.knowledgeId
-        }))
+        questionsData = questionsResponse.map(question => {
+          console.log('题目分数信息:', {
+            questionId: question.questionId,
+            scorePoints: question.scorePoints,
+            scorePointsType: typeof question.scorePoints
+          })
+          return {
+            questionId: question.questionId,
+            content: question.content,
+            questionType: question.questionType,
+            options: question.options || [], // 保留原始options字段，但主要从content解析
+            scorePoints: question.scorePoints,
+            referenceAnswer: question.referenceAnswer,
+            difficulty: question.difficulty,
+            knowledgeId: question.knowledgeId
+          }
+        })
       }
     } catch (error) {
       console.warn('获取题目失败，尝试使用教师API:', error)
@@ -708,6 +715,23 @@ const fetchExamDetail = async () => {
 
     questions.value = questionsData
     console.log('处理后的题目:', questionsData)
+
+    // 详细显示每道题的分数信息
+    console.log('=== 题目分数详情 ===')
+    questionsData.forEach((q, index) => {
+      console.log(`题目${index + 1}:`, {
+        questionId: q.questionId,
+        questionType: q.questionType,
+        scorePoints: q.scorePoints,
+        scorePointsType: typeof q.scorePoints,
+        content: q.content?.substring(0, 50) + '...'
+      })
+    })
+
+    // 计算总分
+    const totalPossibleScore = questionsData.reduce((sum, q) => sum + Number(q.scorePoints || 0), 0)
+    console.log('考试总分:', totalPossibleScore)
+    console.log('平均每题分数:', questionsData.length > 0 ? (totalPossibleScore / questionsData.length).toFixed(1) : 0)
 
     // 如果没有题目，显示提示信息
     if (questionsData.length === 0) {
@@ -787,21 +811,39 @@ const submitAnswer = async (question) => {
       if (correctAnswer && formattedAnswer) {
         // 单选题比较
         if (question.questionType === 'SINGLE_CHOICE') {
-          score = formattedAnswer.trim() === correctAnswer.trim() ? Number(question.scorePoints || 0) : 0
+          const isCorrect = formattedAnswer.trim() === correctAnswer.trim()
+          score = isCorrect ? Number(question.scorePoints || 0) : 0
+          console.log('单选题评分:', {
+            questionId: questionId,
+            userAnswer: formattedAnswer.trim(),
+            correctAnswer: correctAnswer.trim(),
+            isCorrect: isCorrect,
+            scorePoints: question.scorePoints,
+            finalScore: score
+          })
         }
         // 多选题比较（需要排序后比较）
         else if (question.questionType === 'MULTIPLE_CHOICE') {
           const userAnswerSorted = formattedAnswer.split(',').map(a => a.trim()).sort().join(',')
           const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
-          score = userAnswerSorted === correctAnswerSorted ? Number(question.scorePoints || 0) : 0
+          const isCorrect = userAnswerSorted === correctAnswerSorted
+          score = isCorrect ? Number(question.scorePoints || 0) : 0
+          console.log('多选题评分:', {
+            questionId: questionId,
+            userAnswer: userAnswerSorted,
+            correctAnswer: correctAnswerSorted,
+            isCorrect: isCorrect,
+            scorePoints: question.scorePoints,
+            finalScore: score
+          })
         }
       }
     }
 
     const answerData = {
-      examId: Number(examId.value),
-      questionId: Number(questionId),
-      studentId: Number(studentId),
+      examId: String(examId.value),
+      questionId: String(questionId),
+      studentId: String(studentId),
       studentAnswer: formattedAnswer,
       score: score, // 客观题自动评分，主观题为null等待教师批改
       examTitle: examInfo.value.title,
@@ -870,21 +912,39 @@ const submitExam = async () => {
         if (correctAnswer && formattedAnswer) {
           // 单选题比较
           if (question.questionType === 'SINGLE_CHOICE') {
-            score = formattedAnswer.trim() === correctAnswer.trim() ? Number(question.scorePoints || 0) : 0
+            const isCorrect = formattedAnswer.trim() === correctAnswer.trim()
+            score = isCorrect ? Number(question.scorePoints || 0) : 0
+            console.log('批量提交-单选题评分:', {
+              questionId: questionId,
+              userAnswer: formattedAnswer.trim(),
+              correctAnswer: correctAnswer.trim(),
+              isCorrect: isCorrect,
+              scorePoints: question.scorePoints,
+              finalScore: score
+            })
           }
           // 多选题比较（需要排序后比较）
           else if (question.questionType === 'MULTIPLE_CHOICE') {
             const userAnswerSorted = formattedAnswer.split(',').map(a => a.trim()).sort().join(',')
             const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
-            score = userAnswerSorted === correctAnswerSorted ? Number(question.scorePoints || 0) : 0
+            const isCorrect = userAnswerSorted === correctAnswerSorted
+            score = isCorrect ? Number(question.scorePoints || 0) : 0
+            console.log('批量提交-多选题评分:', {
+              questionId: questionId,
+              userAnswer: userAnswerSorted,
+              correctAnswer: correctAnswerSorted,
+              isCorrect: isCorrect,
+              scorePoints: question.scorePoints,
+              finalScore: score
+            })
           }
         }
       }
 
       return {
-        examId: Number(examId.value),
-        questionId: Number(questionId),
-        studentId: Number(studentId),
+        examId: String(examId.value),
+        questionId: String(questionId),
+        studentId: String(studentId),
         studentAnswer: formattedAnswer,
         score: score, // 客观题自动评分，主观题为null等待教师批改
         examTitle: examInfo.value.title,

@@ -121,9 +121,34 @@
 
 <script setup>
 /* eslint-disable no-undef */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 // import { problemAPI } from '@/api/api'
+
+// 错误处理
+let resizeObserver = null
+
+onMounted(() => {
+  // 添加ResizeObserver错误处理
+  const originalError = window.onerror
+  window.onerror = function(message, source, lineno, colno, error) {
+    if (message && message.includes('ResizeObserver loop completed with undelivered notifications')) {
+      return true // 阻止错误显示
+    }
+    if (originalError) {
+      return originalError.call(this, message, source, lineno, colno, error)
+    }
+    return false
+  }
+})
+
+onUnmounted(() => {
+  // 清理ResizeObserver
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+})
 
 // 定义props
 const props = defineProps({

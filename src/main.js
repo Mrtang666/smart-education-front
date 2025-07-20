@@ -15,8 +15,6 @@ import * as ElementPlusIconsVue from "@element-plus/icons-vue";
 import { setupStagewise } from "./plugins/stagewise";
 // 引入错误处理工具
 import { initErrorHandler } from "./utils/errorHandler";
-// 引入文件下载服务
-import fileDownloadService from "./services/fileDownloadService";
 // 不再使用这种初始化方法
 // import initStagewise from "./plugins/stagewise-init";
 
@@ -38,9 +36,6 @@ app.use(ElementPlus, {
 app.use(Vant);
 app.use(Icon);
 app.use(router);
-
-// 注册文件下载服务为全局属性
-app.config.globalProperties.$fileDownloadService = fileDownloadService;
 
 // 使用组件方式初始化Stagewise
 setupStagewise(app);

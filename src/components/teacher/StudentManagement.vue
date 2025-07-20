@@ -33,13 +33,14 @@
       <div v-if="courseStudents.length === 0" class="empty-tip">
         暂无学生，请点击"添加学生"按钮添加
       </div>
-      <el-table
-        v-else
-        :data="filteredStudents"
-        style="width: 100%"
-        @selection-change="handleSelectionChange"
-        v-loading="isLoading"
-      >
+      <div v-else class="table-container">
+        <el-table
+          :data="filteredStudents"
+          style="width: 100%"
+          @selection-change="handleSelectionChange"
+          v-loading="isLoading"
+          height="100%"
+        >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="studentId" label="学号" width="120" />
         <el-table-column prop="fullName" label="姓名" width="120" />
@@ -54,7 +55,8 @@
             <el-button link type="danger" @click="$emit('remove-student', scope.row)">移除</el-button>
           </template>
         </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
       <div class="pagination-container" v-if="courseStudents.length > pageSize">
         <el-pagination
           :current-page="currentPage"
@@ -652,6 +654,9 @@ async function copyInviteCode() {
 .content-section {
   margin-bottom: 40px;
   text-align: left;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .section-header {
@@ -675,6 +680,10 @@ async function copyInviteCode() {
 .section-body {
   padding-left: 19px;
   text-align: left;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .empty-tip {
@@ -696,10 +705,19 @@ async function copyInviteCode() {
   align-items: center;
 }
 
+.table-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+  overflow: hidden;
+}
+
 .pagination-container {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* 分析模态框样式 - 全屏版 */

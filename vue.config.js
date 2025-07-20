@@ -6,7 +6,20 @@ const { defineConfig } = require('@vue/cli-service')
 module.exports = defineConfig({
   transpileDependencies: true,
   devServer: {
-    port: 8080
+    port: 8080,
+    client: {
+      overlay: {
+        errors: true,
+        warnings: false,
+        runtimeErrors: (error) => {
+          const ignoreErrors = [
+            'ResizeObserver loop completed with undelivered notifications',
+            'ResizeObserver loop limit exceeded'
+          ]
+          return !ignoreErrors.some(ignoreError => error.message.includes(ignoreError))
+        }
+      }
+    }
   },
   configureWebpack: {
     plugins: [
