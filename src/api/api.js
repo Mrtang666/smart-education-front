@@ -4735,6 +4735,36 @@ export const studentAnswerAPI = {
     },
 
     /**
+     * 提交学生答案（请求体格式）
+     * @param {Object} answerData 答案数据
+     * @param {string} answerData.studentId 学生ID
+     * @param {string} answerData.problemId 问题ID
+     * @param {string} answerData.answer 答案内容
+     * @returns {Promise<Object>} 提交结果
+     */
+    async submitAnswerWithBody(answerData) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            console.log('提交答案API调用数据（请求体）:', answerData);
+
+            const response = await axios.post('/api/student-answer/submit', answerData);
+
+            console.log('提交答案API响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('提交答案失败:', error.response ? error.response.data : error.message);
+
+            // 如果是405错误，提供更友好的错误信息
+            if (error.response && error.response.status === 405) {
+                console.error('后端不支持答案提交接口');
+                throw new Error('答案提交功能暂时不可用，请联系管理员');
+            }
+
+            throw error;
+        }
+    },
+
+    /**
      * 提交学生答案并触发自动评分（需要token）
      * @param {number} studentId 学生ID
      * @param {number} problemId 问题ID
