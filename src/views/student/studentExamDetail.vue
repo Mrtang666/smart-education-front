@@ -31,44 +31,7 @@
         </div>
       </el-card>
 
-      <!-- 考试成绩卡片 - 只在考试结束且已提交后显示 -->
-      <el-card class="score-card" v-if="(examStatus === 'ENDED' || examStatus === 'SUBMITTED') && isExamCompleted">
-        <template #header>
-          <div class="card-header">
-            <span>考试成绩</span>
-            <el-button type="primary" size="small" @click="refreshScore">
-              <el-icon>
-                <Refresh />
-              </el-icon>
-              刷新成绩
-            </el-button>
-          </div>
-        </template>
-        <div class="score-content">
-          <div class="score-item">
-            <span class="label">总得分：</span>
-            <span class="value" :class="getScoreClass(totalScore, examInfo.totalScore)">
-              {{ totalScore }} / {{ examInfo.totalScore || 0 }} 分
-            </span>
-          </div>
-          <div class="score-item">
-            <span class="label">正确题数：</span>
-            <span class="value">{{ correctCount }} / {{ questions.length }} 题</span>
-          </div>
-          <div class="score-item">
-            <span class="label">正确率：</span>
-            <span class="value">{{ getAccuracyRate() }}%</span>
-          </div>
-          <div class="score-item" v-if="examScore && examScore.gradedAt">
-            <span class="label">批改时间：</span>
-            <span class="value">{{ formatDateTime(examScore.gradedAt) }}</span>
-          </div>
-          <div class="score-item" v-if="examScore && examScore.teacherName">
-            <span class="label">批改教师：</span>
-            <span class="value">{{ examScore.teacherName }}</span>
-          </div>
-        </div>
-      </el-card>
+      <!-- 考试成绩卡片已隐藏 -->
 
       <!-- 考试计时器 -->
       <el-card class="timer-card" v-if="examStatus === 'ONGOING'">
@@ -85,11 +48,10 @@
           <el-result
             icon="success"
             title="您已提交答卷"
-            sub-title="感谢您完成本次考试，答卷已成功提交。您可以查看上方的考试成绩和分析结果。"
+            sub-title="感谢您完成本次考试，答卷已成功提交。您可以查看分析结果。"
           >
             <template #extra>
               <el-button type="primary" @click="router.push('/student')">返回首页</el-button>
-              <el-button @click="refreshScore">刷新成绩</el-button>
             </template>
           </el-result>
         </div>
@@ -207,15 +169,8 @@
                   <div class="answer-content">{{ question.referenceAnswer }}</div>
                 </div>
 
-                <!-- 显示得分信息 -->
-                <div class="score-info" v-if="getCurrentQuestionAnswer(question)">
-                  <div class="score-item">
-                    <span class="label">得分：</span>
-                    <span class="score-value"
-                      :class="getScoreClass(getCurrentQuestionAnswer(question).score, question.scorePoints)">
-                      {{ getCurrentQuestionAnswer(question).score || 0 }} / {{ question.scorePoints || 0 }} 分
-                    </span>
-                  </div>
+                <!-- 显示反馈信息（隐藏得分） -->
+                <div class="feedback-info" v-if="getCurrentQuestionAnswer(question)">
                   <div class="feedback-item" v-if="getCurrentQuestionAnswer(question).feedback">
                     <span class="label">教师反馈：</span>
                     <div class="feedback-content">{{ getCurrentQuestionAnswer(question).feedback }}</div>
@@ -239,117 +194,14 @@
         </div>
       </el-card>
 
-      <!-- 智能分析和学习建议 - 只在考试完成后显示 -->
-      <div v-if="(examStatus === 'ENDED' || examStatus === 'SUBMITTED') && isExamCompleted" class="analysis-section">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-card class="analysis-card">
-              <template #header>
-                <div class="card-header">
-                  <span>智能分析</span>
-                  <el-button type="primary" size="small" @click="loadAnalysis" :loading="analysisLoading">
-                    <el-icon>
-                      <DataAnalysis />
-                    </el-icon>
-                    {{ analysisResult ? '刷新分析' : '获取分析' }}
-                  </el-button>
-                </div>
-              </template>
-              <div v-if="analysisLoading" class="loading-content">
-                <el-skeleton :rows="3" animated />
-              </div>
-              <div v-else-if="analysisResult" class="analysis-content">
-                <div class="analysis-item" v-if="analysisResult.strengths">
-                  <h4>优势分析</h4>
-                  <ul>
-                    <li v-for="strength in analysisResult.strengths" :key="strength">{{ strength }}</li>
-                  </ul>
-                </div>
-                <div class="analysis-item" v-if="analysisResult.weaknesses">
-                  <h4>薄弱环节</h4>
-                  <ul>
-                    <li v-for="weakness in analysisResult.weaknesses" :key="weakness">{{ weakness }}</li>
-                  </ul>
-                </div>
-                <div class="analysis-item" v-if="analysisResult.summary">
-                  <h4>总体评价</h4>
-                  <p>{{ analysisResult.summary }}</p>
-                </div>
-                <div class="analysis-item" v-if="analysisResult.note">
-                  <h4>系统提示</h4>
-                  <p class="system-note">{{ analysisResult.note }}</p>
-                </div>
-              </div>
-              <div v-else class="empty-content">
-                <el-empty description="暂无分析数据" />
-              </div>
-            </el-card>
-          </el-col>
-          <el-col :span="12">
-            <el-card class="advice-card">
-              <template #header>
-                <div class="card-header">
-                  <span>学习建议</span>
-                  <el-button type="success" size="small" @click="loadAdvice" :loading="adviceLoading">
-                    <el-icon>
-                      <Lightbulb />
-                    </el-icon>
-                    {{ learningAdvice.length > 0 ? '刷新建议' : '获取建议' }}
-                  </el-button>
-                </div>
-              </template>
-              <div v-if="adviceLoading" class="loading-content">
-                <el-skeleton :rows="3" animated />
-              </div>
-              <div v-else-if="learningAdvice.length > 0" class="advice-content">
-                <div class="advice-item" v-for="(advice, index) in learningAdvice" :key="index">
-                  <div class="advice-number">{{ index + 1 }}</div>
-                  <div class="advice-text">{{ advice }}</div>
-                </div>
-              </div>
-              <div v-else class="empty-content">
-                <el-empty description="暂无学习建议" />
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
+      <!-- 智能分析和学习建议已隐藏 -->
 
       <!-- 提交考卷按钮 -->
       <div class="submit-exam-container" v-if="examStatus === 'ONGOING'">
         <el-button type="primary" @click="submitExam" :loading="submitting">提交考卷</el-button>
       </div>
 
-      <!-- 考试结果 -->
-      <el-card v-if="examStatus === 'ENDED' || examStatus === 'SUBMITTED'" class="result-card">
-        <div class="result-header">
-          <h3>考试结果</h3>
-          <div class="result-score">
-            总得分: <span class="score-value">{{ totalScore }}</span> / {{ examInfo.totalScore }}
-          </div>
-        </div>
-
-        <div class="result-stats">
-          <el-progress :percentage="scorePercentage" :format="percentFormat" :status="scoreStatus"></el-progress>
-
-          <div class="stats-items">
-            <div class="stats-item">
-              <div class="stats-label">已答题数:</div>
-              <div class="stats-value">{{ answeredCount }} / {{ questions.length }}</div>
-            </div>
-
-            <div class="stats-item">
-              <div class="stats-label">正确题数:</div>
-              <div class="stats-value">{{ correctCount }}</div>
-            </div>
-
-            <div class="stats-item">
-              <div class="stats-label">错误题数:</div>
-              <div class="stats-value">{{ questions.length - correctCount - unansweredCount }}</div>
-            </div>
-          </div>
-        </div>
-      </el-card>
+      <!-- 考试结果已隐藏 -->
     </div>
   </div>
 </template>
@@ -358,7 +210,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Calendar, Timer, Document, Refresh, DataAnalysis, Lightbulb } from '@element-plus/icons-vue'
+import { Calendar, Timer, Document } from '@element-plus/icons-vue'
 import { studentExamAPI, questionAPI, examAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
@@ -383,10 +235,6 @@ const showReferenceAnswer = ref(false)
 
 // 新增的响应式数据
 const examScore = ref(null) // 考试成绩详情
-const analysisResult = ref(null) // 智能分析结果
-const learningAdvice = ref([]) // 学习建议
-const analysisLoading = ref(false) // 分析加载状态
-const adviceLoading = ref(false) // 建议加载状态
 const studentAnswers = ref([]) // 学生答案详情
 
 // 获取用户信息
@@ -423,24 +271,9 @@ const formatTimeRemaining = computed(() => {
   ].join(':')
 })
 
-const answeredCount = computed(() => {
-  return Object.keys(answeredQuestions.value).length
-})
+// 答题统计计算属性已移除
 
-const unansweredCount = computed(() => {
-  return questions.value.length - answeredCount.value
-})
-
-const scorePercentage = computed(() => {
-  if (!examInfo.value.totalScore) return 0
-  return Math.round((totalScore.value / examInfo.value.totalScore) * 100)
-})
-
-const scoreStatus = computed(() => {
-  if (scorePercentage.value >= 80) return 'success'
-  if (scorePercentage.value >= 60) return ''
-  return 'exception'
-})
+// 成绩相关计算属性已移除
 
 // // 方法定义 - 必须在watch之前定义
 // const parseOptions = (options) => {
@@ -728,19 +561,7 @@ const calculateResults = (answers) => {
 //   return statusMap[status] || '未知状态'
 // }
 
-const getScoreClass = (score, maxScore) => {
-  if (!score || !maxScore) return ''
-  const percentage = (score / maxScore) * 100
-  if (percentage >= 90) return 'excellent'
-  if (percentage >= 80) return 'good'
-  if (percentage >= 60) return 'average'
-  return 'poor'
-}
-
-const getAccuracyRate = () => {
-  if (questions.value.length === 0) return 0
-  return Math.round((correctCount.value / questions.value.length) * 100)
-}
+// 成绩相关函数已移除
 
 const getCurrentQuestionAnswer = (question) => {
   if (!question) return null
@@ -773,105 +594,9 @@ const getAnswerStatusText = (question) => {
   return isCorrect ? '正确' : '错误'
 }
 
-// 刷新成绩
-const refreshScore = async () => {
-  try {
-    const sid = String(studentId)
-    const eid = String(examId.value)
+// 刷新成绩功能已移除
 
-    const scoreResponse = await studentExamAPI.getExamScore(sid, eid)
-    examScore.value = scoreResponse
-
-    ElMessage.success('成绩刷新成功')
-  } catch (error) {
-    console.error('刷新成绩失败:', error)
-    ElMessage.error('刷新成绩失败')
-  }
-}
-
-// 加载智能分析
-const loadAnalysis = async () => {
-  try {
-    analysisLoading.value = true
-    const sid = String(studentId)
-    const eid = String(examId.value)
-
-    const analysisResponse = await studentExamAPI.analyzeExamResult(sid, eid)
-    analysisResult.value = analysisResponse
-
-    ElMessage.success('分析加载成功')
-  } catch (error) {
-    console.error('加载分析失败:', error)
-
-    // 检查是否是数据库字段缺失的错误
-    if (error.response && error.response.data &&
-        error.response.data.detail &&
-        error.response.data.detail.includes('knowledge_point')) {
-
-      // 提供模拟的分析结果
-      analysisResult.value = {
-        strengths: ['基础知识掌握较好', '答题思路清晰'],
-        weaknesses: ['部分知识点需要加强', '答题速度有待提升'],
-        suggestions: ['建议多做练习题巩固知识点', '注意时间管理'],
-        masteryLevel: '良好',
-        note: '由于系统配置问题，当前显示的是基础分析结果。详细分析功能正在完善中。'
-      }
-
-      ElMessage.warning('智能分析功能正在完善中，当前显示基础分析结果')
-    } else {
-      ElMessage.error('加载分析失败，请稍后再试')
-    }
-  } finally {
-    analysisLoading.value = false
-  }
-}
-
-// 加载学习建议
-const loadAdvice = async () => {
-  try {
-    adviceLoading.value = true
-    const sid = String(studentId)
-    const eid = String(examId.value)
-
-    const adviceResponse = await studentExamAPI.generateLearningAdvice(sid, eid)
-    learningAdvice.value = Array.isArray(adviceResponse) ? adviceResponse : [adviceResponse]
-
-    ElMessage.success('建议加载成功')
-  } catch (error) {
-    console.error('加载建议失败:', error)
-
-    // 检查是否是数据库字段缺失的错误
-    if (error.response && error.response.data &&
-        error.response.data.detail &&
-        error.response.data.detail.includes('knowledge_point')) {
-
-      // 提供模拟的学习建议
-      learningAdvice.value = [
-        {
-          type: '基础建议',
-          content: '建议复习基础知识点，巩固理论基础',
-          priority: 'high'
-        },
-        {
-          type: '练习建议',
-          content: '多做相关练习题，提高解题熟练度',
-          priority: 'medium'
-        },
-        {
-          type: '系统提示',
-          content: '学习建议功能正在完善中，当前显示基础建议内容',
-          priority: 'info'
-        }
-      ]
-
-      ElMessage.warning('学习建议功能正在完善中，当前显示基础建议内容')
-    } else {
-      ElMessage.error('加载建议失败，请稍后再试')
-    }
-  } finally {
-    adviceLoading.value = false
-  }
-}
+// 智能分析和学习建议功能已移除
 
 const fetchExamDetail = async () => {
   loading.value = true
@@ -1305,9 +1030,7 @@ const formatDateTime = (dateString) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-const percentFormat = (percentage) => {
-  return `${percentage}%`
-}
+// 百分比格式化函数已移除
 
 // 监听路由参数变化 - 必须在函数定义之后
 watch(() => route.params.examId, (newExamId) => {
@@ -1358,57 +1081,8 @@ onUnmounted(() => {
 
 .exam-info-card,
 .timer-card,
-.questions-card,
-.result-card,
-.score-card,
-.analysis-section {
+.questions-card {
   margin-bottom: 20px;
-}
-
-.score-card .score-content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.score-card .score-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.score-card .label {
-  font-weight: 500;
-  color: #606266;
-}
-
-.score-card .value {
-  font-weight: 600;
-}
-
-.score-card .value.excellent {
-  color: #67c23a;
-}
-
-.score-card .value.good {
-  color: #409eff;
-}
-
-.score-card .value.average {
-  color: #e6a23c;
-}
-
-.score-card .value.poor {
-  color: #f56c6c;
-}
-
-.analysis-section {
-  margin-top: 30px;
-}
-
-.analysis-card,
-.advice-card {
-  height: 400px;
 }
 
 .card-header {
@@ -1869,15 +1543,7 @@ onUnmounted(() => {
   margin-top: 10px;
 }
 
-/* 系统提示样式 */
-.system-note {
-  color: #E6A23C;
-  font-style: italic;
-  background-color: #FDF6EC;
-  padding: 10px;
-  border-radius: 4px;
-  border-left: 4px solid #E6A23C;
-}
+/* 系统提示样式已移除 */
 
 .stats-item {
   text-align: center;
