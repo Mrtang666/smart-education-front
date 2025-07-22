@@ -150,6 +150,53 @@ const createTeacherAuthorizedAxios = () => {
     return instance;
 };
 
+// 管理端相关 API
+export const adminAPI = {
+    /**
+     * 搜索教师（管理员）
+     * @param {string} keyword 搜索关键词
+     * @returns {Promise<Array<Object>>} 教师列表
+     */
+    async searchTeacher(keyword) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get('/api/teacher/search', { params: { keyword } });
+        return response.data;
+    },
+
+    /**
+     * 获取所有教师用户（管理员）
+     * @returns {Promise<Array<Object>>} 教师列表
+     */
+    async getTeacherList() {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get('/api/teacher/list');
+        return response.data;
+    },
+
+    /**
+     * 获取所有学生用户（管理员）
+     * @returns {Promise<Array<Object>>} 学生列表
+     */
+    async getStudentList() {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get('/api/student/list');
+        return response.data;
+    },
+
+    /**
+     * 管理员修改用户密码（无需验证原密码）
+     * @param {Object} data 修改信息
+     * @param {string} data.username 用户名
+     * @param {string} data.newPassword 新密码
+     * @returns {Promise<Object>} 修改结果
+     */
+    async adminChangePassword(data) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.put('/api/auth/admin-change-password', data);
+        return response.data;
+    }
+};
+
 // 认证相关 API(√)
 export const authAPI = {
     /**
@@ -695,6 +742,17 @@ export const courseAPI = {
 // 教师相关 API（3更新教师信息）
 export const teacherAPI = {
     /**
+     * 添加新学生
+     * @param {Object} studentData 学生信息
+     * @returns {Promise<Object>} 添加的学生信息
+     */
+    async addStudent(studentData) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.post('/api/student/add', studentData);
+        return response.data;
+    },
+
+    /**
      * 1.根据用户名获取教师信息（需要token）
      * @param {string} username 用户名
      * @returns {Promise<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>} 教师信息
@@ -731,6 +789,67 @@ export const teacherAPI = {
     },
 
     /**
+     * 4.获取教师列表（需要管理员token）
+     * @returns {Promise<Array<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>>} 教师列表
+     */
+    async getTeacherList() {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get('/api/teacher/list');
+        return {
+            data: response.data,
+            total: response.data.length
+        };
+    },
+
+    /**
+     * 5.禁用教师（需要管理员token）
+     * @param {number} teacherId 教师ID
+     */
+    async disableTeacher(teacherId) {
+        const axios = createTeacherAuthorizedAxios();
+        await axios.put(`/api/teacher/update`, {
+            teacherId: teacherId,
+            status: 'DISABLED'  // 假设后端支持这个状态
+        });
+    },
+
+    /**
+     * 6.获取所有学生列表（需要管理员token）
+     * @returns {Promise<Array>} 学生列表
+     */
+    async getStudentList() {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.get('/api/student/list');
+        return {
+            data: response.data,
+            total: response.data.length
+        };
+    },
+
+    /**
+     * 7.更新学生信息（需要管理员token）
+     * @param {Object} updateStudentData 学生信息对象
+     * @returns {Promise<Object>} 更新后的学生信息
+     */
+    async updateStudent(updateStudentData) {
+        const axios = createTeacherAuthorizedAxios();
+        const response = await axios.put(`/api/student/update`, updateStudentData);
+        return response.data;
+    },
+
+    /**
+     * 8.禁用学生（需要管理员token）
+     * @param {number} studentId 学生ID
+     */
+    async disableStudent(studentId) {
+        const axios = createTeacherAuthorizedAxios();
+        await axios.put(`/api/student/update`, {
+            studentId: studentId,
+            status: 'DISABLED'  // 假设后端支持这个状态
+        });
+    },
+
+    /**
      * 4.根据教师ID获取教师信息（需要token）
      * @param {number} id 教师ID
      * @returns {Promise<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>} 教师信息
@@ -751,6 +870,48 @@ export const teacherAPI = {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.get(`/api/student/${studentId}`);
         return response.data;
+    }
+};
+
+// 统计API模块
+export const statsAPI = {
+    /**
+     * 获取所有板块总使用次数（跨用户类型）
+     * @param {Object} params 查询参数
+     * @param {string} params.period 统计周期（daily 或 weekly，必填）
+     * @param {string} [params.date] 日期（可选，格式：YYYY-MM-DD）
+     * @param {string} [params.weekId] 周ID（可选）
+     * @returns {Promise<Object>} { period: string, total: number }
+     */
+    async getTotalUsage(params) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.get('/api/stats/total', { params });
+            return response.data;
+        } catch (error) {
+            console.error('获取总使用次数失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取指定用户类型的统计摘要
+     * @param {Object} params 查询参数
+     * @param {string} params.userType 用户类型（TEACHER 或 STUDENT，必填）
+     * @param {string} params.period 统计周期（daily 或 weekly，必填）
+     * @param {string} [params.date] 日期（可选，格式：YYYY-MM-DD）
+     * @param {string} [params.weekId] 周ID（可选）
+     * @returns {Promise<Object>} { totalUsage: number, moduleStats: { [板块名]: number } }
+     */
+    async getStatsSummary(params) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.get('/api/stats/summary', { params });
+            return response.data;
+        } catch (error) {
+            console.error('获取统计摘要失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
     }
 };
 

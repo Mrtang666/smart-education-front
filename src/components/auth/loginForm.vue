@@ -58,7 +58,9 @@ const handleLogin = () => {
         initUserInfo();
         
         // 根据角色不同跳转至首页
-        if (res.roles && res.roles.includes('ROLE_STUDENT')) {
+        if (res.roles && res.roles.includes('ROLE_ADMIN')) {
+            router.push('/admin');
+        } else if (res.roles && res.roles.includes('ROLE_STUDENT')) {
             router.push('/student');
         } else if (res.roles && res.roles.includes('ROLE_TEACHER')) {
             router.push('/teacher');

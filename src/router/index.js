@@ -3,6 +3,30 @@ import { getValidToken } from "@/utils/auth";
 
 const routes = [
   {
+    path: "/admin",
+    component: () => import("@/views/admin/adminCenter.vue"),
+    redirect: "/admin/teacher",
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "teacher",
+        component: () => import("@/views/admin/teacherManage.vue"),
+      },
+      {
+        path: "student",
+        component: () => import("@/views/admin/studentManage.vue"),
+      },
+      {
+        path: "stats",
+        component: () => import("@/views/admin/statsView.vue"),
+      },
+      {
+        path: "setting",
+        component: () => import("@/views/admin/systemSetting.vue"),
+      }
+    ]
+  },
+  {
     path: "/passwordchange",
     component: () => import("@/components/auth/passwordChange.vue"),
     meta: { requiresAuth: false }

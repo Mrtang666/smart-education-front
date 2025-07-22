@@ -147,32 +147,73 @@ export function removeRefreshToken() {
  */
 export function initUserInfo() {
   // 导入API，避免循环依赖
-  import('@/api/api').then(({ studentAPI, teacherAPI }) => {
+    import('@/api/api').then(({ studentAPI, teacherAPI }) => {
     // 获取用户信息
     // 根据角色不同调用不同接口
     const userRole = localStorage.getItem('user_role');
+    console.log('当前用户角色信息:', userRole);
+    
+    if (!userRole) {
+      console.error('未找到用户角色信息');
+      ElMessage.error('未找到用户角色信息');
+      return;
+    }
     
     try {
       const roleObj = JSON.parse(userRole);
+      console.log('解析后的角色对象:', roleObj);
       
-      if (roleObj.includes('ROLE_STUDENT')) {
-        studentAPI.getSelfStudentInfo().then(res => {
-          localStorage.setItem(USER_INFO_KEY, JSON.stringify(res));
-          localStorage.setItem('is_logged_in', 'true');
-        }).catch(err => {
-          console.error('获取用户信息失败:', err);
-          ElMessage.error('获取用户信息失败');
-        });
-      } else if (roleObj.includes('ROLE_TEACHER')) {
+      const processUserInfo = (res) => {
+        // 确保返回的用户信息包含必要字段
+        const userInfo = {
+          username: res.username || '',
+          fullName: res.fullName || res.username || '',
+          roles: roleObj,  // 使用本地存储的角色信息
+          ...(res || {})   // 保留API返回的其他字段
+        };
+        console.log('处理后的用户信息:', userInfo);
+        localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
+      };
+
+      if (roleObj.includes('ROLE_ADMIN')) {
+        console.log('获取管理员信息（使用教师接口）');
         teacherAPI.getSelfTeacherInfo().then(res => {
-          localStorage.setItem(USER_INFO_KEY, JSON.stringify(res));
-          localStorage.setItem('is_logged_in', 'true');
+          console.log('管理员信息API响应:', res);
+          processUserInfo({
+            ...res,
+            isAdmin: true,  // 添加管理员标识
+            roles: roleObj  // 保持原有角色信息
+          });
         }).catch(err => {
-          console.error('获取用户信息失败:', err);
-          ElMessage.error('获取用户信息失败');
+          console.error('获取管理员信息失败:', err);
+          ElMessage.error('获取管理员信息失败');
         });
+      } else if (roleObj.length === 1) {
+        if (roleObj[0] === 'ROLE_STUDENT') {
+          console.log('获取学生信息');
+          studentAPI.getSelfStudentInfo().then(res => {
+            console.log('学生信息API响应:', res);
+            processUserInfo(res);
+          }).catch(err => {
+            console.error('获取学生信息失败:', err);
+            ElMessage.error('获取学生信息失败');
+          });
+        } else if (roleObj[0] === 'ROLE_TEACHER') {
+          console.log('获取教师信息');
+          teacherAPI.getSelfTeacherInfo().then(res => {
+            console.log('教师信息API响应:', res);
+            processUserInfo(res);
+          }).catch(err => {
+            console.error('获取教师信息失败:', err);
+            ElMessage.error('获取教师信息失败');
+          });
+        } else {
+          console.error('未知的用户角色:', roleObj[0]);
+          ElMessage.error('未知的用户角色');
+        }
       } else {
-        ElMessage.error('用户角色错误');
+        console.error('用户角色配置错误:', roleObj);
+        ElMessage.error('用户角色配置错误');
       }
     } catch (err) {
       console.error('解析用户角色失败:', err);
