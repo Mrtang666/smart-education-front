@@ -221,6 +221,89 @@ export function removeUserInfo() {
 }
 
 /**
+ * 手动刷新用户信息
+ * @returns {Promise<Object|null>} 用户信息对象或null
+ */
+export async function refreshUserInfo() {
+  try {
+    // 动态导入API，避免循环依赖
+    const { studentAPI, teacherAPI } = await import('@/api/api');
+
+    // 获取用户角色
+    const userRole = localStorage.getItem('user_role');
+    if (!userRole) {
+      console.error('未找到用户角色信息');
+      return null;
+    }
+
+    const roleObj = JSON.parse(userRole);
+    let userInfo = null;
+
+    if (roleObj.includes('ROLE_STUDENT')) {
+      userInfo = await studentAPI.getSelfStudentInfo();
+    } else if (roleObj.includes('ROLE_TEACHER')) {
+      userInfo = await teacherAPI.getSelfTeacherInfo();
+    } else {
+      console.error('未知的用户角色:', roleObj);
+      return null;
+    }
+
+    if (userInfo) {
+      // 存储用户信息
+      localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
+      localStorage.setItem('is_logged_in', 'true');
+      console.log('用户信息刷新成功:', userInfo);
+      return userInfo;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('刷新用户信息失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取教师ID的统一方法
+ * @returns {string|null} 教师ID或null
+ */
+export function getTeacherId() {
+  try {
+    const userInfoStr = localStorage.getItem(USER_INFO_KEY);
+    if (!userInfoStr) {
+      console.warn('localStorage中未找到用户信息');
+      return null;
+    }
+
+    const userInfo = JSON.parse(userInfoStr);
+    return userInfo.teacherId || null;
+  } catch (error) {
+    console.error('解析用户信息失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 获取学生ID的统一方法
+ * @returns {string|null} 学生ID或null
+ */
+export function getStudentId() {
+  try {
+    const userInfoStr = localStorage.getItem(USER_INFO_KEY);
+    if (!userInfoStr) {
+      console.warn('localStorage中未找到用户信息');
+      return null;
+    }
+
+    const userInfo = JSON.parse(userInfoStr);
+    return userInfo.studentId || null;
+  } catch (error) {
+    console.error('解析用户信息失败:', error);
+    return null;
+  }
+}
+
+/**
  * 清除所有认证信息
  */
 export function clearAuth() {
