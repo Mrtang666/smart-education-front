@@ -205,6 +205,104 @@
         <el-button @click="$emit('cancel')">取消</el-button>
       </el-form-item>
     </el-form>
+
+    <!-- AI生成习题展示区域 -->
+    <div v-if="aiGeneratedExercises && aiGeneratedExercises.length > 0" class="ai-exercises-section">
+      <el-divider>
+        <el-icon class="ai-icon"><MagicStick /></el-icon>
+        AI生成的习题参考
+      </el-divider>
+
+      <div class="ai-exercises-container">
+        <div class="ai-exercises-header">
+          <span class="ai-exercises-title">以下是AI生成的习题，您可以参考并复制内容到上方表单中</span>
+          <el-button size="small" type="info" @click="toggleAIExercises">
+            {{ showAIExercises ? '收起' : '展开' }}
+          </el-button>
+        </div>
+
+        <div v-show="showAIExercises" class="ai-exercises-list">
+          <div
+            v-for="(exercise, index) in aiGeneratedExercises"
+            :key="index"
+            class="ai-exercise-item"
+          >
+            <div class="exercise-header">
+              <div class="exercise-title">
+                <span class="exercise-number">题目 {{ index + 1 }}</span>
+                <el-tag
+                  v-if="exercise.difficulty"
+                  :type="getDifficultyType(exercise.difficulty)"
+                  size="small"
+                  class="difficulty-tag"
+                >
+                  {{ exercise.difficulty }}
+                </el-tag>
+                <el-tag
+                  v-if="exercise.type"
+                  type="info"
+                  size="small"
+                  class="type-tag"
+                >
+                  {{ getTypeText(exercise.type) }}
+                </el-tag>
+              </div>
+              <div class="exercise-actions">
+                <el-button
+                  size="small"
+                  type="primary"
+                  @click="copyExerciseToForm(exercise)"
+                  :icon="DocumentCopy"
+                >
+                  复制到表单
+                </el-button>
+                <el-button
+                  size="small"
+                  @click="copyExerciseText(exercise)"
+                  :icon="CopyDocument"
+                >
+                  复制文本
+                </el-button>
+              </div>
+            </div>
+
+            <div class="exercise-content">
+              <!-- 题目内容 -->
+              <div class="content-section">
+                <div class="content-label">题目内容：</div>
+                <div class="content-text">{{ exercise.question || exercise.title || exercise.content || '暂无题目内容' }}</div>
+              </div>
+
+              <!-- 选项 -->
+              <div v-if="exercise.options && exercise.options.length > 0" class="content-section">
+                <div class="content-label">选项：</div>
+                <div class="options-text">
+                  <div
+                    v-for="(option, optIndex) in exercise.options"
+                    :key="optIndex"
+                    class="option-line"
+                  >
+                    {{ String.fromCharCode(65 + optIndex) }}. {{ option }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 答案 -->
+              <div v-if="exercise.answer" class="content-section">
+                <div class="content-label">答案：</div>
+                <div class="answer-text">{{ exercise.answer }}</div>
+              </div>
+
+              <!-- 解析 -->
+              <div v-if="exercise.explanation" class="content-section">
+                <div class="content-label">解析：</div>
+                <div class="explanation-text">{{ exercise.explanation }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -212,7 +310,7 @@
 /* eslint-disable no-undef */
 import { ref, watch, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
 
 const props = defineProps({
   problemData: {
@@ -223,6 +321,11 @@ const props = defineProps({
   homeworkId: {
     type: [String, Number],
     required: true
+  },
+  aiGeneratedExercises: {
+    type: Array,
+    required: false,
+    default: () => []
   }
 })
 
@@ -262,6 +365,9 @@ const options = ref([
   { key: 'A', content: '' },
   { key: 'B', content: '' }
 ])
+
+// AI习题展示相关
+const showAIExercises = ref(true)
 
 // 解析选择题选项（从content字段自动格式化）
 function parseOptionsFromContent(content) {
@@ -641,6 +747,152 @@ onMounted(() => {
     }
   }
 })
+
+// ==================== AI习题相关方法 ====================
+
+// 切换AI习题显示状态
+function toggleAIExercises() {
+  showAIExercises.value = !showAIExercises.value
+}
+
+// 获取难度标签类型
+function getDifficultyType(difficulty) {
+  const typeMap = {
+    '简单': 'success',
+    '中等': 'warning',
+    '困难': 'danger'
+  }
+  return typeMap[difficulty] || 'info'
+}
+
+// 获取题目类型文本
+function getTypeText(type) {
+  const typeMap = {
+    'SINGLE_CHOICE': '单选题',
+    'MULTI_CHOICE': '多选题',
+    'FILL_BLANK': '填空题',
+    'ESSAY_QUESTION': '简答题',
+    'TRUE_FALSE': '判断题'
+  }
+  return typeMap[type] || type
+}
+
+// 复制习题到表单
+function copyExerciseToForm(exercise) {
+  try {
+    // 复制题干
+    if (exercise.question || exercise.title || exercise.content) {
+      form.value.title = exercise.question || exercise.title || exercise.content
+    }
+
+    // 根据习题类型设置表单类型
+    if (exercise.type) {
+      form.value.type = exercise.type
+      handleTypeChange(exercise.type)
+    } else if (exercise.options && exercise.options.length > 0) {
+      // 如果有选项，判断为选择题
+      form.value.type = exercise.options.length > 4 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE'
+      handleTypeChange(form.value.type)
+    }
+
+    // 处理选择题
+    if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type) && exercise.options) {
+      // 设置题干
+      questionStem.value = exercise.question || exercise.title || exercise.content || ''
+
+      // 设置选项
+      options.value = exercise.options.map((option, index) => ({
+        key: String.fromCharCode(65 + index), // A, B, C, D...
+        content: option
+      }))
+
+      // 更新表单内容
+      updateFormContent()
+
+      // 设置答案
+      if (exercise.answer) {
+        form.value.expectedAnswer = exercise.answer
+
+        // 如果是多选题，解析答案
+        if (form.value.type === 'MULTI_CHOICE') {
+          const answerArray = exercise.answer.split(',').map(a => a.trim())
+          selectedAnswers.value = answerArray
+        }
+      }
+    } else {
+      // 非选择题直接设置内容
+      form.value.content = exercise.question || exercise.title || exercise.content || ''
+
+      // 设置答案
+      if (exercise.answer) {
+        form.value.expectedAnswer = exercise.answer
+      }
+    }
+
+    // 设置分值（如果有）
+    if (exercise.score) {
+      form.value.score = exercise.score
+    }
+
+    ElMessage.success('习题内容已复制到表单')
+  } catch (error) {
+    console.error('复制习题到表单失败:', error)
+    ElMessage.error('复制失败，请手动复制内容')
+  }
+}
+
+// 复制习题文本到剪贴板
+function copyExerciseText(exercise) {
+  try {
+    let text = ''
+
+    // 题目内容
+    if (exercise.question || exercise.title || exercise.content) {
+      text += `题目：${exercise.question || exercise.title || exercise.content}\n\n`
+    }
+
+    // 选项
+    if (exercise.options && exercise.options.length > 0) {
+      text += '选项：\n'
+      exercise.options.forEach((option, index) => {
+        text += `${String.fromCharCode(65 + index)}. ${option}\n`
+      })
+      text += '\n'
+    }
+
+    // 答案
+    if (exercise.answer) {
+      text += `答案：${exercise.answer}\n\n`
+    }
+
+    // 解析
+    if (exercise.explanation) {
+      text += `解析：${exercise.explanation}\n`
+    }
+
+    // 复制到剪贴板
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text)
+      ElMessage.success('习题内容已复制到剪贴板')
+    } else {
+      // 降级方案
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      document.execCommand('copy')
+      textArea.remove()
+      ElMessage.success('习题内容已复制到剪贴板')
+    }
+  } catch (error) {
+    console.error('复制习题文本失败:', error)
+    ElMessage.error('复制失败，请手动复制内容')
+  }
+}
 </script>
 
 <style scoped>
@@ -840,5 +1092,149 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   margin-left: 8px;
+}
+
+/* AI习题展示区域样式 */
+.ai-exercises-section {
+  margin-top: 30px;
+  padding-top: 20px;
+}
+
+.ai-exercises-section .el-divider {
+  margin: 20px 0;
+}
+
+.ai-exercises-section .ai-icon {
+  color: #409EFF;
+  margin-right: 8px;
+}
+
+.ai-exercises-container {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.ai-exercises-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+}
+
+.ai-exercises-title {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.ai-exercises-list {
+  padding: 0;
+}
+
+.ai-exercise-item {
+  border-bottom: 1px solid #e4e7ed;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.ai-exercise-item:last-child {
+  border-bottom: none;
+  border-radius: 0 0 8px 8px;
+}
+
+.ai-exercise-item:hover {
+  background: #f8f9fa;
+}
+
+.exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.exercise-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exercise-number {
+  font-weight: 600;
+  color: #409EFF;
+  font-size: 14px;
+}
+
+.difficulty-tag,
+.type-tag {
+  font-size: 12px;
+}
+
+.exercise-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.exercise-content {
+  padding: 0 20px 20px 20px;
+}
+
+.content-section {
+  margin-bottom: 15px;
+}
+
+.content-section:last-child {
+  margin-bottom: 0;
+}
+
+.content-label {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.content-text,
+.answer-text,
+.explanation-text {
+  color: #606266;
+  line-height: 1.6;
+  font-size: 14px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #409EFF;
+}
+
+.options-text {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 10px;
+  border-left: 3px solid #67C23A;
+}
+
+.option-line {
+  color: #606266;
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.option-line:last-child {
+  margin-bottom: 0;
+}
+
+.answer-text {
+  border-left-color: #E6A23C;
+  font-weight: 500;
+}
+
+.explanation-text {
+  border-left-color: #909399;
 }
 </style>

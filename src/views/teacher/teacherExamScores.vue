@@ -196,6 +196,7 @@
         <!-- 题目管理工具栏 -->
         <div class="question-toolbar" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
           <el-button type="primary" @click="handleAddQuestion">添加题目</el-button>
+          <el-button type="success" @click="showAIDialog" :icon="MagicStick">AI生成习题</el-button>
           <el-button type="danger" :disabled="!selectedQuestions.length" @click="handleBatchDelete">批量删除 ({{ selectedQuestions.length }})</el-button>
         </div>
 
@@ -381,7 +382,7 @@
     </el-dialog>
 
     <!-- 题目编辑弹窗 -->
-    <el-dialog v-model="showEditDialog" :title="editingQuestion ? '编辑题目' : '添加题目'" width="600px">
+    <el-dialog v-model="showEditDialog" :title="editingQuestion ? '编辑题目' : '添加题目'" width="800px">
       <div class="edit-form">
         <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="90px">
           <el-form-item label="题目内容" prop="content">
@@ -441,11 +442,164 @@
             <el-input-number v-model="editForm.scorePoints" :min="1" :max="100" />
           </el-form-item>
         </el-form>
+
+        <!-- AI生成习题展示区域 -->
+        <div v-if="aiGeneratedExercises && aiGeneratedExercises.length > 0" class="ai-exercises-section">
+          <el-divider>
+            <el-icon class="ai-icon"><MagicStick /></el-icon>
+            AI生成的习题参考
+          </el-divider>
+
+          <div class="ai-exercises-container">
+            <div class="ai-exercises-header">
+              <span class="ai-exercises-title">以下是AI生成的习题，您可以参考并复制内容到上方表单中</span>
+              <el-button size="small" type="info" @click="toggleAIExercises">
+                {{ showAIExercises ? '收起' : '展开' }}
+              </el-button>
+            </div>
+
+            <div v-show="showAIExercises" class="ai-exercises-list">
+              <div
+                v-for="(exercise, index) in aiGeneratedExercises"
+                :key="index"
+                class="ai-exercise-item"
+              >
+                <div class="exercise-header">
+                  <div class="exercise-title">
+                    <span class="exercise-number">题目 {{ index + 1 }}</span>
+                    <el-tag
+                      v-if="exercise.difficulty"
+                      :type="getAIDifficultyType(exercise.difficulty)"
+                      size="small"
+                      class="difficulty-tag"
+                    >
+                      {{ exercise.difficulty }}
+                    </el-tag>
+                    <el-tag
+                      v-if="exercise.type"
+                      type="info"
+                      size="small"
+                      class="type-tag"
+                    >
+                      {{ getAITypeText(exercise.type) }}
+                    </el-tag>
+                  </div>
+                  <div class="exercise-actions">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      @click="copyExerciseToForm(exercise)"
+                      :icon="DocumentCopy"
+                    >
+                      复制到表单
+                    </el-button>
+                    <el-button
+                      size="small"
+                      @click="copyExerciseText(exercise)"
+                      :icon="CopyDocument"
+                    >
+                      复制文本
+                    </el-button>
+                  </div>
+                </div>
+
+                <div class="exercise-content">
+                  <!-- 题目内容 -->
+                  <div class="content-section">
+                    <div class="content-label">题目内容：</div>
+                    <div class="content-text">{{ exercise.question || exercise.title || exercise.content || '暂无题目内容' }}</div>
+                  </div>
+
+                  <!-- 选项 -->
+                  <div v-if="exercise.options && exercise.options.length > 0" class="content-section">
+                    <div class="content-label">选项：</div>
+                    <div class="options-text">
+                      <div
+                        v-for="(option, optIndex) in exercise.options"
+                        :key="optIndex"
+                        class="option-line"
+                      >
+                        {{ String.fromCharCode(65 + optIndex) }}. {{ option }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 答案 -->
+                  <div v-if="exercise.answer" class="content-section">
+                    <div class="content-label">答案：</div>
+                    <div class="answer-text">{{ exercise.answer }}</div>
+                  </div>
+
+                  <!-- 解析 -->
+                  <div v-if="exercise.explanation" class="content-section">
+                    <div class="content-label">解析：</div>
+                    <div class="explanation-text">{{ exercise.explanation }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="showEditDialog = false">取消</el-button>
           <el-button type="primary" @click="saveQuestion">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- AI生成习题对话框 -->
+    <el-dialog v-model="aiDialogVisible" title="AI生成习题" width="600px">
+      <el-form :model="aiForm" :rules="aiRules" ref="aiFormRef" label-width="120px">
+        <el-form-item label="生成方式" prop="generateType">
+          <el-radio-group v-model="aiForm.generateType">
+            <el-radio value="course">基于课程生成</el-radio>
+            <el-radio value="knowledge">基于知识点生成</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item v-if="aiForm.generateType === 'course'" label="课程名称" prop="courseName">
+          <el-select v-model="aiForm.courseName" placeholder="请选择课程" filterable>
+            <el-option
+              v-for="course in courseList"
+              :key="course.courseId || course.id"
+              :label="course.courseName || course.name"
+              :value="course.courseName || course.name"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="aiForm.generateType === 'knowledge'" label="知识点" prop="knowledgeInput">
+          <el-input
+            v-model="aiForm.knowledgeInput"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入知识点，多个知识点用逗号分隔，例如：函数的概念，函数的性质，函数的图像"
+          />
+          <div class="form-tip">请输入相关知识点，多个知识点用逗号分隔</div>
+        </el-form-item>
+
+        <el-form-item label="难度等级" prop="difficultyLevel">
+          <el-select v-model="aiForm.difficultyLevel" placeholder="请选择难度等级">
+            <el-option label="简单" value="简单" />
+            <el-option label="中等" value="中等" />
+            <el-option label="困难" value="困难" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="题目数量" prop="problemCount">
+          <el-input-number v-model="aiForm.problemCount" :min="1" :max="10" />
+          <div class="form-tip">建议生成1-10道题目</div>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="aiDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="generateAIExercises" :loading="aiGenerating">
+            {{ aiGenerating ? '生成中...' : '开始生成' }}
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -456,8 +610,9 @@
 import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Loading, Refresh, Search, Plus, Delete } from '@element-plus/icons-vue'
-import { examAPI, courseAPI, courseSelectionAPI, knowledgeAPI } from '@/api/api'
+import { ArrowLeft, Loading, Refresh, Search, Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
+import { examAPI, courseAPI, courseSelectionAPI, knowledgeAPI, studentAssistantAPI } from '@/api/api'
+import { getTeacherId, refreshUserInfo } from '@/utils/auth'
 import BigNumber from 'bignumber.js'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart, RadarChart, ScatterChart } from 'echarts/charts'
@@ -2068,6 +2223,41 @@ function handleBatchDelete() {
 const showEditDialog = ref(false)
 const editingQuestion = ref(null)
 
+// AI生成习题相关
+const aiDialogVisible = ref(false)
+const aiGenerating = ref(false)
+const aiGeneratedExercises = ref([])
+const showAIExercises = ref(true)
+const courseList = ref([])
+const aiFormRef = ref(null)
+const aiForm = ref({
+  generateType: 'course',
+  courseName: '',
+  knowledgeInput: '',
+  difficultyLevel: '中等',
+  problemCount: 5
+})
+
+const aiRules = {
+  generateType: [
+    { required: true, message: '请选择生成方式', trigger: 'change' }
+  ],
+  courseName: [
+    { required: true, message: '请选择课程', trigger: 'change' }
+  ],
+  knowledgeInput: [
+    { required: true, message: '请输入知识点', trigger: 'blur' },
+    { min: 2, max: 500, message: '知识点长度应在2到500个字符之间', trigger: 'blur' }
+  ],
+  difficultyLevel: [
+    { required: true, message: '请选择难度等级', trigger: 'change' }
+  ],
+  problemCount: [
+    { required: true, message: '请输入题目数量', trigger: 'blur' },
+    { type: 'number', min: 1, max: 10, message: '题目数量应在1到10之间', trigger: 'blur' }
+  ]
+}
+
 const editForm = ref({
   content: '',
   questionType: 'SINGLE_CHOICE',
@@ -2193,6 +2383,256 @@ function formatOptionsToContent(content, options) {
   if (!Array.isArray(options) || options.length === 0) return content
   const optionLines = options.map(opt => `${opt.key}. ${opt.text || ''}`)
   return [content, ...optionLines].join('\n')
+}
+
+// ==================== AI生成习题相关方法 ====================
+
+// 显示AI生成对话框
+function showAIDialog() {
+  aiDialogVisible.value = true
+  // 获取课程列表
+  fetchCourseList()
+}
+
+// 获取课程列表
+async function fetchCourseList() {
+  try {
+    // 使用getAllCourses获取所有课程，与HomeworkDetail.vue保持一致
+    const courses = await courseAPI.getAllCourses()
+    courseList.value = Array.isArray(courses) ? courses : []
+    console.log('获取课程列表成功:', courseList.value)
+  } catch (error) {
+    console.error('获取课程列表失败:', error)
+    ElMessage.error('获取课程列表失败，请检查网络连接')
+    courseList.value = []
+  }
+}
+
+// 生成AI习题
+async function generateAIExercises() {
+  if (!aiFormRef.value) return
+
+  await aiFormRef.value.validate(async (valid) => {
+    if (valid) {
+      aiGenerating.value = true
+      try {
+        let teacherId = getTeacherId()
+
+        // 如果获取不到教师ID，尝试刷新用户信息
+        if (!teacherId) {
+          console.log('未找到教师ID，尝试刷新用户信息...')
+          const userInfo = await refreshUserInfo()
+          if (userInfo && userInfo.teacherId) {
+            teacherId = userInfo.teacherId
+          } else {
+            ElMessage.error('未找到教师信息，请重新登录')
+            return
+          }
+        }
+
+        let response
+
+        if (aiForm.value.generateType === 'course') {
+          // 基于课程生成习题
+          response = await studentAssistantAPI.generateExerciseByCourseName(
+            teacherId,
+            aiForm.value.courseName,
+            aiForm.value.difficultyLevel,
+            aiForm.value.problemCount
+          )
+        } else {
+          // 基于知识点生成习题
+          const knowledgeArray = aiForm.value.knowledgeInput
+            .split(',')
+            .map(item => item.trim())
+            .filter(item => item.length > 0)
+
+          response = await studentAssistantAPI.generateExerciseByKnowledgeNames(
+            teacherId,
+            knowledgeArray,
+            aiForm.value.difficultyLevel,
+            aiForm.value.problemCount
+          )
+        }
+
+        console.log('AI生成习题响应:', response)
+
+        // 处理响应数据
+        if (response && Array.isArray(response)) {
+          aiGeneratedExercises.value = response
+        } else if (response && response.exercises && Array.isArray(response.exercises)) {
+          aiGeneratedExercises.value = response.exercises
+        } else if (response && response.data && Array.isArray(response.data)) {
+          aiGeneratedExercises.value = response.data
+        } else {
+          aiGeneratedExercises.value = [response].filter(Boolean)
+        }
+
+        ElMessage.success(`成功生成 ${aiGeneratedExercises.value.length} 道习题`)
+        aiDialogVisible.value = false
+
+        // 打开题目编辑对话框显示AI生成的习题
+        handleAddQuestion()
+
+      } catch (error) {
+        console.error('AI生成习题失败:', error)
+        let errorMessage = 'AI生成习题失败'
+
+        if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+          errorMessage = 'AI生成习题超时，请稍后重试。生成过程可能需要较长时间，请耐心等待。'
+        } else if (error.response && error.response.data) {
+          if (error.response.data.message) {
+            errorMessage += ': ' + error.response.data.message
+          } else if (error.response.data.error) {
+            errorMessage += ': ' + error.response.data.error
+          }
+        } else if (error.message) {
+          errorMessage += ': ' + error.message
+        }
+
+        ElMessage.error(errorMessage)
+      } finally {
+        aiGenerating.value = false
+      }
+    } else {
+      ElMessage.warning('请完善表单信息')
+    }
+  })
+}
+
+// 切换AI习题显示状态
+function toggleAIExercises() {
+  showAIExercises.value = !showAIExercises.value
+}
+
+// 获取AI难度标签类型
+function getAIDifficultyType(difficulty) {
+  const typeMap = {
+    '简单': 'success',
+    '中等': 'warning',
+    '困难': 'danger'
+  }
+  return typeMap[difficulty] || 'info'
+}
+
+// 获取AI题目类型文本
+function getAITypeText(type) {
+  const typeMap = {
+    'SINGLE_CHOICE': '单选题',
+    'MULTI_CHOICE': '多选题',
+    'FILL_BLANK': '填空题',
+    'ESSAY_QUESTION': '简答题',
+    'TRUE_FALSE': '判断题'
+  }
+  return typeMap[type] || type
+}
+
+// 复制习题到表单
+function copyExerciseToForm(exercise) {
+  try {
+    // 复制题目内容
+    if (exercise.question || exercise.title || exercise.content) {
+      editForm.value.content = exercise.question || exercise.title || exercise.content
+    }
+
+    // 根据习题类型设置表单类型
+    if (exercise.type) {
+      editForm.value.questionType = exercise.type
+    } else if (exercise.options && exercise.options.length > 0) {
+      editForm.value.questionType = exercise.options.length > 4 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE'
+    }
+
+    // 处理选择题选项
+    if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(editForm.value.questionType) && exercise.options) {
+      editForm.value.options = exercise.options.map((option, index) => ({
+        key: String.fromCharCode(65 + index), // A, B, C, D...
+        text: option
+      }))
+    } else if (editForm.value.questionType === 'TRUE_FALSE') {
+      editForm.value.options = [
+        { key: 'A', text: '正确' },
+        { key: 'B', text: '错误' }
+      ]
+    }
+
+    // 设置答案
+    if (exercise.answer) {
+      editForm.value.referenceAnswer = exercise.answer
+    }
+
+    // 设置难度
+    if (exercise.difficulty) {
+      const difficultyMap = {
+        '简单': 'EASY',
+        '中等': 'MEDIUM',
+        '困难': 'HARD'
+      }
+      editForm.value.difficulty = difficultyMap[exercise.difficulty] || 'MEDIUM'
+    }
+
+    // 设置分值
+    if (exercise.score) {
+      editForm.value.scorePoints = exercise.score
+    }
+
+    ElMessage.success('习题内容已复制到表单')
+  } catch (error) {
+    console.error('复制习题到表单失败:', error)
+    ElMessage.error('复制失败，请手动复制内容')
+  }
+}
+
+// 复制习题文本到剪贴板
+function copyExerciseText(exercise) {
+  try {
+    let text = ''
+
+    // 题目内容
+    if (exercise.question || exercise.title || exercise.content) {
+      text += `题目：${exercise.question || exercise.title || exercise.content}\n\n`
+    }
+
+    // 选项
+    if (exercise.options && exercise.options.length > 0) {
+      text += '选项：\n'
+      exercise.options.forEach((option, index) => {
+        text += `${String.fromCharCode(65 + index)}. ${option}\n`
+      })
+      text += '\n'
+    }
+
+    // 答案
+    if (exercise.answer) {
+      text += `答案：${exercise.answer}\n\n`
+    }
+
+    // 解析
+    if (exercise.explanation) {
+      text += `解析：${exercise.explanation}\n`
+    }
+
+    // 复制到剪贴板
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text)
+      ElMessage.success('习题内容已复制到剪贴板')
+    } else {
+      // 降级方案
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      document.execCommand('copy')
+      textArea.remove()
+      ElMessage.success('习题内容已复制到剪贴板')
+    }
+  } catch (error) {
+    console.error('复制习题文本失败:', error)
+    ElMessage.error('复制失败，请手动复制内容')
+  }
 }
 </script>
 
@@ -2873,4 +3313,155 @@ function formatOptionsToContent(content, options) {
     gap: 10px;
   }
 }
-</style> 
+
+/* AI习题展示区域样式 */
+.ai-exercises-section {
+  margin-top: 30px;
+  padding-top: 20px;
+}
+
+.ai-exercises-section .el-divider {
+  margin: 20px 0;
+}
+
+.ai-exercises-section .ai-icon {
+  color: #409EFF;
+  margin-right: 8px;
+}
+
+.ai-exercises-container {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.ai-exercises-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #f8f9fa;
+  border-radius: 8px 8px 0 0;
+}
+
+.ai-exercises-title {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.ai-exercises-list {
+  padding: 0;
+}
+
+.ai-exercise-item {
+  border-bottom: 1px solid #e4e7ed;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.ai-exercise-item:last-child {
+  border-bottom: none;
+  border-radius: 0 0 8px 8px;
+}
+
+.ai-exercise-item:hover {
+  background: #f8f9fa;
+}
+
+.exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.exercise-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exercise-number {
+  font-weight: 600;
+  color: #409EFF;
+  font-size: 14px;
+}
+
+.difficulty-tag,
+.type-tag {
+  font-size: 12px;
+}
+
+.exercise-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.exercise-content {
+  padding: 0 20px 20px 20px;
+}
+
+.content-section {
+  margin-bottom: 15px;
+}
+
+.content-section:last-child {
+  margin-bottom: 0;
+}
+
+.content-label {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.content-text,
+.answer-text,
+.explanation-text {
+  color: #606266;
+  line-height: 1.6;
+  font-size: 14px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #409EFF;
+}
+
+.options-text {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 10px;
+  border-left: 3px solid #67C23A;
+}
+
+.option-line {
+  color: #606266;
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.option-line:last-child {
+  margin-bottom: 0;
+}
+
+.answer-text {
+  border-left-color: #E6A23C;
+  font-weight: 500;
+}
+
+.explanation-text {
+  border-left-color: #909399;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+</style>

@@ -5414,3 +5414,144 @@ export const studentAnswerAPI = {
     }
 };
 
+// 创建专门用于AI接口的axios实例（延长超时时间）
+const createAIAuthorizedAxios = () => {
+    const instance = axios.create({
+        baseURL: 'http://118.89.136.119:8081',
+        timeout: 60000, // 设置为60秒，因为AI生成可能需要较长时间
+    });
+
+    // 请求拦截器：添加 token
+    instance.interceptors.request.use(
+        (config) => {
+            const token = getValidToken();
+            if (token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            }
+            return config;
+        },
+        (error) => Promise.reject(error)
+    );
+
+    // 响应拦截器：处理401和405错误
+    instance.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            const originalRequest = error.config;
+
+            // 如果是405错误，记录警告但不阻止程序运行
+            if (error.response && error.response.status === 405) {
+                console.warn(`API接口不支持 ${originalRequest.method?.toUpperCase()} 方法: ${originalRequest.url}`);
+            }
+
+            // 如果是401错误且没有重试过
+            if (error.response && error.response.status === 401 && !originalRequest._retry) {
+                originalRequest._retry = true;
+
+                try {
+                    // 获取刷新token
+                    const refreshToken = getRefreshToken();
+                    if (!refreshToken) {
+                        throw new Error('没有刷新token可用');
+                    }
+
+                    // 刷新token
+                    const response = await authAPI.teacherRefreshToken({ refreshToken });
+                    const { accessToken, refreshToken: newRefreshToken } = response;
+
+                    // 保存新token
+                    setToken(accessToken);
+                    setRefreshToken(newRefreshToken);
+
+                    // 更新请求头并重试
+                    originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+                    return instance(originalRequest);
+                } catch (refreshError) {
+                    console.error('刷新token失败，需要重新登录:', refreshError);
+                    window.location.href = '/login';
+                    return Promise.reject(refreshError);
+                }
+            }
+
+            return Promise.reject(error);
+        }
+    );
+
+    return instance;
+};
+
+// AI学生助手相关 API
+export const aiAssistantAPI = {
+    /**
+     * 基于课程生成习题（需要token）
+     * @param {string} studentId 学生ID（实际使用teacherId的值）
+     * @param {string} courseName 课程名称
+     * @param {string} difficultyLevel 难度等级
+     * @param {number} problemCount 题目数量
+     * @returns {Promise<Object>} 生成的习题数据
+     */
+    async generateExerciseByCourse(studentId, courseName, difficultyLevel, problemCount) {
+        const axios = createAIAuthorizedAxios(); // 使用专门的AI axios实例
+        try {
+            console.log('基于课程生成习题，参数:', { studentId, courseName, difficultyLevel, problemCount });
+
+            const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-course`, {
+                params: {
+                    courseName,
+                    difficultyLevel,
+                    problemCount
+                },
+                timeout: 60000 // 单独设置这个请求的超时时间为60秒
+            });
+
+            console.log('基于课程生成习题响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('基于课程生成习题失败:', error.response ? error.response.data : error.message);
+
+            // 如果是超时错误，提供更友好的错误信息
+            if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+                throw new Error('AI生成习题超时，请稍后重试。生成过程可能需要较长时间，请耐心等待。');
+            }
+
+            throw error;
+        }
+    },
+
+    /**
+     * 基于知识点生成习题（需要token）
+     * @param {string} studentId 学生ID（实际使用teacherId的值）
+     * @param {Array<string>} knowledgeNames 知识点名称数组
+     * @param {string} difficultyLevel 难度等级
+     * @param {number} problemCount 题目数量
+     * @returns {Promise<Object>} 生成的习题数据
+     */
+    async generateExerciseByKnowledge(studentId, knowledgeNames, difficultyLevel, problemCount) {
+        const axios = createAIAuthorizedAxios(); // 使用专门的AI axios实例
+        try {
+            console.log('基于知识点生成习题，参数:', { studentId, knowledgeNames, difficultyLevel, problemCount });
+
+            const response = await axios.get(`/api/student-assistant/student/${studentId}/generate-exercise/by-knowledge`, {
+                params: {
+                    knowledgeNames: Array.isArray(knowledgeNames) ? knowledgeNames.join(',') : knowledgeNames,
+                    difficultyLevel,
+                    problemCount
+                },
+                timeout: 60000 // 单独设置这个请求的超时时间为60秒
+            });
+
+            console.log('基于知识点生成习题响应:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('基于知识点生成习题失败:', error.response ? error.response.data : error.message);
+
+            // 如果是超时错误，提供更友好的错误信息
+            if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+                throw new Error('AI生成习题超时，请稍后重试。生成过程可能需要较长时间，请耐心等待。');
+            }
+
+            throw error;
+        }
+    }
+};
+
