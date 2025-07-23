@@ -12,11 +12,6 @@
                 <el-date-picker v-model="selectedDate" type="date" placeholder="选择日期" format="YYYY-MM-DD"
                     value-format="YYYY-MM-DD" :disabled-date="disableFutureDate" @change="fetchStats" />
             </template>
-            <template v-else>
-                <el-select v-model="selectedWeek" placeholder="选择周" @change="fetchStats">
-                    <el-option v-for="week in weekOptions" :key="week.value" :label="week.label" :value="week.value" />
-                </el-select>
-            </template>
         </div>
 
         <!-- 基础统计信息 -->
@@ -52,7 +47,7 @@
             <template #header>
                 <div class="card-header">
                     <span>总体使用情况</span>
-                    <div class="time-info">{{ periodType === 'daily' ? selectedDate : selectedWeek }}</div>
+                    <div class="time-info">{{ periodType === 'daily' ? selectedDate : '本周' }}</div>
                 </div>
             </template>
             <el-row :gutter="20">
@@ -99,8 +94,6 @@ const courseCount = ref(0)
 // 使用统计数据
 const periodType = ref('daily')
 const selectedDate = ref(new Date().toISOString().split('T')[0])
-const selectedWeek = ref('')
-const weekOptions = ref([])
 const totalStats = ref({})
 const studentStats = ref({})
 const teacherStats = ref({})
@@ -153,29 +146,6 @@ let teacherChart = null
 // 禁用未来日期
 const disableFutureDate = (time) => {
     return time.getTime() > Date.now()
-}
-
-// 生成最近12周的选项
-const generateWeekOptions = () => {
-    const options = []
-    const currentDate = new Date()
-
-    for (let i = 0; i < 12; i++) {
-        const date = new Date(currentDate)
-        date.setDate(date.getDate() - i * 7)
-        // eslint-disable-next-line no-unused-vars
-        const weekEnd = date.toISOString().split('T')[0]
-        date.setDate(date.getDate() - 6)
-        const weekStart = date.toISOString().split('T')[0]
-
-        options.push({
-            value: `${weekStart}_${weekEnd}`,
-            label: `${weekStart} 至 ${weekEnd}`
-        })
-    }
-
-    weekOptions.value = options
-    selectedWeek.value = options[0].value
 }
 
 // 初始化图表
@@ -249,10 +219,8 @@ const fetchStats = async () => {
 
         if (periodType.value === 'daily') {
             params.date = selectedDate.value
-        } else {
-            const [weekStart] = selectedWeek.value.split('_')
-            params.weekId = weekStart
         }
+        // 周统计只需要 period: 'weekly'
         console.log('统计请求参数:', params)
 
         // 获取总体统计
@@ -290,14 +258,11 @@ const fetchStats = async () => {
 const handlePeriodChange = () => {
     if (periodType.value === 'daily') {
         selectedDate.value = new Date().toISOString().split('T')[0]
-    } else {
-        selectedWeek.value = weekOptions.value[0].value
     }
     fetchStats()
 }
 
 onMounted(() => {
-    generateWeekOptions()
     initCharts()
     fetchBasicStats()
     fetchStats()
