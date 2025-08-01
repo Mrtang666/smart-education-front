@@ -149,7 +149,6 @@ const createTeacherAuthorizedAxios = () => {
 
     return instance;
 };
-
 // 管理端相关 API
 export const adminAPI = {
     /**
@@ -196,6 +195,7 @@ export const adminAPI = {
         return response.data;
     }
 };
+
 
 // 认证相关 API(√)
 export const authAPI = {
@@ -741,12 +741,12 @@ export const courseAPI = {
 
 // 教师相关 API（3更新教师信息）
 export const teacherAPI = {
-    /**
+      /**
      * 添加新学生
      * @param {Object} studentData 学生信息
      * @returns {Promise<Object>} 添加的学生信息
      */
-    async addStudent(studentData) {
+      async addStudent(studentData) {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.post('/api/student/add', studentData);
         return response.data;
@@ -788,11 +788,11 @@ export const teacherAPI = {
         return response.data;
     },
 
-    /**
+      /**
      * 4.获取教师列表（需要管理员token）
      * @returns {Promise<Array<{teacherId: number, username: string, email?: string, fullName?: string, phone?: string, createdAt?: string, updatedAt?: string}>>} 教师列表
      */
-    async getTeacherList() {
+      async getTeacherList() {
         const axios = createTeacherAuthorizedAxios();
         const response = await axios.get('/api/teacher/list');
         return {
@@ -4478,29 +4478,21 @@ export const docAPI = {
     async downloadDoc(filename) {
         try {
             console.log(`开始下载文档: ${filename}`);
-
-            // 使用新的下载接口 - POST请求和JSON请求体
-            const response = await fetch('http://118.89.136.119:8000/docs/download', {
-                method: 'POST',
+            // 修正为GET请求，参数通过URL传递
+            const response = await fetch(`http://118.89.136.119:8000/docs/download?filename=${encodeURIComponent(filename)}`, {
+                method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Accept': 'application/octet-stream'
-                },
-                body: JSON.stringify({
-                    filename: filename
-                })
+                }
             });
-
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('下载响应错误:', response.status, errorText);
                 throw new Error(`下载失败: ${response.status} ${response.statusText}`);
             }
-
             const blob = await response.blob();
             console.log(`文档下载成功: ${filename}, 大小: ${blob.size} bytes`);
             return blob;
-
         } catch (error) {
             console.error('下载文档失败:', error);
             throw error;

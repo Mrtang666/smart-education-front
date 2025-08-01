@@ -128,6 +128,7 @@ import {
 } from '@element-plus/icons-vue'
 import { getUserInfo, clearAuth } from '@/utils/auth'
 import { courseSelectionAPI, studentAssistantAPI } from '@/api/api'
+import { marked } from 'marked'
 
 const router = useRouter()
 const logoUrl = ref('@/assets/projectlogo.png') // 项目logo
@@ -526,20 +527,8 @@ function fetchStudentData() {
 // 格式化消息内容
 function formatMessage(content) {
     if (!content) return ''
-
-    // 将换行符转换为HTML换行
-    let formatted = content.replace(/\n/g, '<br>')
-
-    // 处理代码块（简单的```包围的代码）
-    formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-
-    // 处理行内代码（`包围的代码）
-    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>')
-
-    // 处理粗体文本（**包围的文本）
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-
-    return formatted
+    // 使用marked库渲染Markdown为HTML
+    return marked.parse(content)
 }
 
 // 复制消息内容
