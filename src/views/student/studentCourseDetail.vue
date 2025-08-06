@@ -86,16 +86,12 @@
                 <!-- 知识点卡片循环 -->
                 <div v-for="(point, index) in knowledgePoints" :key="index" 
                     class="knowledge-card"
-                    :class="{ 'knowledge-card-completed': point.completed }"
                     @click="handleKnowledgeCardClick(point)">
                   <div class="knowledge-card-header">
                     <div class="knowledge-card-icon" :style="{ backgroundColor: getKnowledgeDifficultyColor(point.difficultyLevel) }">
                       {{ getKnowledgeIcon(point) }}
                     </div>
-                    <div class="knowledge-card-status">
-                      <el-tag v-if="point.completed" size="small" type="success">已完成</el-tag>
-                      <el-tag v-else size="small" type="info">未完成</el-tag>
-                    </div>
+                    <!-- 状态标签已移除 -->
                   </div>
                   <div class="knowledge-card-content">
                     <h4 class="knowledge-card-title">{{ point.name }}</h4>
@@ -103,31 +99,12 @@
                   </div>
                   <div class="knowledge-card-footer">
                     <el-button
-                      v-if="!point.completed"
                       type="primary"
                       size="small"
                       plain
                       @click.stop="startLearning(point)"
                     >
                       开始学习
-                    </el-button>
-                    <el-button
-                      v-if="!point.completed"
-                      type="success"
-                      size="small"
-                      @click.stop="markAsCompleted(point)"
-                      :loading="point.updating"
-                    >
-                      标记完成
-                    </el-button>
-                    <el-button
-                      v-if="point.completed"
-                      type="info"
-                      size="small"
-                      plain
-                      @click.stop="reviewKnowledge(point)"
-                    >
-                      复习
                     </el-button>
                   </div>
                 </div>
@@ -569,7 +546,7 @@
                       <i class="el-icon-chat-dot-round"></i>
                     </div>
                     <div class="ai-message-content">
-                      <div class="ai-message-text">{{ message.content }}</div>
+                      <div class="ai-message-text" v-html="formatMessage(message.content)"></div>
                       <div class="ai-message-actions">
                         <el-button type="text" size="small" @click="copyMessage(message.content)">
                           <i class="el-icon-document-copy"></i> 复制
@@ -689,6 +666,7 @@
 <script>
 import { knowledgeAPI, examAPI, attendanceAPI, docAPI, assignmentAPI, studentAnswerAPI, studentAssistantAPI } from '@/api/api';
 import { getUserInfo } from '@/utils/auth';
+import { marked } from 'marked'
 
 export default {
   name: 'StudentCourseDetail',
@@ -2508,8 +2486,14 @@ export default {
       } finally {
         this.aiLoading = false;
       }
-    }
+    },
 
+    // 格式化消息内容（支持Markdown）
+    formatMessage(content) {
+      if (!content) return ''
+      // 使用marked库渲染Markdown为HTML
+      return marked.parse(content)
+    },
   }
 }
 </script>
