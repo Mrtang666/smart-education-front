@@ -14,6 +14,63 @@ const teacherAxios = axios.create({
     timeout: 10000,
 });
 
+// 创建带有拦截器的编程题 Axios 实例
+const createProgrammingAxios = () => {
+    const instance = axios.create({
+        baseURL: 'http://118.89.136.119:8081',
+        timeout: 10000,
+    });
+
+    // 请求拦截器：添加 token
+    instance.interceptors.request.use(
+        (config) => {
+            const token = getValidToken();
+            if (token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            }
+            return config;
+        },
+        (error) => Promise.reject(error)
+    );
+
+    // 响应拦截器：处理错误
+    instance.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            const originalRequest = error.config;
+
+            if (error.response && error.response.status === 401 && !originalRequest._retry) {
+                originalRequest._retry = true;
+
+                try {
+                    const refreshToken = getRefreshToken();
+                    if (!refreshToken) {
+                        throw new Error('没有刷新token可用');
+                    }
+
+                    // 使用教师端的刷新token接口
+                    const response = await authAPI.teacherRefreshToken({ refreshToken });
+                    const { accessToken, refreshToken: newRefreshToken } = response;
+
+                    setToken(accessToken);
+                    setRefreshToken(newRefreshToken);
+
+                    originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+                    return instance(originalRequest);
+                } catch (refreshError) {
+                    console.error('刷新token失败，需要重新登录:', refreshError);
+                    window.location.href = '/login';
+                    return Promise.reject(refreshError);
+                }
+            }
+
+            return Promise.reject(error);
+        }
+    );
+
+    return instance;
+};
+
 // 创建带有拦截器的学生端 Axios 实例（√）
 const createStudentAuthorizedAxios = () => {
     const instance = axios.create({
@@ -5646,15 +5703,16 @@ export const scriptForwardAPI = {
 
 // 编程题目相关 API
 export const codeQuestionAPI = {
+    // 创建拦截器实例
+    axios: createProgrammingAxios(),
     /**
      * 学生提交编程题答案，并触发评测判题
      * @param {Object} submitData 提交数据
      * @returns {Promise<Object>} 提交结果，包含编译结果和评测结果
      */
     async submit(submitData) {
-        const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.post('/api/code-question-answer/submit', submitData);
+            const response = await this.axios.post('/api/code-question-answer/submit', submitData);
             return response.data;
         } catch (error) {
             console.error('提交编程题答案失败:', error.response ? error.response.data : error.message);
@@ -5668,9 +5726,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Object>} 更新后的编程题
      */
     async updateCodeQuestion(questionData) {
-        const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.put('/api/code-question/update', questionData);
+            const response = await this.axios.put('/api/code-question/update', questionData);
             return response.data;
         } catch (error) {
             console.error('更新编程题失败:', error);
@@ -5684,9 +5741,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Object>} 保存的编程题
      */
     async saveCodeQuestion(questionData) {
-        const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.post('/api/code-question/save', questionData);
+            const response = await this.axios.post('/api/code-question/save', questionData);
             return response.data;
         } catch (error) {
             console.error('保存编程题失败:', error);
@@ -5700,9 +5756,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Object>} 编程题详情
      */
     async getCodeQuestionById(id) {
-        const axios = createAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question/${id}`);
+            const response = await this.axios.get(`/api/code-question/${id}`);
             return response.data;
         } catch (error) {
             console.error('获取编程题详情失败:', error);
@@ -5716,9 +5771,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Object>} 提交记录详情
      */
     async getAnswerById(answerId) {
-        const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question-answer/${answerId}`);
+            const response = await this.axios.get(`/api/code-question-answer/${answerId}`);
             return response.data;
         } catch (error) {
             console.error('获取答案记录失败:', error.response ? error.response.data : error.message);
@@ -5732,9 +5786,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Array>} 提交记录列表
      */
     async getStudentSubmissions(studentId) {
-        const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question-answer/student/${studentId}`);
+            const response = await this.axios.get(`/api/code-question-answer/student/${studentId}`);
             return response.data;
         } catch (error) {
             console.error('获取学生提交记录失败:', error.response ? error.response.data : error.message);
@@ -5749,9 +5802,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Object>} 完成状态
      */
     async checkStudentCompletion(cqId, studentId) {
-        const axios = createStudentAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question-answer/is-accepted/code-question/${cqId}/student/${studentId}`);
+            const response = await this.axios.get(`/api/code-question-answer/is-accepted/code-question/${cqId}/student/${studentId}`);
             return response.data;
         } catch (error) {
             console.error('检测题目完成状态失败:', error.response ? error.response.data : error.message);
@@ -5765,9 +5817,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Array>} 提交记录列表
      */
     async getQuestionSubmissions(cqId) {
-        const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question-answer/code-question/${cqId}`);
+            const response = await this.axios.get(`/api/code-question-answer/code-question/${cqId}`);
             return response.data;
         } catch (error) {
             console.error('获取题目提交记录失败:', error.response ? error.response.data : error.message);
@@ -5782,9 +5833,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Array>} 提交记录列表
      */
     async getStudentQuestionSubmissions(cqId, studentId) {
-        const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question-answer/code-question/${cqId}/student/${studentId}`);
+            const response = await this.axios.get(`/api/code-question-answer/code-question/${cqId}/student/${studentId}`);
             return response.data;
         } catch (error) {
             console.error('获取学生题目提交记录失败:', error.response ? error.response.data : error.message);
@@ -5798,9 +5848,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Object>} 删除结果
      */
     async deleteCodeQuestion(id) {
-        const axios = createTeacherAuthorizedAxios();
         try {
-            const response = await axios.delete(`/api/code-question/${id}`);
+            const response = await this.axios.delete(`/api/code-question/${id}`);
             return response.data;
         } catch (error) {
             console.error('删除编程题失败:', error.response ? error.response.data : error.message);
@@ -5814,9 +5863,8 @@ export const codeQuestionAPI = {
      * @returns {Promise<Array>} 编程题列表
      */
     async getExamCodeQuestions(examId) {
-        const axios = createAuthorizedAxios();
         try {
-            const response = await axios.get(`/api/code-question/exam/${examId}`);
+            const response = await this.axios.get(`/api/code-question/exam/${examId}`);
             return response.data;
         } catch (error) {
             console.error('获取考试编程题列表失败:', error.response ? error.response.data : error.message);

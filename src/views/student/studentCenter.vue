@@ -110,8 +110,8 @@
 
 <script setup>
 import { getValidToken } from '@/utils/auth'
-import { ref, onUnmounted, provide, onMounted, nextTick, watch } from 'vue'
-import { ElMessage, ElLoading } from 'element-plus'
+import { ref, onUnmounted, provide, onMounted, nextTick, watch, h } from 'vue'
+import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import AppHeader from '@/components/common/AppHeader.vue'
 import { useRouter } from 'vue-router'
 import {
@@ -124,7 +124,8 @@ import {
     Setting,
     HomeFilled,
     DocumentCopy,
-    Refresh
+    Refresh,
+    Monitor
 } from '@element-plus/icons-vue'
 import { getUserInfo, clearAuth } from '@/utils/auth'
 import { courseSelectionAPI, studentAssistantAPI } from '@/api/api'
@@ -216,6 +217,7 @@ const menuList = [
     // { name: '考试', icon: Document },
     // { name: '日程', icon: Calendar },
     { name: '计划', icon: DataAnalysis },
+    { name: 'VSCode', icon: Monitor },
     { name: '设置', icon: Setting }
 ]
 
@@ -285,14 +287,63 @@ function handleMenuClick(menu) {
         case '计划':
             router.push('/student/plan')
             break
+        case 'VSCode': {
+            // 使用当前用户的用户名
+            const username = userInfo.value?.username || userName.value
+            const vscodeUrl = `http://118.89.136.119:8082/?folder=/home/program/${username}`
+            
+            // 检查本地存储中的"不再提醒"设置
+            const noRemind = localStorage.getItem('vscode-permission-no-remind') === 'true'
+            
+            if (noRemind) {
+                window.open(vscodeUrl, '_blank')
+            } else {
+                // 使用 Element Plus 的弹窗
+                const noRemindRef = ref(false)
+                ElMessageBox({
+                    title: '权限提醒',
+                    dangerouslyUseHTMLString: true,
+                    message: h('div', null, [
+                        h('p', null, 'VSCode在线编辑器需要向老师申请使用权限，请确保已经向老师申请并获得授权后再继续访问。'),
+                        h('div', { style: 'margin-top: 15px;' }, [
+                            h('input', {
+                                type: 'checkbox',
+                                style: 'margin-right: 8px; vertical-align: middle;',
+                                checked: noRemindRef.value,
+                                onchange: (event) => {
+                                    noRemindRef.value = event.target.checked
+                                    if (event.target.checked) {
+                                        localStorage.setItem('vscode-permission-no-remind', 'true')
+                                    }
+                                }
+                            }),
+                            h('span', { style: 'vertical-align: middle;' }, '不再提醒')
+                        ])
+                    ]),
+                    showCancelButton: true,
+                    confirmButtonText: '继续访问',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                    closeOnClickModal: false,
+                    closeOnPressEscape: false
+                }).then(action => {
+                    if (action === 'confirm') {
+                        window.open(vscodeUrl, '_blank')
+                        ElMessage.success('成功跳转到VSCode页面')
+                    }
+                }).catch(() => {})
+            }
+            break
+        }
         case '设置':
             router.push('/student/settings')
+            ElMessage.success(`切换到设置页面`)
             break
         default:
+            router.push(`/student/${menu.name.toLowerCase()}`)
+            ElMessage.success(`切换到${menu.name}页面`)
             break
     }
-
-    ElMessage.success(`切换到${menu.name}页面`)
 }
 
 // 用户操作
@@ -1113,5 +1164,25 @@ function handleJoinCourse(code) {
 :deep(.el-avatar),
 :deep(.el-dropdown) {
     writing-mode: horizontal-tb !important;
+}
+
+/* VSCode权限弹窗样式 */
+:deep(.vscode-permission-dialog) {
+    .el-message-box__content {
+        padding: 20px;
+    }
+
+    .el-message-box__container {
+        position: relative;
+        padding-bottom: 30px;
+    }
+
+    .el-checkbox {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        margin: 0;
+        font-size: 14px;
+    }
 }
 </style>

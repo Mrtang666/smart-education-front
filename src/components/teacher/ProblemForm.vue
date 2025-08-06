@@ -92,7 +92,7 @@
 
       <!-- 非选择题的内容输入 -->
       <el-form-item
-        v-else
+        v-else-if="form.type !== 'CODE_QUESTION'"
         label="题目内容"
         required
       >
@@ -351,6 +351,7 @@ const form = ref({
   expectedAnswer: '',
   score: 10,
   assignmentId: props.homeworkId,
+
   autoGrading: getAutoGrading('SINGLE_CHOICE') // 默认单选题支持自动评分
 })
 
@@ -893,12 +894,23 @@ function copyExerciseText(exercise) {
     ElMessage.error('复制失败，请手动复制内容')
   }
 }
+
+
+
 </script>
 
 <style scoped>
 .problem-form {
   max-width: 800px;
   margin: 0 auto;
+}
+
+.input-output-pair {
+  margin-bottom: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
 }
 
 .form-tip {
