@@ -1,0 +1,166 @@
+{
+  "info": {
+    "title": "教学实训软件",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [],
+  "paths": {
+    "/api/program/create": {
+      "post": {
+        "summary": "创建学生OJ权限",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "description": "名称",
+            "required": false,
+            "type": "string",
+            "x-example": ""
+          }
+        ],
+        "responses": {
+          "409": {
+            "description": "",
+            "headers": {},
+            "schema": {
+              "type": "object",
+              "properties": {
+                "details": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "success": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "details",
+                "message",
+                "success"
+              ]
+            }
+          }
+        },
+        "security": [],
+        "produces": [
+          "application/json"
+        ]
+      }
+    },
+    "/api/file/create": {
+      "post": {
+        "summary": "创建作业",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "fileName",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "type": "string",
+            "x-example": "/root/docker/code_server/program/test_user1/ThreeQueue.java"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {},
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "security": [],
+        "produces": [
+          "application/json"
+        ]
+      }
+    },
+    "/api/file/write": {
+      "post": {
+        "summary": "写入作业内容",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "fileName",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "type": "string",
+            "x-example": "/root/docker/code_server/program/test_user1/ThreeQueue1.java"
+          },
+          {
+            "name": "content",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "type": "string",
+            "x-example": "/**这是一个三皇后作业*/"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {},
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "security": [],
+        "produces": [
+          "application/json"
+        ]
+      }
+    },
+    "/api/file/read": {
+      "get": {
+        "summary": "读取文件内容",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "fileName",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "type": "string",
+            "x-example": "/root/docker/code_server/program/test_user1/ThreeQueue.java"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {},
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "security": [],
+        "produces": [
+          "application/json"
+        ]
+      }
+    }
+  },
+  "security": [],
+  "swagger": "2.0",
+  "definitions": {},
+  "securityDefinitions": {},
+  "x-components": {}
+}

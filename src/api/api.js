@@ -5555,3 +5555,280 @@ export const aiAssistantAPI = {
     }
 };
 
+// 在线判题相关 API
+export const onlineJudgeAPI = {
+    /**
+     * 提交代码进行判题
+     * @param {Object} submitData 提交数据
+     * @param {string} submitData.code 代码内容
+     * @param {string} submitData.language 编程语言
+     * @param {string} submitData.questionId 题目ID
+     * @returns {Promise<Object>} 判题结果
+     */
+    async submitForJudge(submitData) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.post('/api/online-judge/submit', submitData);
+            return response.data;
+        } catch (error) {
+            console.error('提交判题失败:', error);
+            throw error;
+        }
+    }
+};
+
+// 脚本转发模块相关 API（这个没用swagger，所以不存在在swagger.json文件里面，但是存在于scriptForwardAPI.json文件中）
+export const scriptForwardAPI = {
+    /**
+     * 创建学生OJ权限
+     * @param {string} name 名称
+     * @returns {Promise<Object>} 创建结果
+     */
+    async createProgram(name) {
+        try {
+            const response = await axios.post('/api/program/create', null, {
+                params: { name }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('创建OJ权限失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 创建作业
+     * @param {string} fileName 文件路径和名称
+     * @returns {Promise<Object>} 创建结果
+     */
+    async createFile(fileName) {
+        try {
+            const response = await axios.post('/api/file/create', null, {
+                params: { fileName }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('创建作业失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 写入作业内容
+     * @param {string} fileName 文件路径和名称  示例：/root/docker/code_server/program/test_user1/ThreeQueue1.java
+     * @param {string} content 文件内容
+     * @returns {Promise<Object>} 写入结果
+     */
+    async writeFile(fileName, content) {
+        try {
+            const response = await axios.post('/api/file/write', null, {
+                params: { 
+                    fileName,
+                    content
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('写入作业内容失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 读取文件内容
+     * @param {string} fileName 文件路径和名称
+     * @returns {Promise<Object>} 文件内容
+     */
+    async readFile(fileName) {
+        try {
+            const response = await axios.get('/api/file/read', {
+                params: { fileName }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('读取文件内容失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+};
+
+// 编程题目相关 API
+export const codeQuestionAPI = {
+    /**
+     * 学生提交编程题答案，并触发评测判题
+     * @param {Object} submitData 提交数据
+     * @returns {Promise<Object>} 提交结果，包含编译结果和评测结果
+     */
+    async submit(submitData) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.post('/api/code-question-answer/submit', submitData);
+            return response.data;
+        } catch (error) {
+            console.error('提交编程题答案失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 更新编程题
+     * @param {Object} questionData 题目数据
+     * @returns {Promise<Object>} 更新后的编程题
+     */
+    async updateCodeQuestion(questionData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.put('/api/code-question/update', questionData);
+            return response.data;
+        } catch (error) {
+            console.error('更新编程题失败:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * 保存编程题
+     * @param {Object} questionData 题目数据 
+     * @returns {Promise<Object>} 保存的编程题
+     */
+    async saveCodeQuestion(questionData) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.post('/api/code-question/save', questionData);
+            return response.data;
+        } catch (error) {
+            console.error('保存编程题失败:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取编程题详情
+     * @param {string} id 编程题ID
+     * @returns {Promise<Object>} 编程题详情
+     */
+    async getCodeQuestionById(id) {
+        const axios = createAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取编程题详情失败:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取指定答案ID的提交记录
+     * @param {string} answerId 答案ID
+     * @returns {Promise<Object>} 提交记录详情
+     */
+    async getAnswerById(answerId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question-answer/${answerId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取答案记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 查看一个学生的所有编程题提交记录
+     * @param {string} studentId 学生ID
+     * @returns {Promise<Array>} 提交记录列表
+     */
+    async getStudentSubmissions(studentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question-answer/student/${studentId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取学生提交记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 检测一位学生是否完成某道编程题
+     * @param {string} cqId 编程题ID
+     * @param {string} studentId 学生ID
+     * @returns {Promise<Object>} 完成状态
+     */
+    async checkStudentCompletion(cqId, studentId) {
+        const axios = createStudentAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question-answer/is-accepted/code-question/${cqId}/student/${studentId}`);
+            return response.data;
+        } catch (error) {
+            console.error('检测题目完成状态失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 查看一道编程题的所有提交记录
+     * @param {string} cqId 编程题ID
+     * @returns {Promise<Array>} 提交记录列表
+     */
+    async getQuestionSubmissions(cqId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question-answer/code-question/${cqId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取题目提交记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 查看一道编程题中，一位学生的所有提交记录
+     * @param {string} cqId 编程题ID
+     * @param {string} studentId 学生ID
+     * @returns {Promise<Array>} 提交记录列表
+     */
+    async getStudentQuestionSubmissions(cqId, studentId) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question-answer/code-question/${cqId}/student/${studentId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取学生题目提交记录失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 删除编程题
+     * @param {string} id 编程题ID
+     * @returns {Promise<Object>} 删除结果
+     */
+    async deleteCodeQuestion(id) {
+        const axios = createTeacherAuthorizedAxios();
+        try {
+            const response = await axios.delete(`/api/code-question/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error('删除编程题失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    },
+
+    /**
+     * 获取考试的编程题列表
+     * @param {string} examId 考试ID
+     * @returns {Promise<Array>} 编程题列表
+     */
+    async getExamCodeQuestions(examId) {
+        const axios = createAuthorizedAxios();
+        try {
+            const response = await axios.get(`/api/code-question/exam/${examId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取考试编程题列表失败:', error.response ? error.response.data : error.message);
+            throw error;
+        }
+    }
+}
