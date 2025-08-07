@@ -14,10 +14,11 @@ const teacherAxios = axios.create({
     timeout: 10000,
 });
 
+
 // 创建带有拦截器的编程题 Axios 实例
 const createProgrammingAxios = () => {
     const instance = axios.create({
-        baseURL: 'http://118.89.136.119:8081',
+        baseURL: 'http://118.89.136.119:8090',
         timeout: 10000,
     });
 
@@ -5627,6 +5628,12 @@ export const onlineJudgeAPI = {
 };
 
 // 脚本转发模块相关 API（这个没用swagger，所以不存在在swagger.json文件里面，但是存在于scriptForwardAPI.json文件中）
+// 创建脚本转发的 Axios 实例
+const scriptForwardAxios = axios.create({
+    baseURL: 'http://118.89.136.119:8090',
+    timeout: 10000,
+});
+
 export const scriptForwardAPI = {
     /**
      * 创建学生OJ权限
@@ -5635,7 +5642,7 @@ export const scriptForwardAPI = {
      */
     async createProgram(name) {
         try {
-            const response = await axios.post('/api/program/create', null, {
+            const response = await scriptForwardAxios.post('/api/program/create', null, {
                 params: { name }
             });
             return response.data;
@@ -5647,13 +5654,16 @@ export const scriptForwardAPI = {
 
     /**
      * 创建作业
-     * @param {string} fileName 文件路径和名称
+     * @param {string} userName 用户名
+     * @param {string} fileName 文件名
      * @returns {Promise<Object>} 创建结果
      */
-    async createFile(fileName) {
+    async createFile(userName, fileName) {
         try {
-            const response = await axios.post('/api/file/create', null, {
-                params: { fileName }
+            // 构建完整的文件路径，包含用户名
+            const fullFileName = `/root/docker/code_server/program/${userName}/${fileName}`;
+            const response = await scriptForwardAxios.post('/api/file/create', null, {
+                params: { fileName: fullFileName }
             });
             return response.data;
         } catch (error) {
@@ -5670,7 +5680,7 @@ export const scriptForwardAPI = {
      */
     async writeFile(fileName, content) {
         try {
-            const response = await axios.post('/api/file/write', null, {
+            const response = await scriptForwardAxios.post('/api/file/write', null, {
                 params: { 
                     fileName,
                     content
@@ -5690,7 +5700,7 @@ export const scriptForwardAPI = {
      */
     async readFile(fileName) {
         try {
-            const response = await axios.get('/api/file/read', {
+            const response = await scriptForwardAxios.get('/api/file/read', {
                 params: { fileName }
             });
             return response.data;
@@ -5794,6 +5804,20 @@ export const codeQuestionAPI = {
             throw error;
         }
     },
+    /**
+     * 获取某次考试的所有编程题目
+     * @param {string} examId 考试ID
+     * @returns {Promise<Array>} 编程题列表
+     */
+    async getExamCodeQuestions(examId) {
+        try {
+            const response = await this.axios.get(`/api/code-question/exam/${examId}`);
+            return response.data;
+        } catch (error) {
+            console.error('获取编程题列表失败:', error);
+            throw error;
+        }
+    },
 
     /**
      * 检测一位学生是否完成某道编程题
@@ -5856,19 +5880,4 @@ export const codeQuestionAPI = {
             throw error;
         }
     },
-
-    /**
-     * 获取考试的编程题列表
-     * @param {string} examId 考试ID
-     * @returns {Promise<Array>} 编程题列表
-     */
-    async getExamCodeQuestions(examId) {
-        try {
-            const response = await this.axios.get(`/api/code-question/exam/${examId}`);
-            return response.data;
-        } catch (error) {
-            console.error('获取考试编程题列表失败:', error.response ? error.response.data : error.message);
-            throw error;
-        }
-    }
 }

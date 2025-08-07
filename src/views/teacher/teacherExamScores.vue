@@ -117,9 +117,19 @@
                 {{ scope.row.email }}
               </template>
             </el-table-column>
-            <el-table-column prop="score" label="分数" min-width="100" sortable align="center" header-align="center">
+            <el-table-column label="分数" min-width="200" sortable align="center" header-align="center">
               <template #default="scope">
-                <span :class="getScoreClass(scope.row.score)">{{ scope.row.score || '未参加' }}</span>
+                <div style="display: flex; justify-content: space-around; align-items: center;">
+                  <span :class="getScoreClass(scope.row.regularScore)" style="margin-right: 8px;">
+                    常规: {{ scope.row.regularScore || 0 }}
+                  </span>
+                  <span :class="getScoreClass(scope.row.codeScore)" style="margin-right: 8px;">
+                    编程: {{ scope.row.codeScore || 0 }}
+                  </span>
+                  <span :class="getScoreClass(scope.row.score)" style="font-weight: bold;">
+                    总分: {{ scope.row.score || '未参加' }}
+                  </span>
+                </div>
               </template>
             </el-table-column>
             <el-table-column prop="submitTime" label="提交时间" min-width="180" sortable align="center" header-align="center">
@@ -385,9 +395,6 @@
     <el-dialog v-model="showEditDialog" :title="editingQuestion ? '编辑题目' : '添加题目'" width="800px">
       <div class="edit-form">
         <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="90px">
-          <el-form-item label="题目内容" prop="content">
-            <el-input v-model="editForm.content" type="textarea" :rows="3" placeholder="请输入题目内容" />
-          </el-form-item>
           <el-form-item label="题型" prop="questionType">
             <el-select v-model="editForm.questionType" placeholder="请选择题型">
               <el-option label="单选题" value="SINGLE_CHOICE" />
@@ -395,8 +402,98 @@
               <el-option label="填空题" value="FILL_BLANK" />
               <el-option label="简答题" value="ESSAY_QUESTION" />
               <el-option label="判断题" value="TRUE_FALSE" />
+              <el-option label="编程题" value="CODE_QUESTION" />
             </el-select>
           </el-form-item>
+
+          <!-- 非编程题的题目内容 -->
+          <template v-if="editForm.questionType !== 'CODE_QUESTION'">
+            <el-form-item label="题目内容" prop="content">
+              <el-input v-model="editForm.content" type="textarea" :rows="3" placeholder="请输入题目内容" />
+            </el-form-item>
+          </template>
+
+          <!-- 编程题表单 -->
+          <template v-if="editForm.questionType === 'CODE_QUESTION'">
+            <el-form-item label="标题" prop="title">
+              <el-input v-model="editForm.title" placeholder="请输入编程题标题" />
+            </el-form-item>
+            
+            <el-form-item label="描述" prop="description">
+              <el-input 
+                v-model="editForm.description" 
+                type="textarea" 
+                :rows="4" 
+                placeholder="请输入题目描述，包含题目要求、输入输出格式等" 
+              />
+            </el-form-item>
+
+            <!-- 示例输入输出 -->
+            <el-form-item label="示例输入">
+              <div v-for="(input, index) in editForm.sampleInputs" :key="'input-'+index" class="sample-item">
+                <el-input 
+                  v-model="editForm.sampleInputs[index]" 
+                  placeholder="请输入示例输入"
+                  style="width: calc(100% - 40px)"
+                />
+                <el-button 
+                  type="danger" 
+                  circle 
+                  plain 
+                  size="small" 
+                  @click="editForm.sampleInputs.splice(index, 1);editForm.sampleOutputs.splice(index, 1)"
+                >
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </div>
+              <el-button type="primary" plain @click="editForm.sampleInputs.push('');editForm.sampleOutputs.push('')">
+                <el-icon><Plus /></el-icon>添加示例
+              </el-button>
+            </el-form-item>
+
+            <el-form-item label="示例输出">
+              <div v-for="(output, index) in editForm.sampleOutputs" :key="'output-'+index">
+                <el-input 
+                  v-model="editForm.sampleOutputs[index]" 
+                  placeholder="请输入示例输出"
+                  :disabled="!editForm.sampleInputs[index]"
+                />
+              </div>
+            </el-form-item>
+
+            <!-- 测试用例输入输出 -->
+            <el-form-item label="测试输入">
+              <div v-for="(input, index) in editForm.caseInputs" :key="'case-input-'+index" class="sample-item">
+                <el-input 
+                  v-model="editForm.caseInputs[index]" 
+                  placeholder="请输入测试用例输入"
+                  style="width: calc(100% - 40px)"
+                />
+                <el-button 
+                  type="danger" 
+                  circle 
+                  plain 
+                  size="small" 
+                  @click="editForm.caseInputs.splice(index, 1);editForm.caseOutputs.splice(index, 1)"
+                >
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </div>
+              <el-button type="primary" plain @click="editForm.caseInputs.push('');editForm.caseOutputs.push('')">
+                <el-icon><Plus /></el-icon>添加测试用例
+              </el-button>
+            </el-form-item>
+
+            <el-form-item label="测试输出">
+              <div v-for="(output, index) in editForm.caseOutputs" :key="'case-output-'+index">
+                <el-input 
+                  v-model="editForm.caseOutputs[index]" 
+                  placeholder="请输入测试用例输出"
+                  :disabled="!editForm.caseInputs[index]"
+                />
+              </div>
+            </el-form-item>
+          </template>
 
           <!-- 选项编辑区，仅选择题/多选题/判断题显示 -->
           <template v-if="['SINGLE_CHOICE','MULTI_CHOICE','TRUE_FALSE'].includes(editForm.questionType)">
@@ -608,10 +705,31 @@
 
 <script setup>
 import { ref, onMounted, computed, nextTick, watch } from 'vue'
+
+// localStorage相关的工具函数
+const getLastSetScore = (questionType) => {
+  try {
+    const lastScores = JSON.parse(localStorage.getItem('lastQuestionScores') || '{}')
+    return lastScores[questionType] || (questionType === 'CODE_QUESTION' ? 50 : 100)
+  } catch (e) {
+    console.error('从localStorage获取分数失败:', e)
+    return questionType === 'CODE_QUESTION' ? 50 : 100
+  }
+}
+
+const saveLastSetScore = (questionType, score) => {
+  try {
+    const lastScores = JSON.parse(localStorage.getItem('lastQuestionScores') || '{}')
+    lastScores[questionType] = score
+    localStorage.setItem('lastQuestionScores', JSON.stringify(lastScores))
+  } catch (e) {
+    console.error('保存分数到localStorage失败:', e)
+  }
+}
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Loading, Refresh, Search, Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
-import { examAPI, courseAPI, courseSelectionAPI, knowledgeAPI, studentAssistantAPI } from '@/api/api'
+import { examAPI, courseAPI, courseSelectionAPI, knowledgeAPI, studentAssistantAPI, codeQuestionAPI } from '@/api/api'
 import { getTeacherId, refreshUserInfo } from '@/utils/auth'
 import BigNumber from 'bignumber.js'
 import * as echarts from 'echarts/core'
@@ -860,11 +978,30 @@ async function fetchExamStudents() {
       console.warn('没有courseId，无法获取课程学生列表')
     }
 
-    // 2. 获取已作答学生的成绩
+    // 2. 获取已作答学生的成绩（包括普通题目和编程题）
     try {
       console.log('正在获取已作答学生成绩，examId:', examIdStr)
-      completedStudentsScores = await examAPI.getExamStudentScores(examIdStr)
-      console.log('获取到的已作答学生成绩:', completedStudentsScores)
+      
+      // 获取普通题目成绩
+      const regularScores = await examAPI.getExamStudentScores(examIdStr)
+      console.log('获取到的普通题目成绩:', regularScores)
+      
+      // 获取编程题成绩
+      const codeScores = await codeQuestionAPI.getExamCodeQuestionScores(examIdStr)
+      console.log('获取到的编程题成绩:', codeScores)
+
+      // 合并成绩
+      completedStudentsScores = regularScores.map(student => {
+        const codeScore = codeScores.find(cs => cs.studentId === student.studentId) || { score: 0 }
+        return {
+          ...student,
+          score: Number(student.score || 0) + Number(codeScore.score || 0), // 普通题目分数 + 编程题分数
+          regularScore: Number(student.score || 0), // 保存普通题目分数
+          codeScore: Number(codeScore.score || 0) // 保存编程题分数
+        }
+      })
+      
+      console.log('合并后的总成绩:', completedStudentsScores)
     } catch (error) {
       console.warn('获取已作答学生成绩失败:', error)
       completedStudentsScores = []
@@ -1207,14 +1344,30 @@ async function fetchExamQuestions() {
     const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
     console.log('开始获取题目数据，examId:', examIdStr)
 
-    // 获取题目列表 - 使用knowledgeAPI中的方法
-    const questions = await knowledgeAPI.getQuestionsByExamId(examIdStr)
-    console.log('获取到的题目列表:', questions)
-    if (Array.isArray(questions)) {
-      examQuestions.value = questions.map(q => ({
+    // 获取普通题目列表
+    const regularQuestions = await knowledgeAPI.getQuestionsByExamId(examIdStr)
+    console.log('获取到的普通题目列表:', regularQuestions)
+
+    // 获取编程题目列表
+    const codeQuestions = await codeQuestionAPI.getExamCodeQuestions(examIdStr)
+    console.log('获取到的编程题目列表:', codeQuestions)
+
+    // 合并并处理题目列表
+    const allQuestions = [
+      ...(Array.isArray(regularQuestions) ? regularQuestions : []),
+      ...(Array.isArray(codeQuestions) ? codeQuestions.map(q => ({
+        ...q,
+        questionType: 'CODE_QUESTION',
+        content: q.description, // 编程题使用description作为content
+        options: [] // 编程题没有选项
+      })) : [])
+    ]
+
+    if (allQuestions.length > 0) {
+      examQuestions.value = allQuestions.map(q => ({
         ...q,
         questionId: String(q.questionId || q.id),
-        questionContent: q.content || '题目内容',
+        questionContent: q.content || q.description || '题目内容未知',
         questionType: q.questionType || 'UNKNOWN',
         scorePoints: q.scorePoints || 0,
         difficulty: q.difficulty || 'MEDIUM',
@@ -1329,6 +1482,8 @@ function getQuestionTypeText(type) {
       return '简答题'
     case 'TRUE_FALSE':
       return '判断题'
+    case 'CODE_QUESTION':
+      return '编程题'
     default:
       return '未知题型'
   }
@@ -1347,6 +1502,8 @@ function getQuestionTypeTagType(type) {
       return 'primary'
     case 'TRUE_FALSE':
       return 'danger'
+    case 'CODE_QUESTION':
+      return '' // 使用默认颜色，突出显示编程题
     default:
       return 'info'
   }
@@ -1382,6 +1539,13 @@ function getDifficultyType(difficulty) {
 
 // 获取题目内容（处理富文本）
 function getQuestionContent(question) {
+  if (question.questionType === 'CODE_QUESTION') {
+    // 编程题显示标题和描述的组合
+    const title = question.title || ''
+    const description = question.description || ''
+    return title + (description ? ': ' + description : '')
+  }
+  
   if (question.content) {
     // 去除HTML标签，获取纯文本内容
     return question.content.replace(/<[^>]*>/g, '').trim()
@@ -2159,6 +2323,7 @@ function handleAddQuestion() {
   editingQuestion.value = null
   showEditDialog.value = true
   // 清空表单
+  const defaultScorePoints = getLastSetScore('SINGLE_CHOICE') || 100
   editForm.value = {
     content: '',
     questionType: 'SINGLE_CHOICE',
@@ -2170,16 +2335,18 @@ function handleAddQuestion() {
     ],
     referenceAnswer: '',
     difficulty: 'MEDIUM',
-    scorePoints: 100
+    scorePoints: defaultScorePoints
   }
 }
 
 function editQuestion(question) {
   editingQuestion.value = { ...question }
   showEditDialog.value = true
+  const questionType = question.questionType || 'SINGLE_CHOICE'
+  
   editForm.value = {
     content: question.content || '',
-    questionType: question.questionType || 'SINGLE_CHOICE',
+    questionType: questionType,
     options: Array.isArray(question.options)
       ? question.options
       : [
@@ -2188,9 +2355,15 @@ function editQuestion(question) {
           { key: 'C', text: '' },
           { key: 'D', text: '' }
         ],
+    title: question.title || '',
+    description: question.description || '',
+    sampleInputs: Array.isArray(question.sampleInputs) ? question.sampleInputs : [''],
+    sampleOutputs: Array.isArray(question.sampleOutputs) ? question.sampleOutputs : [''],
+    caseInputs: Array.isArray(question.caseInputs) ? question.caseInputs : [''],
+    caseOutputs: Array.isArray(question.caseOutputs) ? question.caseOutputs : [''],
     referenceAnswer: question.referenceAnswer || '',
     difficulty: question.difficulty || 'MEDIUM',
-    scorePoints: question.scorePoints || 100
+    scorePoints: questionType === 'CODE_QUESTION' ? 50 : (question.scorePoints || 100)
   }
 }
 
@@ -2267,14 +2440,74 @@ const editForm = ref({
     { key: 'C', text: '' },
     { key: 'D', text: '' }
   ],
+  // 编程题特有的字段
+  title: '',
+  description: '',
+  sampleInputs: [''],
+  sampleOutputs: [''],
+  caseInputs: [''],
+  caseOutputs: [''],
   referenceAnswer: '',
   difficulty: 'MEDIUM',
   scorePoints: 100
 })
 
+// 监听题型变化，设置默认分数
+watch(() => editForm.value.questionType, (newType) => {
+  // 清空参考答案
+  editForm.value.referenceAnswer = ''
+  
+  if (newType === 'CODE_QUESTION') {
+    // 初始化编程题的字段
+    editForm.value.title = ''
+    editForm.value.description = ''
+    editForm.value.sampleInputs = ['']
+    editForm.value.sampleOutputs = ['']
+    editForm.value.caseInputs = ['']
+    editForm.value.caseOutputs = ['']
+    editForm.value.options = []
+    // 设置编程题的默认分数为50分
+    editForm.value.scorePoints = 50
+  } else if (newType === 'SINGLE_CHOICE' || newType === 'MULTI_CHOICE') {
+    // 初始化选择题选项
+    editForm.value.title = ''
+    editForm.value.description = ''
+    editForm.value.options = [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ]
+    // 使用上次设置的分数
+    const lastScore = getLastSetScore(newType)
+    if (lastScore) {
+      editForm.value.scorePoints = lastScore
+    }
+  } else if (newType === 'TRUE_FALSE') {
+    // 初始化判断题选项
+    editForm.value.title = ''
+    editForm.value.description = ''
+    editForm.value.options = [
+      { key: 'A', text: '正确' },
+      { key: 'B', text: '错误' }
+    ]
+    // 使用上次设置的分数
+    const lastScore = getLastSetScore(newType)
+    if (lastScore) {
+      editForm.value.scorePoints = lastScore
+    }
+  }
+})
+
 const editRules = {
   content: [
-    { required: true, message: '请输入题目内容', trigger: 'blur' },
+    { required: true, message: '请输入题目内容', trigger: 'blur', validator: (rule, value, callback) => {
+      if (editForm.value.questionType !== 'CODE_QUESTION' && !value) {
+        callback(new Error('请输入题目内容'))
+      } else {
+        callback()
+      }
+    }},
     { min: 1, max: 300, message: '题目内容长度应在1到300个字符之间', trigger: 'blur' }
   ],
   questionType: [
@@ -2289,38 +2522,158 @@ const editRules = {
   ],
   referenceAnswer: [
     { required: true, message: '请输入参考答案', trigger: 'blur' },
-    { min: 1, max: 300, message: '参考答案长度应在1到300个字符之间', trigger: 'blur' }
+    { validator: (rule, value, callback) => {
+      const type = editForm.value.questionType;
+      // 多选题不限制长度
+      if (type === 'MULTI_CHOICE') {
+        if (!value) {
+          callback(new Error('请选择至少一个正确答案'));
+        } else {
+          callback();
+        }
+      } else if (type === 'CODE_QUESTION') {
+        // 编程题答案可以比较长
+        if (value.length < 1 || value.length > 5000) {
+          callback(new Error('参考答案长度应在1到5000个字符之间'));
+        } else {
+          callback();
+        }
+      } else {
+        // 其他题型限制在2000字符以内
+        if (value.length < 1 || value.length > 2000) {
+          callback(new Error('参考答案长度应在1到2000个字符之间'));
+        } else {
+          callback();
+        }
+      }
+    }, trigger: 'blur' }
+  ],
+  // 编程题特有的验证规则
+  title: [
+    { required: true, message: '请输入编程题标题', trigger: 'blur' },
+    { min: 1, max: 100, message: '标题长度应在1到100个字符之间', trigger: 'blur' }
+  ],
+  description: [
+    { required: true, message: '请输入题目描述', trigger: 'blur' },
+    { min: 1, max: 1000, message: '描述长度应在1到1000个字符之间', trigger: 'blur' }
   ]
 }
 
 const editFormRef = ref(null)
 
+// 验证输入输出对是否一一对应
+function validateIOPairs() {
+  if (editForm.value.questionType !== 'CODE_QUESTION') {
+    return true
+  }
+  
+  const sampleInputs = editForm.value.sampleInputs.filter(input => input.trim() !== '')
+  const sampleOutputs = editForm.value.sampleOutputs.filter(output => output.trim() !== '')
+  const caseInputs = editForm.value.caseInputs.filter(input => input.trim() !== '')
+  const caseOutputs = editForm.value.caseOutputs.filter(output => output.trim() !== '')
+
+  if (sampleInputs.length !== sampleOutputs.length) {
+    ElMessage.error('示例输入和输出数量必须相同')
+    return false
+  }
+
+  if (caseInputs.length !== caseOutputs.length) {
+    ElMessage.error('测试用例输入和输出数量必须相同')
+    return false
+  }
+
+  if (sampleInputs.length === 0) {
+    ElMessage.error('至少需要一组示例输入输出')
+    return false
+  }
+
+  if (caseInputs.length === 0) {
+    ElMessage.error('至少需要一组测试用例')
+    return false
+  }
+
+  return true
+}
+
 async function saveQuestion() {
   editFormRef.value.validate(async (valid) => {
     if (!valid) return
+    if (!validateIOPairs()) return
     try {
       let content = editForm.value.content
-      // 选择题/多选题/判断题，将选项拼接到content
-      if (['SINGLE_CHOICE','MULTI_CHOICE','TRUE_FALSE'].includes(editForm.value.questionType)) {
-        content = formatOptionsToContent(editForm.value.content, editForm.value.options)
-      }
-      const payload = {
-        ...editForm.value,
-        content,
-        // 不再传options字段
-        options: undefined,
-        referenceAnswer: Array.isArray(editForm.value.referenceAnswer)
-          ? editForm.value.referenceAnswer.join(',')
-          : editForm.value.referenceAnswer,
-        examId: examId
-      }
-      if (editingQuestion.value && editingQuestion.value.questionId) {
-        await knowledgeAPI.updateQuestion({ ...payload, questionId: editingQuestion.value.questionId })
-        ElMessage.success('题目编辑成功')
+      let payload = {}
+      
+      if (editForm.value.questionType === 'CODE_QUESTION') {
+        // 编程题的特殊处理
+        payload = {
+          title: editForm.value.title,
+          description: editForm.value.description,
+          sampleInputs: editForm.value.sampleInputs.filter(input => input.trim() !== ''),
+          sampleOutputs: editForm.value.sampleOutputs.filter(output => output.trim() !== ''),
+          caseInputs: editForm.value.caseInputs.filter(input => input.trim() !== ''),
+          caseOutputs: editForm.value.caseOutputs.filter(output => output.trim() !== ''),
+          referenceAnswer: editForm.value.referenceAnswer,
+          content: editForm.value.description, // 为了兼容现有系统，将description作为content
+          questionType: editForm.value.questionType,
+          difficulty: editForm.value.difficulty,
+          scorePoints: editForm.value.scorePoints,
+          examId: examId
+        }
       } else {
-        await knowledgeAPI.addQuestion(payload)
-        ElMessage.success('题目添加成功')
+        // 选择题/多选题/判断题，将选项拼接到content
+        if (['SINGLE_CHOICE','MULTI_CHOICE','TRUE_FALSE'].includes(editForm.value.questionType)) {
+          content = formatOptionsToContent(editForm.value.content, editForm.value.options)
+        }
+        payload = {
+          ...editForm.value,
+          content,
+          // 不再传options字段
+          options: undefined,
+          referenceAnswer: Array.isArray(editForm.value.referenceAnswer)
+            ? editForm.value.referenceAnswer.join(',')
+            : editForm.value.referenceAnswer,
+          examId: examId
+        }
       }
+      if (payload.questionType === 'CODE_QUESTION') {
+        // 编程题使用专门的API
+        const codeQuestionData = {
+          examId: payload.examId,
+          title: payload.title,
+          description: payload.description,
+          sampleInputs: payload.sampleInputs,
+          sampleOutputs: payload.sampleOutputs,
+          caseInputs: payload.caseInputs,
+          caseOutputs: payload.caseOutputs,
+          referenceAnswer: payload.referenceAnswer,
+          difficulty: payload.difficulty,
+          scorePoints: payload.scorePoints
+        }
+        
+        if (editingQuestion.value && editingQuestion.value.questionId) {
+          await codeQuestionAPI.updateCodeQuestion({ ...codeQuestionData, id: editingQuestion.value.questionId })
+          ElMessage.success('编程题编辑成功')
+        } else {
+          await codeQuestionAPI.saveCodeQuestion(codeQuestionData)
+          ElMessage.success('编程题添加成功')
+        }
+      } else {
+        // 其他题型使用原有API
+        if (editingQuestion.value && editingQuestion.value.questionId) {
+          await knowledgeAPI.updateQuestion({ ...payload, questionId: editingQuestion.value.questionId })
+          ElMessage.success('题目编辑成功')
+          // 保存该题型的最后设置分数
+          saveLastSetScore(editForm.value.questionType, editForm.value.scorePoints)
+        } else {
+          await knowledgeAPI.addQuestion(payload)
+          ElMessage.success('题目添加成功')
+          // 保存该题型的最后设置分数
+          saveLastSetScore(editForm.value.questionType, editForm.value.scorePoints)
+        }
+      }
+      // 保存该题型的分数设置
+      saveLastSetScore(editForm.value.questionType, editForm.value.scorePoints)
+      
       showEditDialog.value = false
       editingQuestion.value = null
       refreshQuestions()
@@ -2330,23 +2683,39 @@ async function saveQuestion() {
   })
 }
 
+// 选项操作函数
+
 // 题型切换时自动初始化选项
 watch(() => editForm.value.questionType, (newType) => {
+  // 清空参考答案
   editForm.value.referenceAnswer = ''
-  if (newType === 'SINGLE_CHOICE') {
+  
+  if (newType === 'CODE_QUESTION') {
+    // 初始化编程题的字段
+    editForm.value.title = ''
+    editForm.value.description = ''
+    editForm.value.sampleInputs = ['']
+    editForm.value.sampleOutputs = ['']
+    editForm.value.caseInputs = ['']
+    editForm.value.caseOutputs = ['']
+    editForm.value.options = []
+    // 设置编程题的默认分数为50分
+    editForm.value.scorePoints = 50
+  } else if (newType === 'SINGLE_CHOICE' || newType === 'MULTI_CHOICE') {
+    // 初始化选择题选项
+    editForm.value.title = ''
+    editForm.value.description = ''
     editForm.value.options = [
       { key: 'A', text: '' },
       { key: 'B', text: '' },
       { key: 'C', text: '' },
       { key: 'D', text: '' }
     ]
-  } else if (newType === 'MULTI_CHOICE') {
-    editForm.value.options = [
-      { key: 'A', text: '' },
-      { key: 'B', text: '' },
-      { key: 'C', text: '' },
-      { key: 'D', text: '' }
-    ]
+    // 使用上次设置的分数
+    const lastScore = getLastSetScore(newType)
+    if (lastScore) {
+      editForm.value.scorePoints = lastScore
+    }
   } else if (newType === 'TRUE_FALSE') {
     editForm.value.options = [
       { key: 'A', text: '正确' },

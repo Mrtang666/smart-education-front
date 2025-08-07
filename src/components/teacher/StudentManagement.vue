@@ -48,10 +48,11 @@
         <el-table-column prop="phone" label="电话" width="120" />
         <!-- <el-table-column prop="grade" label="年级" width="100" /> -->
         <!-- <el-table-column prop="className" label="班级" width="120" /> -->
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="$emit('view-student', scope.row)">查看</el-button>
             <el-button link type="success" @click="analyzeCourseProgress(scope.row)">课程学习情况</el-button>
+            <el-button link type="warning" @click="authorizeStudent(scope.row)">授权VSCode</el-button>
             <el-button link type="danger" @click="$emit('remove-student', scope.row)">移除</el-button>
           </template>
         </el-table-column>
@@ -294,7 +295,7 @@ import {
   Refresh
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { studentAssistantAPI, courseSelectionAPI } from '@/api/api'
+import { studentAssistantAPI, courseSelectionAPI, scriptForwardAPI } from '@/api/api'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -620,6 +621,23 @@ async function generateInviteCode() {
   }
 }
 
+// 授权学生使用VSCode
+async function authorizeStudent(student) {
+  try {
+    // 创建以学生姓名和ID命名的文件夹
+    const userName = `${student.fullName}_${student.studentId}`
+    // 先创建程序
+    await scriptForwardAPI.createProgram(userName)
+    // 然后创建初始文件
+    await scriptForwardAPI.createFile(userName, 'README.md')
+    
+    ElMessage.success(`已成功授权学生 ${student.fullName} 使用在线VSCode`)
+  } catch (error) {
+    console.error('授权VSCode失败:', error)
+    ElMessage.error(error.response?.data?.message || '授权失败，请稍后重试')
+  }
+}
+
 // 复制邀请码到剪贴板
 async function copyInviteCode() {
   if (!currentInviteCode.value) {
@@ -628,6 +646,7 @@ async function copyInviteCode() {
   }
 
   try {
+    // 现代浏览器API
     await navigator.clipboard.writeText(currentInviteCode.value)
     ElMessage.success('邀请码已复制到剪贴板')
   } catch (error) {
