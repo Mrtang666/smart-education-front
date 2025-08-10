@@ -177,6 +177,181 @@
         </div>
       </div>
       -->
+
+      <!-- 文件管理模块 -->
+      <div class="detail-card files-card">
+        <div class="card-header">
+          <h3>相关文件</h3>
+          <div class="header-actions">
+            <el-button type="primary" size="small" @click="showUploadDialog">
+              <el-icon><Upload /></el-icon>上传文件
+            </el-button>
+            <el-input
+              v-model="fileSearchPrefix"
+              placeholder="搜索文件名前缀"
+              style="width: 200px; margin-right: 12px;"
+              clearable
+              @keyup.enter="searchFiles"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" size="small" @click="searchFiles">
+              <el-icon><Search /></el-icon>搜索文件
+            </el-button>
+            <el-button type="success" size="small" @click="refreshFiles">
+              <el-icon><Refresh /></el-icon>刷新
+            </el-button>
+          </div>
+        </div>
+        
+        <!-- 文件分类筛选 -->
+        <div class="file-categories">
+          <el-radio-group v-model="selectedCategory" @change="filterByCategory" size="small">
+            <el-radio-button label="">全部</el-radio-button>
+            <el-radio-button 
+              v-for="category in fileCategories" 
+              :key="category" 
+              :label="category"
+            >
+              {{ category }}
+            </el-radio-button>
+          </el-radio-group>
+        </div>
+        
+        <div class="card-body">
+          <div v-if="filesLoading" class="loading-container">
+            <el-skeleton :rows="3" animated />
+          </div>
+          <div v-else-if="files.length === 0" class="empty-content">
+            <el-empty description="暂无相关文件" :image-size="100">
+              <template #image>
+                <el-icon style="font-size: 50px; color: #909399;"><Folder /></el-icon>
+              </template>
+              <el-button type="primary" @click="refreshFiles">刷新文件列表</el-button>
+            </el-empty>
+          </div>
+          <div v-else class="files-list">
+            <div class="files-header">
+              <el-checkbox 
+                v-model="selectAllFiles" 
+                @change="handleSelectAllFiles"
+                :indeterminate="isIndeterminateFiles"
+              >
+                全选
+              </el-checkbox>
+              <div class="files-actions">
+                <el-button 
+                  v-if="selectedFiles.length > 0"
+                  type="info" 
+                  size="small" 
+                  @click="clearFileSelection"
+                >
+                  清空选择
+                </el-button>
+                <el-button 
+                  type="danger" 
+                  size="small" 
+                  :disabled="selectedFiles.length === 0"
+                  :loading="batchDeleteLoading"
+                  @click="batchDeleteFiles"
+                >
+                  <el-icon><Delete /></el-icon>
+                  {{ batchDeleteLoading ? '删除中...' : '批量删除' }}
+                </el-button>
+              </div>
+            </div>
+            
+            <div class="files-grid">
+              <div 
+                v-for="file in files" 
+                :key="file" 
+                class="file-item"
+                :class="{ 'selected': selectedFiles.includes(file) }"
+                @click="toggleFileSelection(file)"
+              >
+                <div class="file-icon">
+                  <el-icon>
+                    <component :is="getFileIcon(file)" />
+                  </el-icon>
+                </div>
+                <div class="file-name" :title="file">{{ file }}</div>
+                <div class="file-category">
+                  <el-tag size="small" type="info">{{ getFileCategory(file) }}</el-tag>
+                </div>
+                <div class="file-actions">
+                  <el-button 
+                    link 
+                    type="primary" 
+                    size="small" 
+                    @click.stop="previewFile(file)"
+                    title="预览文件"
+                  >
+                    <el-icon><View /></el-icon>
+                  </el-button>
+                  <el-button 
+                    link 
+                    type="primary" 
+                    size="small" 
+                    @click.stop="downloadFile(file)"
+                    title="下载文件"
+                  >
+                    <el-icon><Download /></el-icon>
+                  </el-button>
+                  <el-button 
+                    link 
+                    type="danger" 
+                    size="small" 
+                    :loading="deleteLoading"
+                    @click.stop="deleteFile(file)"
+                    title="删除文件"
+                  >
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="files-summary">
+              <span>{{ getFileSelectionStatus() }}</span>
+              <span v-if="selectedFiles.length > 0" class="selection-info">
+                已选择 {{ selectedFiles.length }} 个文件
+              </span>
+            </div>
+            
+            <!-- 删除历史记录 -->
+            <div v-if="deletedFilesHistory.length > 0" class="delete-history">
+              <div class="history-header">
+                <h4>删除历史</h4>
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="clearDeleteHistory"
+                >
+                  清空历史
+                </el-button>
+              </div>
+              <div class="history-list">
+                <div 
+                  v-for="(item, index) in deletedFilesHistory" 
+                  :key="index"
+                  class="history-item"
+                >
+                  <div class="history-info">
+                    <span class="history-time">{{ item.timestamp }}</span>
+                    <span class="history-count">删除了 {{ item.count }} 个文件</span>
+                  </div>
+                  <div class="history-files">
+                    {{ item.files.slice(0, 3).join('、') }}
+                    <span v-if="item.files.length > 3">等 {{ item.files.length }} 个文件</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 编辑知识点对话框 -->
@@ -400,6 +575,110 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 上传对话框 -->
+    <el-dialog v-model="uploadDialogVisible" title="上传文件" width="500px" :close-on-click-modal="false">
+      <div class="upload-form">
+        <div class="upload-section">
+          <label class="upload-label">选择文件：</label>
+          <div 
+            class="upload-drop-zone"
+            @drop="handleDrop"
+            @dragover="handleDragOver"
+            @dragleave="handleDragLeave"
+            :class="{ 'drag-over': isDragOver }"
+          >
+            <input 
+              type="file" 
+              ref="fileInput" 
+              @change="handleFileSelect" 
+              accept="*/*"
+              style="display: none;"
+            />
+            <div class="drop-zone-content">
+              <el-icon class="drop-icon"><Upload /></el-icon>
+              <p class="drop-text">点击选择文件或拖拽文件到此处</p>
+              <p class="drop-hint">支持所有文件类型，最大100MB</p>
+            </div>
+            <el-button type="primary" @click="$refs.fileInput.click()">
+              <el-icon><Upload /></el-icon>选择文件
+            </el-button>
+          </div>
+          <div v-if="uploadFile" class="file-info">
+            <div class="file-details">
+              <span class="file-name">{{ uploadFile.name }}</span>
+              <span class="file-size">{{ formatFileSize(uploadFile.size) }}</span>
+            </div>
+            <div class="file-type">{{ uploadFile.type || '未知类型' }}</div>
+          </div>
+        </div>
+        
+        <div class="upload-section">
+          <label class="upload-label">文件名：</label>
+          <el-input 
+            v-model="uploadFileName" 
+            placeholder="请输入文件名（可选，默认使用原文件名）"
+            :disabled="!uploadFile"
+          />
+        </div>
+        
+        <div class="upload-actions">
+          <el-button 
+            type="primary" 
+            :loading="uploadLoading" 
+            :disabled="!uploadFile"
+            @click="uploadFileToServer"
+          >
+            {{ uploadLoading ? '上传中...' : '开始上传' }}
+          </el-button>
+          <el-button @click="closeUploadDialog">取消</el-button>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 文件预览对话框 -->
+    <el-dialog v-model="showFilePreview" title="文件预览" width="800px" :close-on-click-modal="false">
+      <div v-if="previewLoading" class="preview-loading">
+        <el-skeleton :rows="3" animated />
+      </div>
+      <div v-else-if="currentPreviewFile" class="preview-content">
+        <div class="preview-header">
+          <h4>{{ currentPreviewFile.name }}</h4>
+          <div class="preview-actions">
+            <el-button type="primary" size="small" @click="downloadFile(currentPreviewFile.name)">
+              <el-icon><Download /></el-icon>下载
+            </el-button>
+          </div>
+        </div>
+        
+        <div class="preview-body">
+          <!-- 图片预览 -->
+          <div v-if="currentPreviewFile.type === 'image'" class="image-preview">
+            <img :src="currentPreviewFile.url" :alt="currentPreviewFile.name" class="preview-image" />
+          </div>
+          
+          <!-- 文档预览 -->
+          <div v-else-if="currentPreviewFile.type === 'document'" class="document-preview">
+            <div class="document-info">
+              <p>文档类型文件，请下载后查看</p>
+              <el-button type="primary" @click="downloadFile(currentPreviewFile.name)">
+                <el-icon><Download /></el-icon>下载文档
+              </el-button>
+            </div>
+          </div>
+          
+          <!-- 其他类型文件 -->
+          <div v-else class="other-preview">
+            <div class="file-info">
+              <p>此文件类型不支持在线预览</p>
+              <el-button type="primary" @click="downloadFile(currentPreviewFile.name)">
+                <el-icon><Download /></el-icon>下载文件
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -407,12 +686,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Edit, Document } from '@element-plus/icons-vue'
+import { ArrowLeft, Edit, Document, Search, Refresh, Delete, Download, Folder, Upload, View } from '@element-plus/icons-vue'
 // 题目模块相关导入已注释：watch, nextTick, onUnmounted, ElMessageBox, Plus, DocumentRemove, Delete, echarts
-import { knowledgeAPI, studentAssistantAPI } from '@/api/api'
+import { knowledgeAPI, studentAssistantAPI, minioController } from '@/api/api'
 import BigNumber from 'bignumber.js'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -1442,7 +1722,549 @@ async function saveQuestion() {
 }
 */
 
-// 在组件挂载时获取知识点详情
+// 文件管理相关变量
+const files = ref([])
+const filesLoading = ref(false)
+const fileSearchPrefix = ref('')
+const selectedFiles = ref([])
+const deleteLoading = ref(false) // 删除操作加载状态
+const batchDeleteLoading = ref(false) // 批量删除操作加载状态
+const deletedFilesHistory = ref([]) // 删除历史记录
+const uploadLoading = ref(false) // 上传操作加载状态
+const uploadDialogVisible = ref(false) // 上传对话框显示状态
+const uploadFile = ref(null) // 要上传的文件
+const uploadFileName = ref('') // 上传文件名
+const isDragOver = ref(false) // 拖拽状态
+const fileCategories = ref(['文档', '图片', '视频', '音频', '其他']) // 文件分类
+const selectedCategory = ref('') // 选中的文件分类
+const showFilePreview = ref(false) // 文件预览对话框
+const currentPreviewFile = ref(null) // 预览的文件
+const previewLoading = ref(false) // 预览加载状态
+
+// 文件管理相关函数
+// 获取文件列表
+async function fetchFiles() {
+  filesLoading.value = true
+  try {
+    const response = await minioController.listFiles(fileSearchPrefix.value)
+    console.log('获取到的文件列表:', response)
+    
+    if (Array.isArray(response)) {
+      // 根据分类过滤文件
+      if (selectedCategory.value) {
+        files.value = response.filter(file => getFileCategory(file) === selectedCategory.value)
+      } else {
+        files.value = response
+      }
+      selectedFiles.value = [] // 重置选择
+    } else {
+      files.value = []
+      ElMessage.warning('获取文件列表格式异常')
+    }
+  } catch (error) {
+    console.error('获取文件列表失败:', error)
+    ElMessage.error('获取文件列表失败: ' + (error.message || '请稍后重试'))
+    files.value = []
+  } finally {
+    filesLoading.value = false
+  }
+}
+
+// 获取文件分类
+function getFileCategory(fileName) {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  
+  if (['doc', 'docx', 'pdf', 'txt', 'rtf', 'odt'].includes(extension)) {
+    return '文档'
+  } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(extension)) {
+    return '图片'
+  } else if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(extension)) {
+    return '视频'
+  } else if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(extension)) {
+    return '音频'
+  } else {
+    return '其他'
+  }
+}
+
+// 获取文件图标
+function getFileIcon(fileName) {
+  const category = getFileCategory(fileName)
+  const iconMap = {
+    '文档': 'Document',
+    '图片': 'View',
+    '视频': 'View',
+    '音频': 'View',
+    '其他': 'Document'
+  }
+  return iconMap[category] || 'Document'
+}
+
+// 搜索文件
+function searchFiles() {
+  fetchFiles()
+}
+
+// 刷新文件列表
+function refreshFiles() {
+  fileSearchPrefix.value = ''
+  selectedCategory.value = ''
+  fetchFiles()
+}
+
+// 根据分类筛选文件
+function filterByCategory(category) {
+  selectedCategory.value = category
+  fetchFiles()
+}
+
+// 切换文件选择状态
+function toggleFileSelection(file) {
+  const index = selectedFiles.value.indexOf(file)
+  if (index > -1) {
+    selectedFiles.value.splice(index, 1)
+  } else {
+    selectedFiles.value.push(file)
+  }
+}
+
+// 全选/取消全选文件
+function handleSelectAllFiles(checked) {
+  if (checked) {
+    selectedFiles.value = [...files.value]
+  } else {
+    selectedFiles.value = []
+  }
+}
+
+// 计算属性：是否全选
+const selectAllFiles = computed({
+  get() {
+    return files.value.length > 0 && selectedFiles.value.length === files.value.length
+  },
+  set(value) {
+    handleSelectAllFiles(value)
+  }
+})
+
+// 计算属性：是否部分选择
+const isIndeterminateFiles = computed(() => {
+  return selectedFiles.value.length > 0 && selectedFiles.value.length < files.value.length
+})
+
+// 下载文件
+async function downloadFile(fileName) {
+  try {
+    // 1. 调用后端接口获取预签名下载URL
+    const downloadUrl = await minioController.generateDownloadUrl(fileName)
+    console.log('获取到下载URL:', downloadUrl)
+    
+    // 2. 使用预签名URL下载文件
+    const response = await fetch(downloadUrl, {
+      method: 'GET'
+    })
+    
+    if (response.ok) {
+      // 获取文件blob
+      const blob = await response.blob()
+      
+      // 创建下载链接
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      link.style.display = 'none'
+      
+      // 触发下载
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // 清理URL对象
+      window.URL.revokeObjectURL(url)
+      
+      ElMessage.success('文件下载成功')
+    } else {
+      throw new Error(`下载失败: ${response.status} ${response.statusText}`)
+    }
+  } catch (error) {
+    console.error('下载文件失败:', error)
+    let errorMessage = '下载文件失败'
+    
+    // 根据错误类型提供更友好的错误信息
+    if (error.response) {
+      const status = error.response.status
+      if (status === 404) {
+        errorMessage = '文件不存在或已被删除'
+      } else if (status === 403) {
+        errorMessage = '没有权限下载此文件'
+      } else if (status === 500) {
+        errorMessage = '服务器内部错误，请稍后重试'
+      } else {
+        errorMessage = `下载失败 (${status}): ${error.response.data?.message || '未知错误'}`
+      }
+    } else if (error.message) {
+      errorMessage += ': ' + error.message
+    }
+    
+    ElMessage.error(errorMessage)
+  }
+}
+
+// 预览文件
+async function previewFile(fileName) {
+  try {
+    previewLoading.value = true
+    currentPreviewFile.value = fileName
+    showFilePreview.value = true
+    
+    // 根据文件类型决定预览方式
+    const category = getFileCategory(fileName)
+    if (category === '图片') {
+      // 图片直接预览
+      const downloadUrl = await minioController.generateDownloadUrl(fileName)
+      currentPreviewFile.value = { name: fileName, url: downloadUrl, type: 'image' }
+    } else if (category === '文档') {
+      // 文档类型尝试在线预览
+      const downloadUrl = await minioController.generateDownloadUrl(fileName)
+      currentPreviewFile.value = { name: fileName, url: downloadUrl, type: 'document' }
+    } else {
+      // 其他类型显示下载链接
+      currentPreviewFile.value = { name: fileName, type: 'other' }
+    }
+  } catch (error) {
+    console.error('预览文件失败:', error)
+    ElMessage.error('预览文件失败: ' + (error.message || '请稍后重试'))
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+// 删除单个文件
+async function deleteFile(fileName) {
+  // 安全检查：防止删除重要文件
+  if (fileName.includes('README') || fileName.includes('重要') || fileName.includes('重要')) {
+    try {
+      await ElMessageBox.confirm(
+        `文件"${fileName}"可能包含重要信息，确定要删除吗？`,
+        '重要文件删除确认',
+        {
+          confirmButtonText: '确定删除',
+          cancelButtonText: '取消',
+          type: 'warning',
+          confirmButtonClass: 'el-button--danger'
+        }
+      )
+    } catch (error) {
+      if (error === 'cancel') return
+    }
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除文件"${fileName}"吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+    
+    deleteLoading.value = true
+    await minioController.deleteFile(fileName)
+    ElMessage.success('文件删除成功')
+    
+    // 添加到删除历史
+    addToDeleteHistory(fileName)
+    
+    // 从选中列表中移除已删除的文件
+    const index = selectedFiles.value.indexOf(fileName)
+    if (index > -1) {
+      selectedFiles.value.splice(index, 1)
+    }
+    
+    // 重新获取文件列表
+    await fetchFiles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除文件失败:', error)
+      let errorMessage = '删除文件失败'
+      
+      // 根据错误类型提供更友好的错误信息
+      if (error.response) {
+        const status = error.response.status
+        if (status === 404) {
+          errorMessage = '文件不存在或已被删除'
+        } else if (status === 403) {
+          errorMessage = '没有权限删除此文件'
+        } else if (status === 500) {
+          errorMessage = '服务器内部错误，请稍后重试'
+        } else {
+          errorMessage = `删除失败 (${status}): ${error.response.data?.message || '未知错误'}`
+        }
+      } else if (error.message) {
+        errorMessage += ': ' + error.message
+      }
+      
+      ElMessage.error(errorMessage)
+    }
+  } finally {
+    deleteLoading.value = false
+  }
+}
+
+// 批量删除文件
+async function batchDeleteFiles() {
+  if (selectedFiles.value.length === 0) {
+    ElMessage.warning('请先选择要删除的文件')
+    return
+  }
+  
+  try {
+    const fileCount = selectedFiles.value.length
+    const fileList = selectedFiles.value.slice(0, 3).join('、')
+    const moreFiles = fileCount > 3 ? `等 ${fileCount} 个文件` : ''
+    
+    await ElMessageBox.confirm(
+      `确定要删除以下文件吗？此操作不可恢复！\n\n${fileList}${moreFiles}`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+        dangerouslyUseHTMLString: true
+      }
+    )
+    
+    batchDeleteLoading.value = true
+    const deletedFiles = [...selectedFiles.value] // 保存要删除的文件列表
+    
+    await minioController.batchDeleteFiles(selectedFiles.value)
+    ElMessage.success(`成功删除 ${deletedFiles.length} 个文件`)
+    
+    // 添加到删除历史
+    addToDeleteHistory(deletedFiles)
+    
+    // 清空选择列表
+    selectedFiles.value = []
+    
+    // 重新获取文件列表
+    await fetchFiles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除文件失败:', error)
+      let errorMessage = '批量删除文件失败'
+      
+      // 根据错误类型提供更友好的错误信息
+      if (error.response) {
+        const status = error.response.status
+        if (status === 400) {
+          errorMessage = '请求参数错误，请检查文件列表'
+        } else if (status === 403) {
+          errorMessage = '没有权限删除这些文件'
+        } else if (status === 500) {
+          errorMessage = '服务器内部错误，请稍后重试'
+        } else {
+          errorMessage = `批量删除失败 (${status}): ${error.response.data?.message || '未知错误'}`
+        }
+      } else if (error.message) {
+        errorMessage += ': ' + error.message
+      }
+      
+      ElMessage.error(errorMessage)
+    }
+  } finally {
+    batchDeleteLoading.value = false
+  }
+}
+
+// 清空文件选择
+function clearFileSelection() {
+  selectedFiles.value = []
+}
+
+// 获取文件选择状态
+function getFileSelectionStatus() {
+  const total = files.value.length
+  const selected = selectedFiles.value.length
+  
+  if (selected === 0) {
+    return '未选择任何文件'
+  } else if (selected === total) {
+    return `已选择全部 ${total} 个文件`
+  } else {
+    return `已选择 ${selected} / ${total} 个文件`
+  }
+}
+
+// 添加删除历史记录
+function addToDeleteHistory(fileNames) {
+  const timestamp = new Date().toLocaleString('zh-CN')
+  const historyItem = {
+    files: Array.isArray(fileNames) ? fileNames : [fileNames],
+    timestamp,
+    count: Array.isArray(fileNames) ? fileNames.length : 1
+  }
+  
+  deletedFilesHistory.value.unshift(historyItem)
+  
+  // 只保留最近10条记录
+  if (deletedFilesHistory.value.length > 10) {
+    deletedFilesHistory.value = deletedFilesHistory.value.slice(0, 10)
+  }
+}
+
+// 清空删除历史
+function clearDeleteHistory() {
+  deletedFilesHistory.value = []
+  ElMessage.success('删除历史已清空')
+}
+
+// 显示上传对话框
+function showUploadDialog() {
+  uploadDialogVisible.value = true
+  uploadFile.value = null
+  uploadFileName.value = ''
+}
+
+// 关闭上传对话框
+function closeUploadDialog() {
+  uploadDialogVisible.value = false
+  uploadFile.value = null
+  uploadFileName.value = ''
+}
+
+// 选择文件
+function handleFileSelect(event) {
+  const file = event.target.files[0]
+  if (file) {
+    // 检查文件大小（限制为100MB）
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (file.size > maxSize) {
+      ElMessage.error('文件大小不能超过100MB')
+      return
+    }
+    
+    // 检查文件类型（可选，这里允许所有类型）
+    uploadFile.value = file
+    uploadFileName.value = file.name
+    
+    // 显示文件信息
+    ElMessage.success(`已选择文件: ${file.name} (${formatFileSize(file.size)})`)
+  }
+}
+
+// 拖拽相关函数
+function handleDragOver(event) {
+  event.preventDefault()
+  isDragOver.value = true
+}
+
+function handleDragLeave(event) {
+  event.preventDefault()
+  isDragOver.value = false
+}
+
+function handleDrop(event) {
+  event.preventDefault()
+  isDragOver.value = false
+  
+  const files = event.dataTransfer.files
+  if (files.length > 0) {
+    const file = files[0]
+    
+    // 检查文件大小
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (file.size > maxSize) {
+      ElMessage.error('文件大小不能超过100MB')
+      return
+    }
+    
+    uploadFile.value = file
+    uploadFileName.value = file.name
+    
+    ElMessage.success(`已拖拽文件: ${file.name} (${formatFileSize(file.size)})`)
+  }
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// 上传文件
+async function uploadFileToServer() {
+  if (!uploadFile.value) {
+    ElMessage.warning('请先选择要上传的文件')
+    return
+  }
+  
+  // 如果没有输入文件名，使用原文件名
+  if (!uploadFileName.value.trim()) {
+    uploadFileName.value = uploadFile.value.name
+  }
+  
+  try {
+    uploadLoading.value = true
+    
+    // 1. 调用后端接口获取预签名上传URL
+    const uploadUrl = await minioController.generateUploadUrl(uploadFileName.value)
+    console.log('获取到上传URL:', uploadUrl)
+    
+    // 2. 使用预签名URL上传文件
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: uploadFile.value,
+      headers: {
+        'Content-Type': uploadFile.value.type || 'application/octet-stream'
+      }
+    })
+    
+    if (response.ok) {
+      ElMessage.success('文件上传成功')
+      closeUploadDialog()
+      
+      // 重新获取文件列表
+      await fetchFiles()
+    } else {
+      const errorText = await response.text()
+      throw new Error(`上传失败: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    let errorMessage = '文件上传失败'
+    
+    if (error.response) {
+      const status = error.response.status
+      if (status === 400) {
+        errorMessage = '请求参数错误，请检查文件名'
+      } else if (status === 403) {
+        errorMessage = '没有权限上传文件'
+      } else if (status === 413) {
+        errorMessage = '文件太大，超出限制'
+      } else if (status === 500) {
+        errorMessage = '服务器内部错误，请稍后重试'
+      } else {
+        errorMessage = `上传失败 (${status}): ${error.response.data?.message || '未知错误'}`
+      }
+    } else if (error.message) {
+      errorMessage += ': ' + error.message
+    }
+    
+    ElMessage.error(errorMessage)
+  } finally {
+    uploadLoading.value = false
+  }
+}
+
+// 在组件挂载时获取知识点详情和文件列表
 onMounted(async () => {
   if (!knowledgeId) {
     ElMessage.error('知识点ID不存在')
@@ -1452,6 +2274,7 @@ onMounted(async () => {
   
   try {
     await fetchKnowledgeDetail()
+    await fetchFiles() // 获取文件列表
 
     // 题目模块相关初始化 - 已注释
     /*
@@ -1469,33 +2292,6 @@ onMounted(async () => {
     ElMessage.error('加载知识点详情失败，请稍后重试')
   }
 })
-
-// 题目模块相关清理 - 已注释
-/*
-// 组件卸载时清理图表实例
-onUnmounted(() => {
-  if (typeChart) {
-    typeChart.dispose();
-    typeChart = null;
-  }
-  if (difficultyChart) {
-    difficultyChart.dispose();
-    difficultyChart = null;
-  }
-  // 移除窗口大小变化监听器
-  window.removeEventListener('resize', handleResize);
-});
-
-// 窗口大小变化处理函数
-const handleResize = () => {
-  if (typeChart) {
-    typeChart.resize();
-  }
-  if (difficultyChart) {
-    difficultyChart.resize();
-  }
-};
-*/
 </script>
 
 <style scoped>
@@ -2461,6 +3257,650 @@ const handleResize = () => {
   
   .chart-item {
     height: 300px;
+  }
+}
+
+.files-list {
+  margin-top: 16px;
+}
+
+.files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.files-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.files-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.file-item {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 12px;
+  background-color: #fff;
+  transition: all 0.3s ease;
+  width: calc((100% - 16px) / 3);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.file-item:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.file-item.selected {
+  border-color: #409EFF;
+  background-color: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+}
+
+.file-item.selected::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid #409EFF;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.file-icon {
+  font-size: 32px;
+  color: #409EFF;
+  margin-bottom: 12px;
+}
+
+.file-name {
+  font-size: 14px;
+  color: #303133;
+  text-align: center;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.file-actions .el-button {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.files-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.selection-info {
+  color: #409EFF;
+  font-weight: 500;
+}
+
+.files-actions .el-button {
+  margin-left: 8px;
+}
+
+.files-actions .el-button:first-child {
+  margin-left: 0;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .files-grid {
+    gap: 12px;
+  }
+  
+  .file-item {
+    width: calc((100% - 12px) / 2);
+  }
+  
+  .file-name {
+    font-size: 13px;
+  }
+  
+  .file-actions {
+    gap: 6px;
+  }
+  
+  .file-actions .el-button {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .file-item {
+    width: 100%;
+  }
+  
+  .files-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .files-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* 文件管理模块样式 */
+.files-card {
+  margin-bottom: 16px;
+}
+
+/* 文件分类筛选样式 */
+.file-categories {
+  padding: 16px 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.file-categories .el-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-categories .el-radio-button__inner {
+  border-radius: 16px;
+  padding: 6px 16px;
+  font-size: 13px;
+  border: 1px solid #dcdfe6;
+  background-color: #fff;
+  color: #606266;
+  transition: all 0.3s ease;
+}
+
+.file-categories .el-radio-button__inner:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.file-categories .el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background-color: #409eff;
+  border-color: #409eff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.files-list {
+  margin-top: 16px;
+}
+
+.files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.files-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.files-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.file-item {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fff;
+  transition: all 0.3s ease;
+  width: calc((100% - 32px) / 4);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  min-height: 140px;
+}
+
+.file-item:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.file-item.selected {
+  border-color: #409eff;
+  background-color: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+}
+
+.file-item.selected::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid #409eff;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.file-icon {
+  font-size: 36px;
+  color: #409eff;
+  margin-bottom: 12px;
+}
+
+.file-name {
+  font-size: 13px;
+  color: #303133;
+  text-align: center;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  font-weight: 500;
+}
+
+.file-category {
+  margin-bottom: 12px;
+}
+
+.file-category .el-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.file-actions .el-button {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.files-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.selection-info {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.files-actions .el-button {
+  margin-left: 8px;
+}
+
+.files-actions .el-button:first-child {
+  margin-left: 0;
+}
+
+/* 文件管理模块响应式布局 */
+@media (max-width: 1200px) {
+  .file-item {
+    width: calc((100% - 24px) / 3);
+  }
+}
+
+@media (max-width: 768px) {
+  .files-grid {
+    gap: 12px;
+  }
+  
+  .file-item {
+    width: calc((100% - 12px) / 2);
+    min-height: 120px;
+    padding: 12px;
+  }
+  
+  .file-name {
+    font-size: 12px;
+  }
+  
+  .file-actions {
+    gap: 6px;
+  }
+  
+  .file-actions .el-button {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+  
+  .file-categories .el-radio-group {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .file-item {
+    width: 100%;
+  }
+  
+  .files-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .files-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* 删除历史记录样式 */
+.delete-history {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.history-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.history-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.history-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.history-count {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.history-files {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+
+/* 上传对话框样式 */
+.upload-form {
+  padding: 20px 0;
+}
+
+.upload-section {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-label {
+  font-weight: 500;
+  color: #303133;
+  min-width: 80px;
+}
+
+.selected-file {
+  margin-left: 12px;
+  color: #409eff;
+  font-size: 14px;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+.upload-drop-zone {
+  border: 2px dashed #409eff;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+
+.upload-drop-zone:hover {
+  background-color: #f0f7ff;
+  border-color: #409eff;
+}
+
+.upload-drop-zone.drag-over {
+  background-color: #f0f7ff;
+  border-color: #409eff;
+  transform: scale(1.02);
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.drop-icon {
+  font-size: 48px;
+  color: #409eff;
+  margin-bottom: 16px;
+}
+
+.drop-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.drop-hint {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 16px;
+}
+
+.file-info {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.file-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #606266;
+}
+
+.file-type {
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 文件预览对话框样式 */
+.preview-loading {
+  padding: 40px;
+  text-align: center;
+}
+
+.preview-content {
+  padding: 0;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.preview-header h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-body {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview {
+  width: 100%;
+  text-align: center;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.document-preview, .other-preview {
+  text-align: center;
+  padding: 40px;
+}
+
+.document-info, .file-info {
+  max-width: 400px;
+}
+
+.document-info p, .file-info p {
+  font-size: 16px;
+  color: #606266;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.document-info .el-button, .file-info .el-button {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .upload-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .upload-label {
+    min-width: auto;
+  }
+  
+  .upload-drop-zone {
+    width: 100%;
+  }
+  
+  .preview-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .preview-body {
+    min-height: 300px;
+  }
+  
+  .preview-image {
+    max-height: 300px;
   }
 }
 </style> 
