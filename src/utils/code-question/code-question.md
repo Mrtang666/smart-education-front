@@ -6,6 +6,7 @@
   "examId": 0,
   "title": "string",
   "description": "string",
+  "scorePoints": 0,
   "sampleInputs": [
     "string"
   ],
@@ -19,8 +20,8 @@
     "string"
   ],
   "referenceAnswer": "string",
-  "createdAt": "2025-08-06T02:20:16.986Z",
-  "updatedAt": "2025-08-06T02:20:16.986Z"
+  "createdAt": "2025-08-07T16:38:49.274Z",
+  "updatedAt": "2025-08-07T16:38:49.274Z"
 }
 ```
 

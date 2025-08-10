@@ -289,14 +289,15 @@ function handleMenuClick(menu) {
             break
         case 'VSCode': {
             // 使用当前用户的用户名
-            const username = userInfo.value?.username || userName.value
-            const vscodeUrl = `http://118.89.136.119:8082/?folder=/home/program/${username}`
+            const folderName = userInfo.value.studentId
+            const vscodeUrl = `http://118.89.136.119:8082/?folder=/home/program/${folderName}`
             
             // 检查本地存储中的"不再提醒"设置
             const noRemind = localStorage.getItem('vscode-permission-no-remind') === 'true'
             
             if (noRemind) {
                 window.open(vscodeUrl, '_blank')
+                ElMessage.success('成功跳转到VSCode页面')
             } else {
                 // 使用 Element Plus 的弹窗
                 const noRemindRef = ref(false)

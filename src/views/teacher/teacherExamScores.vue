@@ -2232,6 +2232,13 @@ async function fetchExamInfo() {
     console.log('获取到的考试信息:', examInfo)
 
     if (examInfo) {
+      // 检查考试状态，如果未发布则显示提示信息
+      if (examInfo.status === '未发布') {
+        ElMessage.warning('该考试尚未发布，无法查看成绩')
+        // 可以选择返回或执行其他操作
+        return false
+      }
+
       examTitle.value = examInfo.title || route.query.title || '考试成绩'
 
       // 保存课程ID
@@ -2267,6 +2274,9 @@ async function fetchExamInfo() {
       if (courseName.value === '加载中...' || courseName.value === '未知课程') {
         courseName.value = '智慧教育课程'
       }
+      
+      // 如果考试已发布，继续执行
+      return true
     }
   } catch (error) {
     console.warn('getExamById API调用失败，使用路由参数:', error)
@@ -2277,6 +2287,8 @@ async function fetchExamInfo() {
     } else {
       courseName.value = '智慧教育课程'
     }
+    // 出错时默认返回true，允许继续加载其他数据
+    return true
   }
 }
 
@@ -2295,9 +2307,11 @@ onMounted(async () => {
   initQuestionStatistics()
 
   // 先获取考试信息（包含courseId），再获取学生成绩
-  await fetchExamInfo()
-  await fetchExamStudents()
-  await fetchExamQuestions() // 获取题目列表和统计信息
+  const shouldContinue = await fetchExamInfo()
+  if (shouldContinue) {
+    await fetchExamStudents()
+    await fetchExamQuestions() // 获取题目列表和统计信息
+  }
 })
 
 // 初始化题目统计信息
@@ -2363,7 +2377,7 @@ function editQuestion(question) {
     caseOutputs: Array.isArray(question.caseOutputs) ? question.caseOutputs : [''],
     referenceAnswer: question.referenceAnswer || '',
     difficulty: question.difficulty || 'MEDIUM',
-    scorePoints: questionType === 'CODE_QUESTION' ? 50 : (question.scorePoints || 100)
+    scorePoints: question.scorePoints || 100
   }
 }
 
@@ -2453,51 +2467,54 @@ const editForm = ref({
 })
 
 // 监听题型变化，设置默认分数
-watch(() => editForm.value.questionType, (newType) => {
-  // 清空参考答案
-  editForm.value.referenceAnswer = ''
-  
-  if (newType === 'CODE_QUESTION') {
-    // 初始化编程题的字段
-    editForm.value.title = ''
-    editForm.value.description = ''
-    editForm.value.sampleInputs = ['']
-    editForm.value.sampleOutputs = ['']
-    editForm.value.caseInputs = ['']
-    editForm.value.caseOutputs = ['']
-    editForm.value.options = []
-    // 设置编程题的默认分数为50分
-    editForm.value.scorePoints = 50
-  } else if (newType === 'SINGLE_CHOICE' || newType === 'MULTI_CHOICE') {
-    // 初始化选择题选项
-    editForm.value.title = ''
-    editForm.value.description = ''
-    editForm.value.options = [
-      { key: 'A', text: '' },
-      { key: 'B', text: '' },
-      { key: 'C', text: '' },
-      { key: 'D', text: '' }
-    ]
-    // 使用上次设置的分数
-    const lastScore = getLastSetScore(newType)
-    if (lastScore) {
-      editForm.value.scorePoints = lastScore
+  watch(() => editForm.value.questionType, (newType) => {
+    // 清空参考答案
+    editForm.value.referenceAnswer = ''
+    
+    if (newType === 'CODE_QUESTION') {
+      // 初始化编程题的字段
+      editForm.value.title = ''
+      editForm.value.description = ''
+      editForm.value.sampleInputs = ['']
+      editForm.value.sampleOutputs = ['']
+      editForm.value.caseInputs = ['']
+      editForm.value.caseOutputs = ['']
+      editForm.value.options = []
+      // 使用上次设置的分数
+      const lastScore = getLastSetScore(newType)
+      if (lastScore) {
+        editForm.value.scorePoints = lastScore
+      }
+    } else if (newType === 'SINGLE_CHOICE' || newType === 'MULTI_CHOICE') {
+      // 初始化选择题选项
+      editForm.value.title = ''
+      editForm.value.description = ''
+      editForm.value.options = [
+        { key: 'A', text: '' },
+        { key: 'B', text: '' },
+        { key: 'C', text: '' },
+        { key: 'D', text: '' }
+      ]
+      // 使用上次设置的分数
+      const lastScore = getLastSetScore(newType)
+      if (lastScore) {
+        editForm.value.scorePoints = lastScore
+      }
+    } else if (newType === 'TRUE_FALSE') {
+      // 初始化判断题选项
+      editForm.value.title = ''
+      editForm.value.description = ''
+      editForm.value.options = [
+        { key: 'A', text: '正确' },
+        { key: 'B', text: '错误' }
+      ]
+      // 使用上次设置的分数
+      const lastScore = getLastSetScore(newType)
+      if (lastScore) {
+        editForm.value.scorePoints = lastScore
+      }
     }
-  } else if (newType === 'TRUE_FALSE') {
-    // 初始化判断题选项
-    editForm.value.title = ''
-    editForm.value.description = ''
-    editForm.value.options = [
-      { key: 'A', text: '正确' },
-      { key: 'B', text: '错误' }
-    ]
-    // 使用上次设置的分数
-    const lastScore = getLastSetScore(newType)
-    if (lastScore) {
-      editForm.value.scorePoints = lastScore
-    }
-  }
-})
+  })
 
 const editRules = {
   content: [
@@ -2686,45 +2703,48 @@ async function saveQuestion() {
 // 选项操作函数
 
 // 题型切换时自动初始化选项
-watch(() => editForm.value.questionType, (newType) => {
-  // 清空参考答案
-  editForm.value.referenceAnswer = ''
-  
-  if (newType === 'CODE_QUESTION') {
-    // 初始化编程题的字段
-    editForm.value.title = ''
-    editForm.value.description = ''
-    editForm.value.sampleInputs = ['']
-    editForm.value.sampleOutputs = ['']
-    editForm.value.caseInputs = ['']
-    editForm.value.caseOutputs = ['']
-    editForm.value.options = []
-    // 设置编程题的默认分数为50分
-    editForm.value.scorePoints = 50
-  } else if (newType === 'SINGLE_CHOICE' || newType === 'MULTI_CHOICE') {
-    // 初始化选择题选项
-    editForm.value.title = ''
-    editForm.value.description = ''
-    editForm.value.options = [
-      { key: 'A', text: '' },
-      { key: 'B', text: '' },
-      { key: 'C', text: '' },
-      { key: 'D', text: '' }
-    ]
-    // 使用上次设置的分数
-    const lastScore = getLastSetScore(newType)
-    if (lastScore) {
-      editForm.value.scorePoints = lastScore
+  watch(() => editForm.value.questionType, (newType) => {
+    // 清空参考答案
+    editForm.value.referenceAnswer = ''
+    
+    if (newType === 'CODE_QUESTION') {
+      // 初始化编程题的字段
+      editForm.value.title = ''
+      editForm.value.description = ''
+      editForm.value.sampleInputs = ['']
+      editForm.value.sampleOutputs = ['']
+      editForm.value.caseInputs = ['']
+      editForm.value.caseOutputs = ['']
+      editForm.value.options = []
+      // 使用上次设置的分数
+      const lastScore = getLastSetScore(newType)
+      if (lastScore) {
+        editForm.value.scorePoints = lastScore
+      }
+    } else if (newType === 'SINGLE_CHOICE' || newType === 'MULTI_CHOICE') {
+      // 初始化选择题选项
+      editForm.value.title = ''
+      editForm.value.description = ''
+      editForm.value.options = [
+        { key: 'A', text: '' },
+        { key: 'B', text: '' },
+        { key: 'C', text: '' },
+        { key: 'D', text: '' }
+      ]
+      // 使用上次设置的分数
+      const lastScore = getLastSetScore(newType)
+      if (lastScore) {
+        editForm.value.scorePoints = lastScore
+      }
+    } else if (newType === 'TRUE_FALSE') {
+      editForm.value.options = [
+        { key: 'A', text: '正确' },
+        { key: 'B', text: '错误' }
+      ]
+    } else {
+      editForm.value.options = []
     }
-  } else if (newType === 'TRUE_FALSE') {
-    editForm.value.options = [
-      { key: 'A', text: '正确' },
-      { key: 'B', text: '错误' }
-    ]
-  } else {
-    editForm.value.options = []
-  }
-})
+  })
 
 // 选项增删
 function addOption() {

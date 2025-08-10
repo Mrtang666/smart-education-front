@@ -5,7 +5,7 @@
       <el-skeleton :rows="10" animated />
     </div>
 
-    <div v-else>
+    <div class="exam-detail-contenter" v-else>
       <!-- 考试信息头部 -->
       <el-card class="exam-info-card">
         <div class="exam-header">
@@ -45,11 +45,7 @@
       <el-card class="questions-card">
         <!-- 考试已提交的友好提示 -->
         <div v-if="examStatus === 'SUBMITTED'" class="submitted-message">
-          <el-result
-            icon="success"
-            title="您已提交答卷"
-            sub-title="感谢您完成本次考试，答卷已成功提交。您可以查看分析结果。"
-          >
+          <el-result icon="success" title="您已提交答卷" sub-title="感谢您完成本次考试，答卷已成功提交。您可以查看分析结果。">
             <template #extra>
               <el-button type="primary" @click="router.push('/student')">返回首页</el-button>
             </template>
@@ -62,28 +58,24 @@
         </div>
 
         <div v-else class="questions-container">
-          <div
-            v-for="(question, qIndex) in questions"
-            :key="question.questionId"
-            class="question-box"
-            style="margin-bottom: 24px; border: 1px solid #e4e7ed; border-radius: 8px; background: #fff; padding: 20px;"
-          >
+          <div v-for="(question, qIndex) in questions" :key="question.questionId" class="question-box"
+            :class="{ 'answered-question': isQuestionAnswered(question.questionId) }"
+            style="margin-bottom: 24px; border: 1px solid #e4e7ed; border-radius: 8px; background: #fff; padding: 20px;">
             <div class="question-header">
               <span class="question-number">{{ qIndex + 1 }}.</span>
-              <span class="question-type">{{ getQuestionTypeText(question.questionType) }}</span>
+              <span v-if="question.questionType !== 'CODE_QUESTION'" class="question-type">{{ getQuestionTypeText(question.questionType) }}</span>
+              <span v-else>{{ getQuestionTypeText(question.title) }}</span>
               <span class="question-score">({{ question.scorePoints || 0 }}分)</span>
             </div>
             <div class="question-content">
-              <h4>题目内容：</h4>
-              <div class="question-text">{{ getQuestionMainContent(question) }}</div>
+              <div v-if="question.questionType !== 'CODE_QUESTION'" class="question-text">{{ getQuestionMainContent(question) }}</div>
             </div>
             <!-- 这里可以根据考试状态和题型，渲染答题区或结果区，参考你原有的 currentQuestion 逻辑，传 question 进去即可 -->
             <div class="answer-area" v-if="examStatus === 'ONGOING'">
               <!-- 单选题 -->
               <div v-if="question.questionType === 'SINGLE_CHOICE'" class="question-options">
                 <el-radio-group v-model="userAnswers[question.questionId]" class="option-group">
-                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex"
-                    class="option-item">
+                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex" class="option-item">
                     <el-radio :value="String.fromCharCode(65 + optIndex)" class="option-radio">
                       <div class="option-wrapper">
                         <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
@@ -95,11 +87,11 @@
               </div>
 
               <!-- 多选题 -->
-              <div v-else-if="question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE'" class="question-options">
+              <div v-else-if="question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE'"
+                class="question-options">
                 <el-checkbox-group v-model="userAnswers[question.questionId]" class="option-group">
-                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex"
-                    class="option-item">
-                    <el-checkbox :value="String.fromCharCode(65 + optIndex)" class="option-checkbox">
+                  <div v-for="(option, optIndex) in getQuestionOptions(question)" :key="optIndex" class="option-item">
+                    <el-checkbox :label="String.fromCharCode(65 + optIndex)" class="option-checkbox">
                       <div class="option-wrapper">
                         <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
                         <span class="option-content">{{ option }}</span>
@@ -141,6 +133,38 @@
                   placeholder="请输入您的答案"></el-input>
               </div>
 
+              <!-- 编程题 -->
+              <div v-else-if="question.questionType === 'CODE_QUESTION'" class="question-options">
+                <div class="programming-question">
+                  <!-- 编程题详细信息 -->
+                  <div v-if="question.codeQuestionDetail" class="code-question-detail">
+                    <div class="question-description">
+                      <h4>题目描述</h4>
+                      <p>{{ question.codeQuestionDetail.description }}</p>
+                    </div>
+                    
+                    <div v-if="question.codeQuestionDetail.sampleInputs && question.codeQuestionDetail.sampleInputs.length > 0" class="sample-inputs">
+                      <h4>示例输入</h4>
+                      <div v-for="(input, index) in question.codeQuestionDetail.sampleInputs" :key="index" class="sample-item">
+                        <p><strong>示例 {{ index + 1 }}:</strong></p>
+                        <pre>{{ input }}</pre>
+                      </div>
+                    </div>
+                    
+                    <div v-if="question.codeQuestionDetail.sampleOutputs && question.codeQuestionDetail.sampleOutputs.length > 0" class="sample-outputs">
+                      <h4>示例输出</h4>
+                      <div v-for="(output, index) in question.codeQuestionDetail.sampleOutputs" :key="index" class="sample-item">
+                        <p><strong>示例 {{ index + 1 }}:</strong></p>
+                        <pre>{{ output }}</pre>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <p>编程题目需要在VS Code中完成作答。</p>
+                  <el-button type="primary" @click="openVSCode(question)">打开VS Code进行编程</el-button>
+                </div>
+              </div>
+
               <!-- 未知题型的调试信息 -->
               <div v-else class="question-options">
                 <div class="debug-info">
@@ -158,8 +182,7 @@
                 <el-button v-if="qIndex < questions.length - 1" type="default" size="small"
                   @click="nextQuestion(question)">下一题</el-button>
 
-                <el-button v-if="qIndex > 0" type="default" size="small"
-                  @click="prevQuestion(question)">上一题</el-button>
+                <el-button v-if="qIndex > 0" type="default" size="small" @click="prevQuestion(question)">上一题</el-button>
               </div>
             </div>
 
@@ -202,7 +225,7 @@
             </div>
 
             <!-- 考试进行中或未完成时的提示 -->
-            <div v-else-if="examStatus !== '进行中' " class="exam-pending">
+            <div v-else-if="examStatus !== '进行中'" class="exam-pending">
               <el-empty description="考试已结束，等待批改完成后查看结果" />
             </div>
           </div>
@@ -226,7 +249,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Calendar, Timer, Document } from '@element-plus/icons-vue'
-import { studentExamAPI, questionAPI, examAPI } from '@/api/api'
+import { studentExamAPI, questionAPI, examAPI, codeQuestionAPI, scriptForwardAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
 const route = useRoute()
@@ -286,22 +309,7 @@ const formatTimeRemaining = computed(() => {
   ].join(':')
 })
 
-// 答题统计计算属性已移除
-
-// 成绩相关计算属性已移除
-
-// // 方法定义 - 必须在watch之前定义
-// const parseOptions = (options) => {
-//   if (typeof options === 'string') {
-//     try {
-//       return JSON.parse(options)
-//     } catch (e) {
-//       return []
-//     }
-//   }
-//   return Array.isArray(options) ? options : []
-// }
-
+// 初始化用户答案
 const initUserAnswers = (answers) => {
   const userAnswersData = {}
   const answeredQuestionsData = {}
@@ -565,18 +573,6 @@ const calculateResults = (answers) => {
   correctCount.value = correct
 }
 
-// // 新增的方法
-// const getExamStatusText = (status) => {
-//   const statusMap = {
-//     'NOT_STARTED': '未开始',
-//     'ONGOING': '进行中',
-//     'ENDED': '已结束',
-//     'SUBMITTED': '已提交'
-//   }
-//   return statusMap[status] || '未知状态'
-// }
-
-// 成绩相关函数已移除
 
 const getCurrentQuestionAnswer = (question) => {
   if (!question) return null
@@ -651,6 +647,7 @@ const fetchExamDetail = async () => {
     console.log('获取考试题目...')
     let questionsData = []
     try {
+      // 获取普通题目
       const questionsResponse = await studentExamAPI.getExamQuestions(eid)
       console.log('题目信息:', questionsResponse)
 
@@ -672,6 +669,30 @@ const fetchExamDetail = async () => {
             knowledgeId: question.knowledgeId
           }
         })
+      }
+
+      // 获取编程题
+      const codeQuestionsResponse = await codeQuestionAPI.getExamCodeQuestions(eid)
+      console.log('编程题信息:', codeQuestionsResponse)
+
+      if (Array.isArray(codeQuestionsResponse)) {
+        const codeQuestions = codeQuestionsResponse.map(question => ({
+          questionId: question.id,
+          title: question.title,  // 添加title字段
+          content: question.description,
+          questionType: 'CODE_QUESTION',
+          options: [],
+          scorePoints: question.scorePoints,
+          referenceAnswer: question.referenceAnswer,
+          difficulty: question.difficulty,
+          knowledgeId: question.knowledgeId,
+          codeQuestionDetail: {
+            description: question.description,
+            sampleInputs: question.sampleInputs,
+            sampleOutputs: question.sampleOutputs
+          }
+        }))
+        questionsData = [...questionsData, ...codeQuestions]
       }
     } catch (error) {
       console.warn('获取题目失败，尝试使用教师API:', error)
@@ -791,21 +812,63 @@ const submitAnswer = async (question) => {
   const questionId = question.questionId
   const answer = userAnswers.value[questionId]
 
-  if (!isAnswerValid(question)) {
+  // 编程题不需要验证答案有效性
+  if (question.questionType !== 'CODE' && !isAnswerValid(question)) {
     ElMessage.warning('请完成答题后再提交')
     return
   }
 
   try {
-    // 使用 student-exam/submit 接口提交答案（请求体格式）
-    const formattedAnswer = (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') ? answer.join(',') : answer
-
-    // 获取当前时间作为提交时间
-    const submitTime = new Date().toISOString()
-
-    // 计算客观题成绩
+    // 其他题型使用常规提交接口
+    let formattedAnswer = ''
     let score = null
-    if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'MULTIPLE_CHOICE') {
+    const submitTime = new Date().toISOString()
+    const studentId = getUserInfo().studentId
+    // 处理编程题提交
+    if (question.questionType === 'CODE_QUESTION') {
+      try {
+        console.log('开始处理编程题提交:', { questionId: question.questionId, studentId });
+        
+        // 获取编程题详情
+        const questionDetail = await codeQuestionAPI.getCodeQuestionById(question.questionId)
+        console.log('获取到的编程题详情:', questionDetail);
+
+        // 创建文件名
+        const fileName = `${questionDetail.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.java`
+        console.log('文件名:', fileName);
+
+        console.log('准备读取文件:', { studentId, fileName });
+        const codeContent = await scriptForwardAPI.readFile(studentId, fileName)
+        console.log('学生代码内容:', codeContent);
+        console.log('typeof codeContent:', typeof codeContent);
+        
+        const submitData = {
+          questionId: questionId,
+          answer: codeContent,
+          submitTime: submitTime
+        }
+        console.log('准备提交的编程题数据:', submitData);
+        
+        const result = await codeQuestionAPI.submit(submitData)
+        console.log('编程题提交结果:', result);
+        
+        // 标记为已答题
+        answeredQuestions.value[questionId] = { answered: true }
+        
+        ElMessage.success('代码已成功提交')
+        return result
+      } catch (error) {
+        console.error('提交编程题答案失败:', error)
+        ElMessage.error('提交编程题答案失败，请稍后再试')
+        return
+      }
+      
+    }
+
+    // 处理选择题提交
+    formattedAnswer = (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') ? answer.join(',') : answer
+
+    if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') {
       // 客观题自动评分
       const correctAnswer = question.referenceAnswer || question.correctAnswer
       if (correctAnswer && formattedAnswer) {
@@ -823,24 +886,24 @@ const submitAnswer = async (question) => {
           })
         }
         // 多选题比较（需要排序后比较）
-        else if (question.questionType === 'MULTIPLE_CHOICE') {
+        else if (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') {
           const userAnswerSorted = formattedAnswer.split(',').map(a => a.trim()).sort().join(',')
-          const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
-          const isCorrect = userAnswerSorted === correctAnswerSorted
-          score = isCorrect ? Number(question.scorePoints || 0) : 0
-          console.log('多选题评分:', {
-            questionId: questionId,
-            userAnswer: userAnswerSorted,
-            correctAnswer: correctAnswerSorted,
-            isCorrect: isCorrect,
-            scorePoints: question.scorePoints,
-            finalScore: score
-          })
+            const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
+            const isCorrect = userAnswerSorted === correctAnswerSorted
+            score = isCorrect ? Number(question.scorePoints || 0) : 0
+            console.log('多选题评分:', {
+              questionId: questionId,
+              userAnswer: userAnswerSorted,
+              correctAnswer: correctAnswerSorted,
+              isCorrect: isCorrect,
+              scorePoints: question.scorePoints,
+              finalScore: score
+            })
+          }
         }
       }
-    }
 
-    const answerData = {
+      const answerData = {
       examId: String(examId.value),
       questionId: String(questionId),
       studentId: String(studentId),
@@ -906,7 +969,7 @@ const submitExam = async () => {
 
       // 计算客观题成绩
       let score = null
-      if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'MULTIPLE_CHOICE') {
+      if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') {
         // 客观题自动评分
         const correctAnswer = question.referenceAnswer || question.correctAnswer
         if (correctAnswer && formattedAnswer) {
@@ -924,7 +987,7 @@ const submitExam = async () => {
             })
           }
           // 多选题比较（需要排序后比较）
-          else if (question.questionType === 'MULTIPLE_CHOICE') {
+          else if (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') {
             const userAnswerSorted = formattedAnswer.split(',').map(a => a.trim()).sort().join(',')
             const correctAnswerSorted = correctAnswer.split(',').map(a => a.trim()).sort().join(',')
             const isCorrect = userAnswerSorted === correctAnswerSorted
@@ -1092,14 +1155,20 @@ const getQuestionOptions = (question) => {
 
 // 获取题目主体内容（不包含选项）
 const getQuestionMainContent = (question) => {
+  // 对于编程题，返回题目标题
+  if (question.questionType === 'CODE_QUESTION') {
+    return question.title || ''
+  }
+  
   if (!question.content) return ''
 
   const content = question.content
 
   // 对于选择题和判断题，需要分离题目主体和选项
   if (question.questionType === 'SINGLE_CHOICE' ||
-      question.questionType === 'MULTIPLE_CHOICE' ||
-      question.questionType === 'TRUE_FALSE') {
+    question.questionType === 'MULTIPLE_CHOICE' ||
+    question.questionType === 'MULTI_CHOICE' ||
+    question.questionType === 'TRUE_FALSE') {
 
     // 按换行符分割内容
     const lines = content.split('\n').map(line => line.trim()).filter(line => line)
@@ -1119,8 +1188,8 @@ const getQuestionMainContent = (question) => {
     } else if (firstOptionIndex === 0) {
       // 如果第一行就是选项，说明没有题目主体，返回题型名称
       return question.questionType === 'SINGLE_CHOICE' ? '单选题' :
-             question.questionType === 'MULTIPLE_CHOICE' ? '多选题' :
-             question.questionType === 'TRUE_FALSE' ? '判断题' : '题目'
+        question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE' ? '多选题' :
+          question.questionType === 'TRUE_FALSE' ? '判断题' : '题目'
     }
   }
 
@@ -1131,6 +1200,11 @@ const getQuestionMainContent = (question) => {
 const isAnswerValid = (question) => {
   const answer = userAnswers.value[question.questionId]
 
+  // 编程题可以直接提交
+  if (question.questionType === 'CODE_QUESTION') {
+    return true
+  }
+  
   if (question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') {
     return Array.isArray(answer) && answer.length > 0
   } else if (question.questionType === 'SINGLE_CHOICE' || question.questionType === 'TRUE_FALSE') {
@@ -1146,8 +1220,13 @@ const getDisplayAnswer = (question) => {
   const answer = userAnswers.value[question.questionId]
   if (!answer) return '未作答'
 
-  if (question.questionType === 'MULTIPLE_CHOICE' && Array.isArray(answer)) {
-    return answer.join(', ')
+  if ((question.questionType === 'MULTIPLE_CHOICE' || question.questionType === 'MULTI_CHOICE') && Array.isArray(answer)) {
+    // 对于多选题，将选项转换为带选项内容的格式
+    const options = getQuestionOptions(question)
+    return answer.map(option => {
+      const optionIndex = option.charCodeAt(0) - 65  // 将字母转换为索引
+      return `${option}. ${options[optionIndex] || ''}`
+    }).join(', ')
   } else if (question.questionType === 'TRUE_FALSE') {
     // 对于判断题，如果答案是A或B，显示对应的选项内容
     const options = getQuestionOptions(question)
@@ -1160,6 +1239,53 @@ const getDisplayAnswer = (question) => {
     return answer === 'true' ? '正确' : answer === 'false' ? '错误' : answer
   }
   return answer
+}
+
+// 打开VS Code进行编程答题
+const openVSCode = async (question) => {
+  // 获取用户信息
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.studentId) {
+    ElMessage.error('未获取到用户信息，请重新登录')
+    return
+  }
+  const folderName = userInfo.studentId
+  // 获取编程题详情
+  const questionDetail = await codeQuestionAPI.getCodeQuestionById(question.questionId)
+
+  // 创建文件名
+  const fileName = `${questionDetail.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.java`
+
+  try {
+
+    // 创建文件
+    await scriptForwardAPI.createFile(folderName, fileName)
+
+  } catch (error) {
+    console.error('打开VS Code失败:', error)
+    // ElMessage.error('打开VS Code失败，请稍后再试')
+  }
+  try {
+    // 准备文件内容（包含题目描述和示例）
+    const fileContent = `/*\n题目: ${questionDetail.title}\n\n描述:\n${questionDetail.description}\n\n示例输入:\n${questionDetail.sampleInputs ? questionDetail.sampleInputs.join('\n') : ''}\n\n示例输出:\n${questionDetail.sampleOutputs ? questionDetail.sampleOutputs.join('\n') : ''}\n\n请在此处编写你的代码\n*/\n\npublic class Solution {\n    public static void main(String[] args) {\n        // 你的代码\n    }\n}\n`
+    // const fileContent = `测试111`
+    // 写入文件内容
+    await scriptForwardAPI.writeFile(folderName, fileName, fileContent)
+
+  } catch (error) {
+    console.error('写入文件内容失败:', error)
+    // ElMessage.error('写入文件内容失败，请稍后再试')
+  } finally {
+    ElMessage.success('已经准备好编程环境，请在VS Code中进行编程答题')
+    // 打开VS Code
+    const vscodeUrl = `http://118.89.136.119:8082/?folder=/home/program/${folderName}`
+    window.open(vscodeUrl, '_blank')
+  }
+}
+
+// 判断题目是否已回答的计算属性
+const isQuestionAnswered = (questionId) => {
+  return answeredQuestions.value[questionId] && answeredQuestions.value[questionId].answered
 }
 
 const formatDateTime = (dateString) => {
@@ -1205,9 +1331,9 @@ onUnmounted(() => {
 
 <style scoped>
 .exam-detail-container {
-  padding: 20px;
   background-color: #f6f8fa;
-  min-height: 100vh;
+  min-height: auto;
+  overflow-y: auto;
 }
 
 .loading-container,
@@ -1649,7 +1775,7 @@ onUnmounted(() => {
 }
 
 .my-answer .answer-content {
-  color: #409EFF;
+  color: #67C23A;
 }
 
 .correct-answer .answer-content {
@@ -1734,6 +1860,36 @@ onUnmounted(() => {
 .stats-value {
   font-size: 18px;
   font-weight: bold;
-  color: #409EFF;
+  color: #67C23A;
+}
+
+/* 编程题目样式 */
+.programming-question {
+  padding: 20px;
+  background-color: #f0f9ff;
+  border: 1px solid #409eff;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.programming-question p {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  color: #606266;
+}
+
+.programming-question .el-button {
+  font-size: 16px;
+  padding: 12px 24px;
+}
+
+/* 已回答题目的绿色标识 */
+.answered-question {
+  border-left: 4px solid #67c23a !important;
+  background-color: #f0f9ff !important;
+}
+
+.answered-question .question-header {
+  color: #67c23a;
 }
 </style>

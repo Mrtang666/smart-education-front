@@ -5,87 +5,72 @@
       <h3>学生列表</h3>
       <div class="header-actions">
         <el-button type="success" size="small" @click="generateInviteCode">
-          <el-icon><Share /></el-icon>
+          <el-icon>
+            <Share />
+          </el-icon>
           生成邀请码
         </el-button>
-        <el-button type="danger" size="small" v-if="selectedStudents.length > 0" @click="$emit('batch-remove-students')">
-          <el-icon><Delete /></el-icon>
+        <el-button type="danger" size="small" v-if="selectedStudents.length > 0"
+          @click="$emit('batch-remove-students')">
+          <el-icon>
+            <Delete />
+          </el-icon>
           批量删除 ({{ selectedStudents.length }})
         </el-button>
         <el-button type="primary" size="small" @click="$emit('show-add-student')">
-          <el-icon><Plus /></el-icon>
+          <el-icon>
+            <Plus />
+          </el-icon>
           添加学生
         </el-button>
       </div>
     </div>
     <div class="section-body">
       <div class="table-toolbar" v-if="courseStudents.length > 0">
-        <el-input
-          v-model="studentSearchKeyword"
-          placeholder="搜索学生姓名或学号"
-          prefix-icon="Search"
-          clearable
-          @clear="handleSearchClear"
-          @input="handleSearchInput"
-          style="width: 250px;"
-        />
+        <el-input v-model="studentSearchKeyword" placeholder="搜索学生姓名或学号" prefix-icon="Search" clearable
+          @clear="handleSearchClear" @input="handleSearchInput" style="width: 250px;" />
       </div>
       <div v-if="courseStudents.length === 0" class="empty-tip">
         暂无学生，请点击"添加学生"按钮添加
       </div>
       <div v-else class="table-container">
-        <el-table
-          :data="filteredStudents"
-          style="width: 100%"
-          @selection-change="handleSelectionChange"
-          v-loading="isLoading"
-          height="100%"
-        >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="studentId" label="学号" width="120" />
-        <el-table-column prop="fullName" label="姓名" width="120" />
-        <el-table-column prop="email" label="邮箱" />
-        <el-table-column prop="phone" label="电话" width="120" />
-        <!-- <el-table-column prop="grade" label="年级" width="100" /> -->
-        <!-- <el-table-column prop="className" label="班级" width="120" /> -->
-        <el-table-column label="操作" width="320" fixed="right">
-          <template #default="scope">
-            <el-button link type="primary" @click="$emit('view-student', scope.row)">查看</el-button>
-            <el-button link type="success" @click="analyzeCourseProgress(scope.row)">课程学习情况</el-button>
-            <el-button link type="warning" @click="authorizeStudent(scope.row)">授权VSCode</el-button>
-            <el-button link type="danger" @click="$emit('remove-student', scope.row)">移除</el-button>
-          </template>
-        </el-table-column>
+        <el-table :data="filteredStudents" style="width: 100%" @selection-change="handleSelectionChange"
+          v-loading="isLoading" height="100%">
+          <el-table-column type="selection" width="55" />
+          <el-table-column prop="studentId" label="学号" width="120" />
+          <el-table-column prop="fullName" label="姓名" width="120" />
+          <el-table-column prop="email" label="邮箱" />
+          <el-table-column prop="phone" label="电话" width="120" />
+          <!-- <el-table-column prop="grade" label="年级" width="100" /> -->
+          <!-- <el-table-column prop="className" label="班级" width="120" /> -->
+          <el-table-column label="操作" width="320" fixed="right">
+            <template #default="scope">
+              <el-button link type="primary" @click="$emit('view-student', scope.row)">查看</el-button>
+              <el-button link type="success" @click="analyzeCourseProgress(scope.row)">课程学习情况</el-button>
+              <el-button link type="warning" @click="authorizeStudent(scope.row)">授权VSCode</el-button>
+              <el-button link type="danger" @click="$emit('remove-student', scope.row)">移除</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
       <div class="pagination-container" v-if="courseStudents.length > pageSize">
-        <el-pagination
-          :current-page="currentPage"
-          :page-size="pageSize"
+        <el-pagination :current-page="currentPage" :page-size="pageSize"
           @update:current-page="$emit('update:current-page', $event)"
-          @update:page-size="$emit('update:page-size', $event)"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="filteredStudents.length"
-        />
+          @update:page-size="$emit('update:page-size', $event)" :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper" :total="filteredStudents.length" />
       </div>
     </div>
 
     <!-- 课程学习情况分析模态框 -->
-    <el-dialog
-      v-model="analysisDialogVisible"
-      title="课程学习情况分析"
-      width="100%"
-      :close-on-click-modal="false"
-      @close="resetAnalysisState"
-      class="analysis-modal"
-      fullscreen
-    >
+    <el-dialog v-model="analysisDialogVisible" title="课程学习情况分析" width="100%" :close-on-click-modal="false"
+      @close="resetAnalysisState" class="analysis-modal" fullscreen>
       <!-- 自定义头部 -->
       <template #header>
         <div class="modal-header">
           <div class="header-content">
-            <el-icon class="header-icon"><TrendCharts /></el-icon>
+            <el-icon class="header-icon">
+              <TrendCharts />
+            </el-icon>
             <span class="modal-title">课程学习情况分析</span>
           </div>
         </div>
@@ -104,17 +89,15 @@
 
           <div class="analyzing-content">
             <div class="analyzing-icon-wrapper">
-              <el-icon class="is-loading"><Loading /></el-icon>
+              <el-icon class="is-loading">
+                <Loading />
+              </el-icon>
             </div>
             <h4>正在分析学习情况...</h4>
             <p class="analyzing-desc">{{ progressText }}</p>
 
             <div class="progress-wrapper">
-              <el-progress
-                :percentage="progressPercentage"
-                :show-text="true"
-                :stroke-width="6"
-              />
+              <el-progress :percentage="progressPercentage" :show-text="true" :stroke-width="6" />
             </div>
           </div>
         </div>
@@ -160,20 +143,15 @@
     </el-dialog>
 
     <!-- 邀请码对话框 -->
-    <el-dialog
-      v-model="inviteCodeDialogVisible"
-      width="580px"
-      :close-on-click-modal="false"
-      :show-close="false"
-      class="invite-code-dialog"
-      top="8vh"
-      append-to-body
-    >
+    <el-dialog v-model="inviteCodeDialogVisible" width="580px" :close-on-click-modal="false" :show-close="false"
+      class="invite-code-dialog" top="8vh" append-to-body>
       <!-- 自定义头部 -->
       <template #header>
         <div class="dialog-header">
           <div class="header-icon">
-            <el-icon><Share /></el-icon>
+            <el-icon>
+              <Share />
+            </el-icon>
           </div>
           <div class="header-content">
             <h3 class="dialog-title">课程邀请码</h3>
@@ -186,7 +164,9 @@
         <!-- 生成中状态 -->
         <div v-if="generatingInviteCode" class="generating-container">
           <div class="loading-wrapper">
-            <el-icon class="loading-icon is-loading"><Loading /></el-icon>
+            <el-icon class="loading-icon is-loading">
+              <Loading />
+            </el-icon>
             <div class="loading-text">
               <h4>正在生成邀请码</h4>
               <p>请稍候片刻...</p>
@@ -199,7 +179,9 @@
           <!-- 邀请码展示区域 -->
           <div class="invite-code-display">
             <div class="code-label">
-              <el-icon><Ticket /></el-icon>
+              <el-icon>
+                <Ticket />
+              </el-icon>
               <span>邀请码</span>
             </div>
             <div class="code-container">
@@ -207,13 +189,10 @@
                 <span class="invite-code">{{ currentInviteCode }}</span>
                 <div class="code-decoration"></div>
               </div>
-              <el-button
-                type="primary"
-                size="default"
-                @click="copyInviteCode"
-                class="copy-button"
-              >
-                <el-icon><DocumentCopy /></el-icon>
+              <el-button type="primary" size="default" @click="copyInviteCode" class="copy-button">
+                <el-icon>
+                  <DocumentCopy />
+                </el-icon>
                 <span>复制</span>
               </el-button>
             </div>
@@ -222,20 +201,28 @@
           <!-- 使用说明 -->
           <div class="invite-code-info">
             <div class="info-header">
-              <el-icon><InfoFilled /></el-icon>
+              <el-icon>
+                <InfoFilled />
+              </el-icon>
               <span>使用说明</span>
             </div>
             <div class="info-content">
               <div class="info-item">
-                <el-icon class="step-icon"><User /></el-icon>
+                <el-icon class="step-icon">
+                  <User />
+                </el-icon>
                 <span>学生可以使用此邀请码快速加入课程</span>
               </div>
               <div class="info-item">
-                <el-icon class="step-icon"><Clock /></el-icon>
+                <el-icon class="step-icon">
+                  <Clock />
+                </el-icon>
                 <span>邀请码长期有效，请妥善保管</span>
               </div>
               <div class="info-item">
-                <el-icon class="step-icon"><ChatDotRound /></el-icon>
+                <el-icon class="step-icon">
+                  <ChatDotRound />
+                </el-icon>
                 <span>可以通过微信、QQ等方式分享给学生</span>
               </div>
             </div>
@@ -245,11 +232,15 @@
         <!-- 错误状态 -->
         <div v-else class="error-container">
           <div class="error-content">
-            <el-icon class="error-icon"><CircleCloseFilled /></el-icon>
+            <el-icon class="error-icon">
+              <CircleCloseFilled />
+            </el-icon>
             <h4>生成失败</h4>
             <p>邀请码生成失败，请重试</p>
             <el-button type="primary" @click="generateInviteCode" class="retry-button">
-              <el-icon><Refresh /></el-icon>
+              <el-icon>
+                <Refresh />
+              </el-icon>
               重新生成
             </el-button>
           </div>
@@ -262,13 +253,11 @@
           <el-button @click="inviteCodeDialogVisible = false" size="default">
             关闭
           </el-button>
-          <el-button
-            type="primary"
-            @click="generateInviteCode"
-            v-if="!generatingInviteCode && currentInviteCode"
-            size="default"
-          >
-            <el-icon><Refresh /></el-icon>
+          <el-button type="primary" @click="generateInviteCode" v-if="!generatingInviteCode && currentInviteCode"
+            size="default">
+            <el-icon>
+              <Refresh />
+            </el-icon>
             重新生成
           </el-button>
         </div>
@@ -331,9 +320,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'batch-remove-students', 
-  'show-add-student', 
-  'view-student', 
+  'batch-remove-students',
+  'show-add-student',
+  'view-student',
   'remove-student',
   'selection-change',
   'search-clear',
@@ -580,15 +569,15 @@ async function generateInviteCode() {
     if (response) {
       // 尝试多种可能的字段名（包括下划线和驼峰格式）
       inviteCode = response.invite_code ||  // 下划线格式（实际API格式）
-                   response.inviteCode ||
-                   response.code ||
-                   response.data?.invite_code ||
-                   response.data?.inviteCode ||
-                   response.data?.code ||
-                   response.result?.invite_code ||
-                   response.result?.inviteCode ||
-                   response.result?.code ||
-                   (typeof response === 'string' ? response : null)
+        response.inviteCode ||
+        response.code ||
+        response.data?.invite_code ||
+        response.data?.inviteCode ||
+        response.data?.code ||
+        response.result?.invite_code ||
+        response.result?.inviteCode ||
+        response.result?.code ||
+        (typeof response === 'string' ? response : null)
     }
 
     if (inviteCode) {
@@ -623,20 +612,44 @@ async function generateInviteCode() {
 
 // 授权学生使用VSCode
 async function authorizeStudent(student) {
+  // 创建以学生用户名为文件夹名
+  const userName = `${student.studentId}`
   try {
-    // 创建以学生姓名和ID命名的文件夹
-    const userName = `${student.fullName}_${student.studentId}`
-    // 先创建程序
+    // 先授权学生使用VSCode
     await scriptForwardAPI.createProgram(userName)
-    // 然后创建初始文件
-    await scriptForwardAPI.createFile(userName, 'README.md')
-    
     ElMessage.success(`已成功授权学生 ${student.fullName} 使用在线VSCode`)
   } catch (error) {
     console.error('授权VSCode失败:', error)
-    ElMessage.error(error.response?.data?.message || '授权失败，请稍后重试')
+    // ElMessage.error(error.response?.data?.message || '授权失败，请稍后重试')
+  } finally {
+    ElMessage.success(`已成功授权学生 ${student.fullName} 使用在线VSCode`) 
+  }
+  // 创建以README.md文件 
+  try {
+    // 创建README.md文件
+    // const readmeContent = `# 欢迎使用在线VSCode，欢迎使用在线VSCode环境！请在此处编写您的代码。`
+    await scriptForwardAPI.createFile(userName, 'README.md')
+    ElMessage.success('已成功创建初始README文件')
+  } catch (error) {
+    console.error('创建README文件失败:', error)
+    // ElMessage.error(error.response?.data?.message || '创建失败，请稍后重试')
+  }finally {
+    ElMessage.success('已成功创建初始README文件') 
+  }
+  // 写README.md文件内容
+  try {
+    const readmeContent = `# 欢迎使用在线VSCode，欢迎使用在线VSCode环境！请在此处编写您的代码。`
+    const formData = new FormData()
+    formData.append('file', new Blob([readmeContent], { type: 'text/markdown' }), 'README.md')
+    await scriptForwardAPI.writeFile(userName, formData)
+    ElMessage.success('已成功写入README文件内容')
+  } catch (error) {
+    console.error('写入README文件内容失败:', error)
+    //ElMessage.error(error.response?.data?.message || '写入失败，请稍后重试')
   }
 }
+
+
 
 // 复制邀请码到剪贴板
 async function copyInviteCode() {
@@ -1372,9 +1385,20 @@ async function copyInviteCode() {
 }
 
 @keyframes pulse {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.2); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .copy-button {
