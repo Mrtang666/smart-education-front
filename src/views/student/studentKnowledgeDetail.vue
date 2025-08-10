@@ -36,6 +36,105 @@
             </el-button>
           </div>
           
+          <!-- 文件管理模块 -->
+          <div class="detail-card files-card">
+            <div class="card-header">
+              <div class="header-left">
+                <h3><el-icon><Folder /></el-icon> 相关文件</h3>
+                <span class="file-count" v-if="!filesLoading && files.length > 0">{{ files.length }} 个文件</span>
+              </div>
+              <div class="header-actions">
+                <el-input
+                  v-model="fileSearchPrefix"
+                  placeholder="搜索文件..."
+                  style="width: 180px;"
+                  clearable
+                  @keyup.enter="searchFiles"
+                >
+                  <template #prefix>
+                    <el-icon><Search /></el-icon>
+                  </template>
+                </el-input>
+                <el-button type="primary" size="small" @click="searchFiles">
+                  搜索
+                </el-button>
+                <el-button type="default" size="small" @click="refreshFiles">
+                  <el-icon><Refresh /></el-icon>
+                </el-button>
+              </div>
+            </div>
+            
+            <!-- 文件分类筛选 -->
+            <div class="file-categories" v-if="files.length > 0">
+              <el-radio-group v-model="selectedCategory" @change="filterByCategory" size="small">
+                <el-radio-button label="">全部</el-radio-button>
+                <el-radio-button 
+                  v-for="category in fileCategories" 
+                  :key="category" 
+                  :label="category"
+                >
+                  {{ category }}
+                </el-radio-button>
+              </el-radio-group>
+            </div>
+            
+            <div class="card-body">
+              <div v-if="filesLoading" class="loading-container">
+                <el-skeleton :rows="3" animated />
+              </div>
+              <div v-else-if="files.length === 0" class="empty-content">
+                <el-empty description="暂无相关文件" :image-size="80">
+                  <template #image>
+                    <el-icon style="font-size: 40px; color: #c0c4cc;"><Folder /></el-icon>
+                  </template>
+                  <el-button type="primary" size="small" @click="refreshFiles">刷新文件列表</el-button>
+                </el-empty>
+              </div>
+              <div v-else class="files-list">
+                <div class="files-grid">
+                  <div 
+                    v-for="file in files" 
+                    :key="file.name" 
+                    class="file-item"
+                    @click="previewFile(file.name)"
+                  >
+                    <div class="file-icon">
+                      <el-icon>
+                        <component :is="getFileIcon(file.name)" />
+                      </el-icon>
+                    </div>
+                    <div class="file-info">
+                      <div class="file-name" :title="file.name">{{ file.name }}</div>
+                      <div class="file-category">
+                        <el-tag size="small" type="info" effect="plain">{{ getFileCategory(file.name) }}</el-tag>
+                      </div>
+                    </div>
+                    <div class="file-actions">
+                      <el-button 
+                        link 
+                        type="primary" 
+                        size="small" 
+                        @click.stop="previewFile(file.name)"
+                        title="预览文件"
+                      >
+                        <el-icon><View /></el-icon>
+                      </el-button>
+                      <el-button 
+                        link 
+                        type="success" 
+                        size="small" 
+                        @click.stop="downloadFile(file.name)"
+                        title="下载文件"
+                      >
+                        <el-icon><Download /></el-icon>
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <!-- 题目部分暂时注释掉 -->
           <!--
           <div v-if="questions.length === 0" class="empty-container">
@@ -292,15 +391,69 @@
       </el-card>
     </div>
   </div>
+  
+  <!-- 文件预览对话框 -->
+  <el-dialog v-model="showFilePreview" title="文件预览" width="800px" :close-on-click-modal="false">
+    <div v-if="previewLoading" class="preview-loading">
+      <el-skeleton :rows="3" animated />
+    </div>
+    <div v-else-if="currentPreviewFile" class="preview-content">
+      <div class="preview-header">
+        <h4>{{ currentPreviewFile.name }}</h4>
+        <div class="preview-actions">
+          <el-button type="primary" size="small" @click="downloadFile(currentPreviewFile.name)">
+            <el-icon><Download /></el-icon>下载
+          </el-button>
+        </div>
+      </div>
+      
+      <div class="preview-body">
+        <!-- 图片预览 -->
+        <div v-if="currentPreviewFile.type === 'image'" class="image-preview">
+          <img :src="currentPreviewFile.url" :alt="currentPreviewFile.name" class="preview-image" />
+        </div>
+        
+        <!-- 文档预览 -->
+        <div v-else-if="currentPreviewFile.type === 'document'" class="document-preview">
+          <div class="document-info">
+            <p>文档类型文件，请下载后查看</p>
+            <el-button type="primary" @click="downloadFile(currentPreviewFile.name)">
+              <el-icon><Download /></el-icon>下载文档
+            </el-button>
+          </div>
+        </div>
+        
+        <!-- 其他类型文件 -->
+        <div v-else class="other-preview">
+          <div class="file-info">
+            <p>此文件类型不支持在线预览</p>
+            <el-button type="primary" @click="downloadFile(currentPreviewFile.name)">
+              <el-icon><Download /></el-icon>下载文件
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <script>
 import { knowledgeAPI, learningProgressAPI } from '@/api/api';
 import { BigNumber } from 'bignumber.js';
 import { getUserInfo } from '@/utils/auth';
+import { minioController } from '@/api/api';
+import { Search, Refresh, Download, Folder, View, Document } from '@element-plus/icons-vue';
 
 export default {
   name: 'StudentKnowledgeDetail',
+  components: {
+    Search,
+    Refresh,
+    Download,
+    Folder,
+    View,
+    Document
+  },
   data() {
     return {
       // 知识点信息
@@ -325,6 +478,16 @@ export default {
       catalogLoading: true,
       searchKeyword: '',
       currentKnowledgeId: '',
+      
+      // 文件管理
+      files: [],
+      filesLoading: true,
+      fileSearchPrefix: '',
+      selectedCategory: '',
+      fileCategories: ['文档', '图片', '视频', '音频', '压缩包', '其他'],
+      showFilePreview: false,
+      previewLoading: true,
+      currentPreviewFile: null,
       
       // 树形控件配置
       defaultProps: {
@@ -435,6 +598,9 @@ export default {
     
     // 加载学习状态
     this.loadLearningStatus();
+    
+    // 获取文件列表
+    this.fetchFiles();
   },
   methods: {
     // 获取知识点详情
@@ -810,6 +976,217 @@ export default {
       }).catch(() => {
         // 取消操作
       });
+    },
+    
+    // 文件管理相关方法
+    async fetchFiles() {
+      this.filesLoading = true;
+      try {
+        // 调用API获取文件列表
+        const fileNames = await minioController.listFiles(this.fileSearchPrefix);
+        
+        // 将文件名转换为文件对象格式
+        const fileObjects = fileNames.map(fileName => ({
+          name: fileName,
+          url: '#', // 实际项目中应该使用真实的文件URL
+          type: this.getFileExtension(fileName)
+        }));
+        
+        // 根据分类筛选文件
+        if (this.selectedCategory) {
+          this.files = fileObjects.filter(file => this.getFileCategory(file.name) === this.selectedCategory);
+        } else {
+          this.files = fileObjects;
+        }
+      } catch (error) {
+        console.error('获取文件列表失败:', error);
+        this.$message.error('获取文件列表失败，请稍后再试');
+        this.files = [];
+      } finally {
+        this.filesLoading = false;
+      }
+    },
+
+    searchFiles() {
+      this.fetchFiles();
+    },
+
+    refreshFiles() {
+      this.fileSearchPrefix = '';
+      this.selectedCategory = '';
+      this.fetchFiles();
+    },
+
+    filterByCategory() {
+      this.fetchFiles();
+    },
+
+    getFileIcon(fileName) {
+      // 添加类型检查
+      if (!fileName || typeof fileName !== 'string') {
+        return 'Document';
+      }
+      
+      const category = this.getFileCategory(fileName);
+      const iconMap = {
+        '文档': 'Document',
+        '图片': 'View',
+        '视频': 'View',
+        '音频': 'View',
+        '压缩包': 'Folder',
+        '其他': 'Document'
+      };
+      return iconMap[category] || 'Document';
+    },
+
+    getFileCategory(fileName) {
+      // 添加类型检查和默认值处理
+      if (!fileName || typeof fileName !== 'string') {
+        return '其他';
+      }
+      
+      const extension = fileName.split('.').pop()?.toLowerCase();
+      
+      if (['doc', 'docx', 'pdf', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)) {
+        return '文档';
+      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(extension)) {
+        return '图片';
+      } else if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(extension)) {
+        return '视频';
+      } else if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(extension)) {
+        return '音频';
+      } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(extension)) {
+        return '压缩包';
+      } else {
+        return '其他';
+      }
+    },
+
+    getFileExtension(fileName) {
+      if (!fileName || typeof fileName !== 'string') {
+        return '';
+      }
+      return fileName.split('.').pop()?.toLowerCase() || '';
+    },
+
+    previewFile(fileName) {
+      try {
+        // 添加类型检查
+        if (!fileName || typeof fileName !== 'string') {
+          this.$message.error('文件名无效');
+          return;
+        }
+        
+        this.previewLoading = true;
+        this.currentPreviewFile = { name: fileName };
+        this.showFilePreview = true;
+        
+        // 根据文件类型决定预览方式
+        const category = this.getFileCategory(fileName);
+        if (category === '图片') {
+          // 图片直接预览
+          this.currentPreviewFile = { 
+            name: fileName, 
+            url: '#', // 实际项目中应该是真实的图片URL
+            type: 'image' 
+          };
+        } else if (category === '文档') {
+          // 文档类型尝试在线预览
+          this.currentPreviewFile = { 
+            name: fileName, 
+            url: '#', // 实际项目中应该是真实的文档URL
+            type: 'document' 
+          };
+        } else {
+          // 其他类型显示下载链接
+          this.currentPreviewFile = { 
+            name: fileName, 
+            type: 'other' 
+          };
+        }
+      } catch (error) {
+        console.error('预览文件失败:', error);
+        this.$message.error('预览文件失败: ' + (error.message || '请稍后重试'));
+      } finally {
+        this.previewLoading = false;
+      }
+    },
+
+    async downloadFile(fileName) {
+      try {
+        // 添加类型检查
+        if (!fileName || typeof fileName !== 'string') {
+          this.$message.error('文件名无效');
+          return;
+        }
+        
+        // 显示下载中提示
+        this.$message.info(`正在获取下载链接: ${fileName}`);
+        
+        // 调用API获取预签名下载URL
+        const response = await minioController.generateDownloadUrl(fileName);
+        
+        console.log('下载API响应:', response); // 调试信息
+        
+        let downloadUrl = null;
+        
+        // 处理不同的响应格式
+        if (typeof response === 'string') {
+          // 如果直接返回URL字符串
+          downloadUrl = response;
+        } else if (response && typeof response === 'object') {
+          // 如果返回对象，尝试不同的属性名
+          downloadUrl = response.url || response.downloadUrl || response.download_url || response.fileUrl || response.file_url;
+        }
+        
+        if (downloadUrl && typeof downloadUrl === 'string' && downloadUrl.startsWith('http')) {
+          // 验证URL格式
+          try {
+            new URL(downloadUrl); // 验证URL是否有效
+            
+            // 直接访问预签名URL进行下载
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            link.target = '_blank'; // 在新标签页打开，避免页面跳转
+            
+            // 添加到DOM并触发点击
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            this.$message.success(`开始下载文件: ${fileName}`);
+            
+            // 记录下载日志
+            console.log(`文件下载成功: ${fileName}, URL: ${downloadUrl}`);
+          } catch (urlError) {
+            console.error('URL格式无效:', urlError);
+            this.$message.error('下载链接格式无效，请稍后重试');
+          }
+        } else {
+          // 响应格式错误
+          this.$message.error('无法获取有效的下载链接，请稍后重试');
+          console.error('下载URL响应格式错误:', response);
+          console.error('期望的响应格式应该是包含URL的对象或直接的URL字符串');
+        }
+      } catch (error) {
+        console.error('下载文件失败:', error);
+        
+        // 根据错误类型显示不同的错误信息
+        if (error.response) {
+          if (error.response.status === 404) {
+            this.$message.error('文件不存在或已被删除');
+          } else if (error.response.status === 403) {
+            this.$message.error('没有权限下载此文件');
+          } else {
+            this.$message.error(`下载失败: ${error.response.data?.message || '服务器错误'}`);
+          }
+        } else if (error.request) {
+          this.$message.error('网络连接失败，请检查网络设置');
+        } else {
+          this.$message.error('下载文件失败: ' + (error.message || '请稍后重试'));
+        }
+      }
     }
   }
 };
@@ -1229,5 +1606,340 @@ export default {
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* 文件管理模块样式 */
+.detail-card {
+  margin-top: 20px;
+  padding: 24px;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 20px 0 rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+}
+
+.files-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.files-card .header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.files-card .header-left h3 {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.files-card .header-left h3 .el-icon {
+  color: #409EFF;
+  font-size: 20px;
+}
+
+.file-count {
+  font-size: 14px;
+  color: #8c8c8c;
+  background-color: #f5f5f5;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-weight: 500;
+}
+
+.files-card .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-categories {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.file-categories .el-radio-group {
+  display: flex;
+  gap: 8px;
+}
+
+.file-categories .el-radio-button {
+  border-radius: 20px;
+  padding: 0 16px;
+  height: 32px;
+  line-height: 30px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.file-categories .el-radio-button:hover {
+  border-color: #409EFF;
+  color: #409EFF;
+}
+
+.file-categories .el-radio-button.is-active {
+  background-color: #409EFF;
+  color: #fff;
+  border-color: #409EFF;
+  box-shadow: 0 2px 8px 0 rgba(64, 158, 255, 0.3);
+}
+
+.files-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background-color: #fafafa;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.file-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.file-item:hover {
+  background-color: #fff;
+  border-color: #409EFF;
+  box-shadow: 0 4px 20px 0 rgba(64, 158, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.file-item:hover::before {
+  transform: scaleX(1);
+}
+
+.file-icon {
+  font-size: 32px;
+  color: #409EFF;
+  margin-right: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background-color: rgba(64, 158, 255, 0.1);
+  border-radius: 12px;
+}
+
+.file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 14px;
+  color: #1a1a1a;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.file-category {
+  display: flex;
+  align-items: center;
+}
+
+.file-category .el-tag {
+  border-radius: 12px;
+  font-size: 11px;
+  padding: 2px 8px;
+  height: 20px;
+  line-height: 16px;
+}
+
+.file-actions {
+  margin-left: 12px;
+  display: flex;
+  gap: 4px;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.file-item:hover .file-actions {
+  opacity: 1;
+}
+
+.file-actions .el-button {
+  padding: 6px;
+  font-size: 14px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.file-actions .el-button:hover {
+  background-color: rgba(64, 158, 255, 0.1);
+  transform: scale(1.1);
+}
+
+/* 文件预览对话框样式 */
+.preview-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.preview-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.preview-header h4 {
+  margin: 0;
+  color: #303133;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.preview-body {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f7f8fa;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.image-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.image-preview .preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.document-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.document-info p {
+  margin-bottom: 15px;
+  color: #606266;
+}
+
+.other-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.file-info p {
+  margin-bottom: 15px;
+  color: #606266;
+}
+
+/* 空状态优化 */
+.empty-content {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-content .el-empty__description {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+/* 加载状态优化 */
+.loading-container {
+  padding: 20px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .files-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .files-card .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .files-card .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .file-item {
+    padding: 12px;
+  }
+  
+  .file-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+    margin-right: 12px;
+  }
 }
 </style>
