@@ -6947,3 +6947,86 @@ export const codeQuestionAPI = {
     }
   },
 };
+// MinIO 文件管理相关 API
+export const minioController = {
+  // 创建拦截器实例
+  axios: createTeacherAuthorizedAxios(),
+  
+  /**
+   * 生成上传文件URL
+   * @param {string} objectName 对象名称（文件名）
+   * @returns {Promise<string>} 上传URL
+   */
+  async generateUploadUrl(objectName) {
+      try {
+          const response = await this.axios.post(`/api/minio/upload-url?objectName=${encodeURIComponent(objectName)}`);
+          return response.data;
+      } catch (error) {
+          console.error('生成上传文件URL失败:', error.response ? error.response.data : error.message);
+          throw error;
+      }
+  },
+
+  /**
+   * 生成下载文件URL
+   * @param {string} objectName 对象名称（文件名）
+   * @returns {Promise<string>} 下载URL
+   */
+  async generateDownloadUrl(objectName) {
+      try {
+          const response = await this.axios.post(`/api/minio/download-url?objectName=${encodeURIComponent(objectName)}`);
+          return response.data;
+      } catch (error) {
+          console.error('生成下载文件URL失败:', error.response ? error.response.data : error.message);
+          throw error;
+      }
+  },
+
+  /**
+   * 按照文件名前缀列出文件名
+   * @param {string} prefix 文件名前缀（可选）
+   * @returns {Promise<Array<string>>} 文件名列表
+   */
+  async listFiles(prefix = '') {
+      try {
+          const params = prefix ? `?prefix=${encodeURIComponent(prefix)}` : '';
+          const response = await this.axios.get(`/api/minio/list${params}`);
+          return response.data;
+      } catch (error) {
+          console.error('获取文件列表失败:', error.response ? error.response.data : error.message);
+          throw error;
+      }
+  },
+
+  /**
+   * 删除指定文件
+   * @param {string} objectName 对象名称（文件名）
+   * @returns {Promise<string>} 删除结果
+   */
+  async deleteFile(objectName) {
+      try {
+          const response = await this.axios.delete(`/api/minio/delete?objectName=${encodeURIComponent(objectName)}`);
+          return response.data;
+      } catch (error) {
+          console.error('删除文件失败:', error.response ? error.response.data : error.message);
+          throw error;
+      }
+  },
+
+  /**
+   * 批量删除文件
+   * @param {Array<string>} objectNames 对象名称列表（文件名数组）
+   * @returns {Promise<string>} 删除结果
+   */
+  async batchDeleteFiles(objectNames) {
+      try {
+          const response = await this.axios.delete('/api/minio/batch-delete', {
+              data: objectNames
+          });
+          return response.data;
+      } catch (error) {
+          console.error('批量删除文件失败:', error.response ? error.response.data : error.message);
+          throw error;
+      }
+    }}
+    
