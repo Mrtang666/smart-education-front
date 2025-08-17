@@ -692,12 +692,13 @@ async function fetchExams(isRetry = false) {
         
         if (courseExamsResponse && Array.isArray(courseExamsResponse)) {
           courseExamsResponse.forEach(exam => {
-            allExams.push({
-              ...exam,
-              courseName: course.courseName || course.name,
-              courseId: course.courseId || course.id
-            })
+            // 只处理有examId的考试，确保allExams和examIds数组索引对应
             if (exam.examId) {
+              allExams.push({
+                ...exam,
+                courseName: course.courseName || course.name,
+                courseId: course.courseId || course.id
+              })
               examIds.push(exam.examId)
             }
           })

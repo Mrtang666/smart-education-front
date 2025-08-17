@@ -813,7 +813,7 @@ const submitAnswer = async (question) => {
   const answer = userAnswers.value[questionId]
 
   // 编程题不需要验证答案有效性
-  if (question.questionType !== 'CODE' && !isAnswerValid(question)) {
+  if (question.questionType !== 'CODE_QUESTION' && !isAnswerValid(question)) {
     ElMessage.warning('请完成答题后再提交')
     return
   }
@@ -842,10 +842,22 @@ const submitAnswer = async (question) => {
         console.log('学生代码内容:', codeContent);
         console.log('typeof codeContent:', typeof codeContent);
         
+        // 确保studentCode是字符串类型
+        let studentCodeString = ''
+        if (typeof codeContent === 'string') {
+          studentCodeString = codeContent
+        } else if (codeContent && typeof codeContent === 'object') {
+          // 如果是对象，尝试提取content字段或转换为JSON字符串
+          studentCodeString = codeContent.content || codeContent.data || JSON.stringify(codeContent)
+        } else {
+          studentCodeString = String(codeContent || '')
+        }
+        
         const submitData = {
-          questionId: questionId,
-          answer: codeContent,
-          submitTime: submitTime
+          codeQuestionId: String(questionId),
+          studentId: String(studentId),
+          language: question.language || 'java',
+          studentCode: studentCodeString
         }
         console.log('准备提交的编程题数据:', submitData);
         
@@ -954,8 +966,68 @@ const submitExam = async () => {
     // 获取当前时间作为提交时间
     const submitTime = new Date().toISOString()
 
-    // 准备批量提交的答案
-    const answerList = questions.value.map(question => {
+    // 分离编程题和其他题目
+    const codeQuestions = []
+    const otherQuestions = []
+    
+    questions.value.forEach(question => {
+      console.log('题目类型检查:', question.questionType, question)
+      if (question.questionType === 'CODE_QUESTION') {
+        codeQuestions.push(question)
+      } else {
+        otherQuestions.push(question)
+      }
+    })
+    
+    console.log('编程题数量:', codeQuestions.length)
+    console.log('其他题目数量:', otherQuestions.length)
+
+    // 处理编程题提交
+    for (const question of codeQuestions) {
+      const questionId = question.questionId
+      
+      try {
+        // 获取编程题详情
+        const questionDetail = await codeQuestionAPI.getCodeQuestionById(questionId)
+        
+        // 创建文件名
+        const fileName = `${questionDetail.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.java`
+        
+        // 读取学生代码
+        const codeContent = await scriptForwardAPI.readFile(studentId, fileName)
+        
+        if (codeContent) {
+          // 确保studentCode是字符串类型
+          let studentCodeString = ''
+          if (typeof codeContent === 'string') {
+            studentCodeString = codeContent
+          } else if (codeContent && typeof codeContent === 'object') {
+            // 如果是对象，尝试提取content字段或转换为JSON字符串
+            studentCodeString = codeContent.content || codeContent.data || JSON.stringify(codeContent)
+          } else {
+            studentCodeString = String(codeContent || '')
+          }
+          
+          const submitData = {
+            codeQuestionId: String(questionId),
+            studentId: String(studentId),
+            language: question.language || 'java', // 默认语言
+            studentCode: studentCodeString
+          }
+          
+          console.log('批量提交编程题:', submitData)
+          await codeQuestionAPI.submit(submitData)
+        } else {
+          console.log('编程题未找到代码文件:', fileName)
+        }
+      } catch (error) {
+        console.error('批量提交编程题失败:', error)
+        // 继续处理下一题，不中断整个提交流程
+      }
+    }
+
+    // 准备其他题目的批量提交答案
+    const answerList = otherQuestions.map(question => {
       const questionId = question.questionId
       const answer = userAnswers.value[questionId]
 
@@ -1019,10 +1091,12 @@ const submitExam = async () => {
       }
     })
 
-    console.log('准备提交的答案数据:', answerList)
+    console.log('准备提交的其他题目答案数据:', answerList)
 
-    // 使用批量提交接口
-    await studentExamAPI.batchSubmitAnswers(answerList)
+    // 如果有其他题目，使用批量提交接口
+    if (answerList.length > 0) {
+      await studentExamAPI.batchSubmitAnswers(answerList)
+    }
 
     // 计算总成绩
     const totalCalculatedScore = answerList.reduce((sum, answer) => {

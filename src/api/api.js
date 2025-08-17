@@ -4078,6 +4078,10 @@ export const studentExamAPI = {
           params: {
             examIds: examIdsStr,
           },
+          // 配置数组参数序列化格式，避免使用默认的brackets格式
+          paramsSerializer: {
+            indexes: null // 使用 examIds=1&examIds=2&examIds=3 格式而不是 examIds[]=1&examIds[]=2&examIds[]=3
+          }
         }
       );
 
