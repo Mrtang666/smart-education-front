@@ -1,6 +1,8 @@
 <template>
   <div class="student-plan-container">
-    <el-tabs v-model="activeTab">
+    <div class="page-header">
+      <div class="tabs-container">
+        <el-tabs v-model="activeTab">
       <el-tab-pane label="当前学习计划" name="current">
         <div v-if="loadingStates.currentPlan" class="loading-container">
           <el-skeleton :rows="5" animated />
@@ -597,7 +599,20 @@
           </div>
         </div>
       </el-tab-pane> -->
-    </el-tabs>
+        </el-tabs>
+      </div>
+      
+      <!-- <div class="action-buttons">
+        <el-button 
+          type="success" 
+          size="large" 
+          @click="goToPlanDetail"
+          :icon="ArrowRight"
+        >
+          学习计划资料
+        </el-button>
+      </div> -->
+    </div>
     
     <!-- 编辑学习计划对话框 -->
     <el-dialog v-model="editPlanVisible" title="编辑学习计划" width="70%">
@@ -801,15 +816,17 @@
 
 <script>
 import { ref, reactive, onMounted, computed, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import { learningPlanAPI, courseAPI, knowledgeAPI } from '@/api/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Magic, Delete, Check, Edit } from '@element-plus/icons-vue';
+import { Magic, Delete, Check, Edit, ArrowRight } from '@element-plus/icons-vue';
 import { getUserInfo } from '@/utils/auth';
 import { learningPlanController } from '@/api/apiLearning';
 
 export default {
   name: 'StudentPlan',
   setup() {
+    const router = useRouter();
     const activeTab = ref('current');
     const planForm = ref(null);
     const currentPlan = ref(null);
@@ -2313,6 +2330,12 @@ export default {
       }
     };
 
+    // 跳转到详情页面
+    const goToPlanDetail = () => {
+      router.push('/student/plan-detail');
+      ElMessage.success('正在跳转到学习计划资源页面');
+    };
+
     // 加载测试数据
     const loadTestData = () => {
       // 使用包含3天学习活动的第三个计划
@@ -2434,7 +2457,9 @@ export default {
       Magic,
       Delete,
       Check,
-      Edit
+      Edit,
+      ArrowRight,
+      goToPlanDetail
     };
   }
 }
@@ -2448,6 +2473,27 @@ export default {
   box-sizing: border-box;
   margin-bottom: 100px;
   overflow-y: visible;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.tabs-container {
+  flex: 1;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  margin-left: 20px;
+  align-items: flex-start;
+  padding-top: 5px;
 }
 
 .section-title {

@@ -202,6 +202,10 @@ const routes = [
         path: "plan",
         component: () => import("@/views/student/studentPlan.vue"),
       },
+      // {
+      //   path: "plan-detail",
+      //   component: () => import("@/views/student/studentPlanResource.vue"),
+      // },
     ]
   },
   {
