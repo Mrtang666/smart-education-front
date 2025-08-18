@@ -427,6 +427,14 @@ export const problemKnowledgeUnit = {
 // 课程（subject）相关接口
 export const subjectController = {
   /**
+   * 获取全部课程
+   * GET /api/subject/all
+   */
+  async getAll() {
+    return (await http.get(`/api/subject/all`)).data;
+  },
+
+  /**
    * 更新课程
    * PUT /api/subject/update
    */
