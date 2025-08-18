@@ -831,8 +831,20 @@ export default {
     formatProblemContent(content) {
       if (!content) return '';
 
+      // 过滤掉选项内容，只保留纯题目文本
+      let cleanContent = content;
+      
+      // 移除 A. B. C. D. 格式的选项
+      cleanContent = cleanContent.replace(/([A-H])\.\s*[^A-H]*?(?=\s*[A-H]\.|$)/g, '');
+      
+      // 移除 A B C D 格式的选项
+      cleanContent = cleanContent.replace(/([A-H])\s+[^A-H]*?(?=\s*[A-H]\s|$)/g, '');
+      
+      // 清理多余的空白字符
+      cleanContent = cleanContent.replace(/\s+/g, ' ').trim();
+
       // 简单的HTML转义和换行处理
-      return content
+      return cleanContent
         .replace(/\n/g, '<br>')
         .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
     },
@@ -847,8 +859,8 @@ export default {
       const options = [];
 
       // 尝试多种格式解析选项
-      // 格式1: A. 选项内容
-      const pattern1 = /([A-H])\.\s*([^\n\r]+)/g;
+      // 格式1: A. 选项内容 (支持同行多选项)
+      const pattern1 = /([A-H])\.\s*([^A-H]*?)(?=\s*[A-H]\.|$)/g;
       let match1;
       while ((match1 = pattern1.exec(content)) !== null) {
         options.push({
@@ -859,8 +871,8 @@ export default {
 
       if (options.length > 0) return options;
 
-      // 格式2: A 选项内容
-      const pattern2 = /([A-H])\s+([^\n\r]+)/g;
+      // 格式2: A 选项内容 (支持同行多选项)
+      const pattern2 = /([A-H])\s+([^A-H]*?)(?=\s*[A-H]\s|$)/g;
       let match2;
       while ((match2 = pattern2.exec(content)) !== null) {
         options.push({
@@ -2186,6 +2198,8 @@ export default {
   padding: 10px;
   border-radius: 6px;
   transition: background-color 0.3s;
+  display: flex;
+  align-items: flex-start;
 }
 
 .option-item:hover {
@@ -2196,11 +2210,15 @@ export default {
   font-weight: 600;
   color: #409eff;
   margin-right: 8px;
+  min-width: 24px;
+  flex-shrink: 0;
 }
 
 .option-content {
   color: #303133;
   line-height: 1.6;
+  flex: 1;
+  word-wrap: break-word;
 }
 
 .answer-actions {

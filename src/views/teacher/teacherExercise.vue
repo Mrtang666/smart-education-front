@@ -60,16 +60,16 @@
                 <el-descriptions-item label="作业标题">{{ selectedHomework.title }}</el-descriptions-item>
                 <el-descriptions-item label="作业状态">
                     <el-tag :type="getStatusType(selectedHomework.status)" effect="dark">
-                        <el-icon v-if="selectedHomework.status === '未开始' || selectedHomework.status === '未设置截止日期'">
+                        <el-icon v-if="selectedHomework.status === 'DRAFT' || selectedHomework.status === '未开始' || selectedHomework.status === '未设置截止日期'">
                             <Calendar />
                         </el-icon>
-                        <el-icon v-else-if="selectedHomework.status === '进行中' || selectedHomework.status === '即将截止'">
+                        <el-icon v-else-if="selectedHomework.status === 'PUBLISHED' || selectedHomework.status === '进行中' || selectedHomework.status === '即将截止'">
                             <Loading />
                         </el-icon>
-                        <el-icon v-else-if="selectedHomework.status === '已截止'">
+                        <el-icon v-else-if="selectedHomework.status === 'ENDED' || selectedHomework.status === '已截止'">
                             <Timer />
                         </el-icon>
-                        {{ getHomeworkStatusDescription(selectedHomework) }}
+                        {{ getStatusText(selectedHomework.status) }}
                     </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="截止时间">
@@ -187,16 +187,8 @@
                         style="width: 100%" />
                     <div class="form-tip">设置截止日期后，学生将在此日期前提交作业</div>
                 </el-form-item>
-                <el-form-item label="状态" prop="status">
-                    <el-select v-model="homeworkForm.status" placeholder="请选择状态" style="width: 100%">
-                        <el-option label="未设置截止日期" value="未设置截止日期" disabled />
-                        <el-option label="未开始" value="未开始" />
-                        <el-option label="进行中" value="进行中" />
-                        <el-option label="即将截止" value="即将截止" disabled />
-                        <el-option label="已截止" value="已截止" />
-                    </el-select>
-                    <div class="form-tip">状态将根据截止日期自动计算，也可手动设置</div>
-                </el-form-item>
+
+                <!-- 状态由系统自动判定，不需要用户手动设置 -->
                 <el-form-item label="作业附件">
                     <el-upload
                         action="/api/upload"
@@ -216,6 +208,42 @@
                         </template>
                     </el-upload>
                 </el-form-item>
+                
+                <!-- 作业设置 -->
+                <el-form-item label="答案公开" prop="isAnswerPublic">
+                    <el-switch 
+                        v-model="homeworkForm.isAnswerPublic" 
+                        active-text="公开" 
+                        inactive-text="不公开" />
+                    <div class="form-tip">设置作业完成后是否向学生公开标准答案</div>
+                </el-form-item>
+                
+                <el-form-item label="分数可见" prop="isScoreVisible">
+                    <el-switch 
+                        v-model="homeworkForm.isScoreVisible" 
+                        active-text="可见" 
+                        inactive-text="不可见" />
+                    <div class="form-tip">设置学生是否可以查看自己的作业分数</div>
+                </el-form-item>
+                
+                <el-form-item label="允许重做" prop="isRedoAllowed">
+                    <el-switch 
+                        v-model="homeworkForm.isRedoAllowed" 
+                        active-text="允许" 
+                        inactive-text="不允许" />
+                    <div class="form-tip">设置学生是否可以重新提交作业</div>
+                </el-form-item>
+                
+                <el-form-item label="最大尝试次数" prop="maxAttempts" v-if="homeworkForm.isRedoAllowed">
+                    <el-input-number 
+                        v-model="homeworkForm.maxAttempts" 
+                        :min="1" 
+                        :max="10" 
+                        :step="1" />
+                    <span class="unit-label">次</span>
+                    <div class="form-tip">学生可以尝试提交作业的最大次数</div>
+                </el-form-item>
+                
                 <el-form-item label="描述" prop="description">
                     <el-input v-model="homeworkForm.description" type="textarea" :rows="3" placeholder="请输入作业描述" />
                 </el-form-item>
@@ -246,6 +274,13 @@ const router = useRouter()
 const userInfo = getUserInfo()
 const teacherId = userInfo ? (userInfo.teacherId || userInfo.studentId || userInfo.id) : null
 
+// 根据用户角色自动判定作业类型
+const getAssignmentTypeByUserRole = () => {
+    // 在教师页面，默认为教师布置类型
+    // 如果需要支持学生上传类型，可以根据具体业务逻辑判断
+    return 'TEACHER_ASSIGNED'
+}
+
 // 课程和作业列表
 const courseList = ref([])
 const selectedCourseId = ref('')
@@ -271,8 +306,8 @@ const homeworkForm = ref({
     teacherId: teacherId,
     totalScore: 100,
     endTime: '',
-    status: '未开始',
-    type: 'homework' // 指定类型为作业
+    status: 'DRAFT',
+    type: getAssignmentTypeByUserRole() // 根据用户角色自动判定
 })
 const homeworkFormTitle = ref('创建作业')
 const homeworkFileList = ref([])
@@ -312,8 +347,19 @@ const rules = {
             trigger: 'change'
         }
     ],
-    status: [
-        { required: true, message: '请选择状态', trigger: 'change' }
+    // status 由系统自动判定，不需要验证
+    isAnswerPublic: [
+        { required: true, message: '请选择是否公开答案', trigger: 'change' }
+    ],
+    isScoreVisible: [
+        { required: true, message: '请选择是否显示分数', trigger: 'change' }
+    ],
+    isRedoAllowed: [
+        { required: true, message: '请选择是否允许重做', trigger: 'change' }
+    ],
+    maxAttempts: [
+        { required: true, message: '请输入最大尝试次数', trigger: 'blur' },
+        { type: 'number', min: 1, max: 10, message: '最大尝试次数应在1-10之间', trigger: 'blur' }
     ],
     description: [
         { max: 500, message: '描述不能超过500个字符', trigger: 'blur' }
@@ -357,26 +403,26 @@ onMounted(async () => {
         // 更新作业状态
         homeworkList.value.forEach(homework => {
             if (!homework.endTime) {
-                homework.status = '未设置截止日期'
+                homework.status = 'DRAFT'
                 return
             }
             
             const deadline = new Date(homework.endTime)
             const now = currentTime.value
             
-            if (now > deadline && homework.status !== '已截止') {
-                homework.status = '已截止'
+            if (now > deadline && homework.status !== 'ENDED') {
+                homework.status = 'ENDED'
                 console.log(`作业状态已更新: ${homework.title} 已截止`)
             } else if (now <= deadline) {
                 // 计算剩余时间
                 const timeRemaining = deadline.getTime() - now.getTime()
                 const hoursRemaining = timeRemaining / (1000 * 60 * 60)
                 
-                if (hoursRemaining <= 24 && homework.status !== '即将截止') {
-                    homework.status = '即将截止'
+                if (hoursRemaining <= 24 && homework.status !== 'PUBLISHED') {
+                    homework.status = 'PUBLISHED'
                     console.log(`作业状态已更新: ${homework.title} 即将截止，剩余${Math.round(hoursRemaining)}小时`)
-                } else if (hoursRemaining > 24 && homework.status !== '进行中') {
-                    homework.status = '进行中'
+                } else if (hoursRemaining > 24 && homework.status !== 'PUBLISHED') {
+                    homework.status = 'PUBLISHED'
                     console.log(`作业状态已更新: ${homework.title} 进行中`)
                 }
             }
@@ -504,23 +550,23 @@ const loadHomeworks = async () => {
         const now = new Date()
         res.forEach(homework => {
             if (!homework.endTime) {
-                homework.status = '未设置截止日期'
+                homework.status = 'DRAFT'
                 return
             }
             
             const deadline = new Date(homework.endTime)
             
             if (now > deadline) {
-                homework.status = '已截止'
+                homework.status = 'ENDED'
             } else {
                 // 计算剩余时间
                 const timeRemaining = deadline.getTime() - now.getTime()
                 const hoursRemaining = timeRemaining / (1000 * 60 * 60)
                 
                 if (hoursRemaining <= 24) {
-                    homework.status = '即将截止'
+                    homework.status = 'PUBLISHED'
                 } else {
-                    homework.status = '进行中'
+                    homework.status = 'PUBLISHED'
                 }
             }
         })
@@ -800,8 +846,11 @@ const handlePageChange = (page) => {
 
 // 获取作业状态描述，添加剩余时间显示
 const getHomeworkStatusDescription = (homework) => {
+    // 首先显示基础状态文本
+    const baseStatus = getStatusText(homework.status);
+    
     if (!homework.endTime) {
-        return '未设置截止日期';
+        return baseStatus + ' (未设置截止日期)';
     }
     
     const now = new Date();
@@ -814,9 +863,9 @@ const getHomeworkStatusDescription = (homework) => {
         const passedHours = Math.floor((passedTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         
         if (passedDays > 0) {
-            return `已截止 (${passedDays}天${passedHours}小时前)`;
+            return `${baseStatus} (${passedDays}天${passedHours}小时前截止)`;
         } else {
-            return `已截止 (${passedHours}小时前)`;
+            return `${baseStatus} (${passedHours}小时前截止)`;
         }
     } else {
         // 未截止，显示剩余多长时间
@@ -825,12 +874,12 @@ const getHomeworkStatusDescription = (homework) => {
         const remainingHours = Math.floor((remainingTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         
         if (remainingDays > 0) {
-            return `剩余 ${remainingDays}天${remainingHours}小时`;
+            return `${baseStatus} (剩余 ${remainingDays}天${remainingHours}小时)`;
         } else if (remainingHours > 0) {
-            return `剩余 ${remainingHours}小时`;
+            return `${baseStatus} (剩余 ${remainingHours}小时)`;
         } else {
             const remainingMinutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-            return `剩余 ${remainingMinutes}分钟`;
+            return `${baseStatus} (剩余 ${remainingMinutes}分钟)`;
         }
     }
 }
@@ -849,14 +898,20 @@ const showCreateDialog = () => {
     const formattedDeadline = nextWeek.toISOString().slice(0, 19).replace('T', ' ');
     
     homeworkForm.value = {
+        assignmentId: null, // 新建作业时设为null
         title: '',
         description: '',
         courseId: selectedCourseId.value || '', // 如果已选择课程，默认使用该课程
         teacherId: teacherId,
         totalScore: 100,
+        startTime: now.toISOString(), // 设置开始时间为当前时间
         endTime: formattedDeadline, // 设置默认截止时间为一周后
-        status: '进行中',
-        type: 'homework' // 指定类型为作业
+        status: 'DRAFT',
+        type: getAssignmentTypeByUserRole(), // 根据用户角色自动判定
+        isAnswerPublic: false, // 默认答案不公开
+        isScoreVisible: true, // 默认分数可见
+        isRedoAllowed: false, // 默认不允许重做
+        maxAttempts: 1 // 默认最大尝试次数为1
     }
     
     homeworkFileList.value = []
@@ -898,7 +953,19 @@ const submitHomework = async () => {
                     assignmentId: homeworkForm.value.assignmentId,
                     // 确保其他字段正确
                     creatorId: homeworkForm.value.teacherId, // assignmentAPI使用creatorId字段
-                    type: homeworkForm.value.type || 'TEACHER_ASSIGNED' // 确保type字段正确
+                    type: homeworkForm.value.type || getAssignmentTypeByUserRole() // 根据用户角色自动判定作业类型
+                }
+                
+                // 处理开始时间 - 确保数据格式正确
+                if (submitData.startTime) {
+                    // 如果开始时间不是ISO格式字符串，则转换为ISO格式
+                    if (!(typeof submitData.startTime === 'string' && submitData.startTime.includes('T'))) {
+                        const startDate = new Date(submitData.startTime);
+                        submitData.startTime = startDate.toISOString();
+                    }
+                } else {
+                    // 如果没有设置开始时间，默认为当前时间
+                    submitData.startTime = new Date().toISOString();
                 }
                 
                 // 处理截止日期 - 确保数据格式正确
@@ -916,19 +983,19 @@ const submitHomework = async () => {
                 
                 if (!deadline) {
                     // 如果没有设置截止日期
-                    submitData.status = '未设置截止日期';
+                    submitData.status = 'PUBLISHED';
                 } else if (now > deadline) {
                     // 如果当前时间已经超过截止日期
-                    submitData.status = '已截止';
+                    submitData.status = 'ENDED';
                 } else {
                     // 计算剩余时间
                     const timeRemaining = deadline.getTime() - now.getTime();
                     const hoursRemaining = timeRemaining / (1000 * 60 * 60);
                     
                     if (hoursRemaining <= 24) {
-                        submitData.status = '即将截止';
+                        submitData.status = 'PUBLISHED'; // 即将截止仍然是已发布状态
                     } else {
-                        submitData.status = '进行中';
+                        submitData.status = 'PUBLISHED';
                     }
                 }
                 
@@ -1004,18 +1071,48 @@ const formatDateTimeLocal = (dateTimeStr) => {
 // 获取状态对应的类型
 const getStatusType = (status) => {
     switch(status) {
-        case '未设置截止日期':
+        case 'DRAFT':
             return 'info';
+        case 'PUBLISHED':
+            return 'primary';
+        case 'ENDED':
+            return 'success';
+        // 兼容旧的中文状态值
+        case '未设置截止日期':
         case '未开始':
             return 'info';
         case '进行中':
-            return 'primary';
         case '即将截止':
-            return 'warning';
+            return 'primary';
         case '已截止':
             return 'success';
         default:
             return 'info';
+    }
+}
+
+// 获取状态显示文本
+const getStatusText = (status) => {
+    switch(status) {
+        case 'DRAFT':
+            return '草稿';
+        case 'PUBLISHED':
+            return '已发布';
+        case 'ENDED':
+            return '已结束';
+        // 兼容旧的中文状态值
+        case '未设置截止日期':
+            return '未设置截止日期';
+        case '未开始':
+            return '未开始';
+        case '进行中':
+            return '进行中';
+        case '即将截止':
+            return '即将截止';
+        case '已截止':
+            return '已截止';
+        default:
+            return status || '未知状态';
     }
 }
 
@@ -1082,23 +1179,23 @@ const handleCourseSelect = async () => {
             const now = new Date()
             courseHomeworks.value.forEach(homework => {
                 if (!homework.endTime) {
-                    homework.status = '未设置截止日期'
+                    homework.status = 'DRAFT'
                     return
                 }
                 
                 const deadline = new Date(homework.endTime)
                 
                 if (now > deadline) {
-                    homework.status = '已截止'
+                    homework.status = 'ENDED'
                 } else {
                     // 计算剩余时间
                     const timeRemaining = deadline.getTime() - now.getTime()
                     const hoursRemaining = timeRemaining / (1000 * 60 * 60)
                     
                     if (hoursRemaining <= 24) {
-                        homework.status = '即将截止'
+                        homework.status = 'PUBLISHED'
                     } else {
-                        homework.status = '进行中'
+                        homework.status = 'PUBLISHED'
                     }
                 }
             })

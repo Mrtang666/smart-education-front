@@ -200,7 +200,7 @@
                 </div>
                 <div class="item-status">
                   <el-tag :type="getHomeworkStatusType(homework)" size="small">
-                    {{ homework.status || '未设置状态' }}
+                    {{ getHomeworkStatusText(homework) }}
                   </el-tag>
                 </div>
               </div>
@@ -785,12 +785,30 @@ function getHomeworkStatusType(homework) {
   
   const status = homework.status
   
-  if (status.includes('未设置')) return 'info'
-  if (status.includes('已截止')) return 'success'
-  if (status.includes('即将截止')) return 'warning'
-  if (status.includes('进行中')) return 'primary'
+  // 支持英文状态值
+  if (status === 'DRAFT' || status.includes('未设置')) return 'info'
+  if (status === 'ENDED' || status.includes('已截止')) return 'success'
+  if (status === 'PUBLISHED' || status.includes('即将截止') || status.includes('进行中')) return 'primary'
   
   return 'info'
+}
+
+// 获取状态显示文本
+function getHomeworkStatusText(homework) {
+  if (!homework || !homework.status) return '未设置状态'
+  
+  const status = homework.status
+  
+  switch(status) {
+    case 'DRAFT':
+      return '草稿'
+    case 'PUBLISHED':
+      return '已发布'
+    case 'ENDED':
+      return '已结束'
+    default:
+      return status || '未设置状态'
+  }
 }
 
 // 获取近期作业（按更新时间排序取前三）

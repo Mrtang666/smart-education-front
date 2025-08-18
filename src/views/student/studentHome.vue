@@ -924,7 +924,7 @@ async function fetchUnfinishedAssignments(isRetry = false) {
         title: assignment.title || '未命名作业',
         courseName: courseName,
         endTime: assignment.endTime,
-        status: assignment.status || '进行中',
+        status: assignment.status || 'PUBLISHED',
         description: assignment.description || '',
         totalScore: totalScore,
         submitted: false, // 这个接口返回的都是未完成的作业

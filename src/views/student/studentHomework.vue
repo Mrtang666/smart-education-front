@@ -14,9 +14,9 @@
           <el-select v-model="selectedStatus" placeholder="作业状态" @change="handleStatusSelect"
             class="status-select">
             <el-option label="全部状态" value="" />
-            <el-option label="未开始" value="未开始" />
-            <el-option label="进行中" value="进行中" />
-            <el-option label="已结束" value="已结束" />
+            <el-option label="草稿" value="DRAFT" />
+            <el-option label="已发布" value="PUBLISHED" />
+            <el-option label="已结束" value="ENDED" />
           </el-select>
           <el-input v-model="searchKeyword" placeholder="搜索作业" class="search-input" @input="handleSearch">
             <template #suffix>
@@ -58,16 +58,16 @@
           <el-table-column label="状态" width="120">
             <template #default="scope">
               <el-tag :type="getStatusType(scope.row.status)" effect="dark">
-                <el-icon v-if="scope.row.status === '未开始'">
+                <el-icon v-if="scope.row.status === 'DRAFT' || scope.row.status === '未开始'">
                   <Calendar />
                 </el-icon>
-                <el-icon v-else-if="scope.row.status === '进行中'">
+                <el-icon v-else-if="scope.row.status === 'PUBLISHED' || scope.row.status === '进行中'">
                   <Loading />
                 </el-icon>
-                <el-icon v-else-if="scope.row.status === '已结束'">
+                <el-icon v-else-if="scope.row.status === 'ENDED' || scope.row.status === '已结束'">
                   <Timer />
                 </el-icon>
-                {{ scope.row.status }}
+                {{ getStatusText(scope.row.status) }}
               </el-tag>
             </template>
           </el-table-column>
@@ -247,14 +247,14 @@
 
         <div class="drawer-footer">
           <el-button 
-            v-if="selectedHomework.status === '进行中' && !selectedHomework.submitted" 
+            v-if="selectedHomework.status === 'PUBLISHED' && !selectedHomework.submitted" 
             type="primary" 
             @click="submitHomework(selectedHomework)"
           >
             提交作业
           </el-button>
           <el-button 
-            v-else-if="selectedHomework.status === '进行中' && selectedHomework.submitted" 
+            v-else-if="selectedHomework.status === 'PUBLISHED' && selectedHomework.submitted" 
             type="warning" 
             @click="resubmitHomework(selectedHomework)"
           >
@@ -500,14 +500,14 @@ async function fetchHomeworkList() {
 
 // 获取作业状态
 function getHomeworkStatus(homework, now) {
-  if (!homework.endTime) return '进行中'
+  if (!homework.endTime) return 'PUBLISHED'
   
   const deadline = new Date(homework.endTime)
     
     if (now > deadline) {
-    return '已结束'
+    return 'ENDED'
     } else {
-    return '进行中'
+    return 'PUBLISHED'
     }
 }
 
@@ -528,14 +528,38 @@ function formatDateTimeLocal(dateTimeStr) {
 // 获取状态标签类型
 function getStatusType(status) {
   switch (status) {
+    case 'DRAFT':
     case '未开始':
       return 'info'
+    case 'PUBLISHED':
     case '进行中':
       return 'primary'
+    case 'ENDED':
     case '已结束':
       return 'danger'
     default:
       return 'info'
+  }
+}
+
+// 获取状态显示文本
+function getStatusText(status) {
+  switch (status) {
+    case 'DRAFT':
+      return '草稿'
+    case 'PUBLISHED':
+      return '已发布'
+    case 'ENDED':
+      return '已结束'
+    // 兼容旧的中文状态值
+    case '未开始':
+      return '未开始'
+    case '进行中':
+      return '进行中'
+    case '已结束':
+      return '已结束'
+    default:
+      return status || '未知状态'
   }
 }
 
@@ -600,7 +624,7 @@ function viewHomeworkDetail(homework) {
 
 // 提交作业
 function submitHomework(homework) {
-  if (homework.status !== '进行中') {
+  if (homework.status !== 'PUBLISHED') {
     ElMessage.warning('作业已截止或未开始')
     return
   }
@@ -613,7 +637,7 @@ function submitHomework(homework) {
 
 // 重新提交作业
 function resubmitHomework(homework) {
-  if (homework.status !== '进行中') {
+  if (homework.status !== 'PUBLISHED') {
     ElMessage.warning('作业已截止或未开始')
     return
   }
