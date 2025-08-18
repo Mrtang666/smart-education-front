@@ -23,6 +23,11 @@
         </div>
       </div>
       
+      <div class="nav-item" :class="{ active: activeSection === 'repository' }" @click="setActiveSection('repository')">
+        <i class="el-icon-collection"></i>
+        <span>知识库</span>
+      </div>
+      
       <div class="nav-item" :class="{ active: activeSection === 'chapter' }" @click="setActiveSection('knowledge')">
         <i class="el-icon-notebook-1"></i>
         <span>知识点</span>
@@ -68,6 +73,62 @@
       
       <!-- 内容区域 -->
       <div class="section-content">
+        <!-- 知识库部分（占位） -->
+        <div v-if="activeSection === 'repository'" class="repository-content">
+          <div class="repo-header">
+            <div>
+              <h3 style="margin: 0;">知识库</h3>
+              <div class="repo-subject" v-if="repositorySubject">学科：{{ repositorySubject }}</div>
+            </div>
+            <el-button size="small" type="primary" @click="loadRepository" :loading="repositoryLoading">刷新</el-button>
+          </div>
+          <el-skeleton :loading="repositoryLoading" animated :rows="3">
+            <template #default>
+              <el-empty v-if="repositoryUnitsView.length === 0" :description="repositorySubject ? '该学科暂无启用的知识单元' : '未获取到学科'" />
+              <el-table v-else :data="repositoryUnitsView" style="width: 100%">
+                <el-table-column prop="id" label="ID" width="120" />
+                <el-table-column prop="name" label="知识点名称" min-width="220" />
+                <el-table-column prop="subject" label="所属学科" width="160" />
+                <el-table-column prop="status" label="状态" width="120">
+                  <template #default="scope">
+                    <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ scope.row.status === 1 ? '启用' : '禁用' }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="createdAt" label="创建时间" width="200">
+                  <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
+                </el-table-column>
+                <el-table-column label="操作" width="140">
+                  <template #default="scope">
+                    <el-button type="primary" size="small" @click="goToKUProblems(scope.row)">查看题目</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              
+              <!-- 点击知识单元后在页面下方展示其题目（占位，不接入接口） -->
+              <div v-if="selectedKU" class="ku-problems-panel">
+                <div class="ku-problems-header">
+                  <h4 style="margin:0;">知识单元「{{ selectedKU.name }}」的题目</h4>
+                  <div>
+                    <el-button size="small" @click="selectedKU = null">收起</el-button>
+                  </div>
+                </div>
+                <el-skeleton :loading="kuProblemsLoadingInline" animated :rows="4">
+                  <template #default>
+                    <el-empty v-if="kuProblems.length === 0" description="暂无题目" />
+                    <el-table v-else :data="kuProblems" style="width: 100%">
+                  <el-table-column prop="id" label="题目ID" width="160" />
+                  <el-table-column prop="title" label="标题" min-width="200" />
+                  <el-table-column prop="content" label="内容" min-width="280" />
+                  <el-table-column prop="type" label="题型" width="140" />
+                  <el-table-column prop="expectedAnswer" label="答案" min-width="200" />
+                    </el-table>
+                  </template>
+                </el-skeleton>
+              </div>
+            </template>
+          </el-skeleton>
+        </div>
+        
         <!-- 知识点部分 -->
         <div v-if="activeSection === 'knowledge'" class="knowledge-content">
 
@@ -665,6 +726,7 @@
 
 <script>
 import { knowledgeAPI, examAPI, attendanceAPI, docAPI, assignmentAPI, studentAnswerAPI, studentAssistantAPI } from '@/api/api';
+import { subjectController, knowledgeUnitController, problemKnowledgeUnit, problemBank } from '@/api/apiLearning';
 import { getUserInfo } from '@/utils/auth';
 import { marked } from 'marked'
 
@@ -678,6 +740,11 @@ export default {
       courseName: '',
       courseCode: '',
       courseCategory: '',
+      
+      // 知识库
+      repositorySubject: '',
+      repositoryUnits: [],
+      repositoryLoading: false,
       
       // 当前激活的部分
       activeSection: 'knowledge',
@@ -713,6 +780,10 @@ export default {
       // AI生成练习相关
       aiGenerating: false,
       generatedQuestions: [],
+      // 知识库-行内查看题目（点击后通过接口拉取并展示）
+      selectedKU: null,
+      kuProblems: [],
+      kuProblemsLoadingInline: false,
       knowledgeInputDialogVisible: false,
       knowledgeForm: {
         knowledgeNames: '',
@@ -768,6 +839,11 @@ export default {
       } else {
         return this.assignments.filter(item => item.status !== '已提交');
       }
+    },
+    // 知识库展示数据：仅显示 state/status 为 1 的
+    repositoryUnitsView() {
+      if (!Array.isArray(this.repositoryUnits)) return []
+      return this.repositoryUnits.filter(u => (u.state === 1) || (u.status === 1))
     },
     
     // 根据筛选条件过滤考试
@@ -864,6 +940,89 @@ export default {
       if (section === 'document' && this.documents.length === 0) {
         this.fetchDocuments();
       }
+      // 切换到知识库则加载
+      if (section === 'repository') {
+        this.loadRepository();
+      }
+    },
+
+    // 显示并加载知识单元题目（使用指定接口级联获取）
+    async showKUProblems(ku) {
+      this.selectedKU = ku
+      this.kuProblems = []
+      if (!ku || !ku.id) return
+      try {
+        this.kuProblemsLoadingInline = true
+        // 1) 通过知识单元ID获取题目ID列表
+        const idList = await problemKnowledgeUnit.getProblemIdByKnowledgeUnitId(ku.id)
+        const rawContainer = Array.isArray(idList)
+          ? idList
+          : (idList?.problemIds || idList?.problemIdList || idList?.ids || idList?.data || idList?.records || idList?.list || [])
+        let problemIds = []
+        if (Array.isArray(rawContainer)) {
+          // 情况1：数组元素可能直接是ID（number/string）
+          // 情况2：数组元素可能是对象，尝试从常见字段中提取
+          problemIds = rawContainer.map(item => {
+            if (item == null) return null
+            if (typeof item === 'number' || typeof item === 'string') return String(item)
+            if (typeof item === 'object') {
+              return String(item.problemId || item.problem_id || item.id || item.problemID || item.problemid || '')
+            }
+            return null
+          }).filter(v => v && v !== 'null' && v !== 'undefined')
+        }
+        if (problemIds.length === 0) {
+          this.kuProblems = []
+          return
+        }
+        // 2) 逐个根据题目ID获取题目详情
+        const results = await Promise.all(problemIds.map(async (pid) => {
+          try {
+            const detail = await problemBank.getById(pid)
+            const d = (detail && (detail.data || detail.result || detail.payload)) || detail || {}
+            // 解析选项为数组
+            let options = d.options
+            if (typeof options === 'string') {
+              try {
+                if (options.trim().startsWith('[')) options = JSON.parse(options)
+                else options = options.split(/\r?\n|\||；|;|、|，/).map(t => t.trim()).filter(Boolean)
+              } catch (_) {
+                options = options.split(/\r?\n|\||；|;|、|，/).map(t => t.trim()).filter(Boolean)
+              }
+            }
+            return {
+              id: d.id ?? pid,
+              title: d.title || d.name || '',
+              content: d.content || d.question || d.stem || '',
+              type: d.type || d.problemType || '',
+              options: Array.isArray(options) ? options : (options ? [String(options)] : []),
+              expectedAnswer: d.expectedAnswer || d.expected_answer || d.answer || '',
+              analysis: d.analysis || '',
+              origin: d.origin || ''
+            }
+          } catch (e) {
+            return { id: pid, content: '题目加载失败', type: '', options: [], expectedAnswer: '', analysis: '' }
+          }
+        }))
+        this.kuProblems = results
+      } catch (e) {
+        console.error('加载知识单元题目失败:', e)
+        this.$message.error('加载题目失败，请稍后再试')
+      } finally {
+        this.kuProblemsLoadingInline = false
+      }
+    },
+
+    // 跳转到单独页面展示题目
+    goToKUProblems(ku) {
+      if (!ku || !ku.id) {
+        this.$message.warning('无法识别知识单元ID')
+        return
+      }
+      this.$router.push({
+        name: 'studentKnowledgeProblems',
+        params: { knowledgeUnitId: String(ku.id) }
+      })
     },
     
     // 处理知识点点击
@@ -1060,6 +1219,39 @@ export default {
         .finally(() => {
           this.knowledgePointsLoading = false;
         });
+    },
+    
+    // 加载知识库（学科和知识单元）
+    async loadRepository() {
+      try {
+        this.repositoryLoading = true
+        this.repositoryUnits = []
+        this.repositorySubject = ''
+        // 先通过课程ID获取学科
+        const subject = await subjectController.getSubjectByCourseId(this.courseId)
+        let subjectName = ''
+        if (subject && subject.name) {
+          subjectName = subject.name
+        } else if (Array.isArray(subject) && subject[0] && subject[0].name) {
+          subjectName = subject[0].name
+        }
+        this.repositorySubject = subjectName
+        if (!subjectName) return
+        // 再根据学科名获取所有知识单元
+        const units = await knowledgeUnitController.getAllBySubject(subjectName)
+        if (Array.isArray(units)) {
+          this.repositoryUnits = units
+        } else if (units && Array.isArray(units.records)) {
+          this.repositoryUnits = units.records
+        } else {
+          this.repositoryUnits = []
+        }
+      } catch (e) {
+        console.error('加载知识库失败:', e)
+        this.$message.error('加载知识库失败，请稍后重试')
+      } finally {
+        this.repositoryLoading = false
+      }
     },
     
     // 组织知识点数据为树形结构
@@ -3779,5 +3971,21 @@ export default {
 
 .dialog-footer .el-button {
   margin-left: 10px;
+}
+
+/* 知识库-行内题目展示面板 */
+.ku-problems-panel {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+}
+
+.ku-problems-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 </style>

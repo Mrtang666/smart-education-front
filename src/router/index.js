@@ -21,6 +21,18 @@ const routes = [
         component: () => import("@/views/admin/statsView.vue"),
       },
       {
+        path: "knowledge",
+        component: () => import("@/views/admin/knowledgeManage.vue"),
+      },
+      {
+        path: "subject",
+        component: () => import("@/views/admin/subjectManage.vue"),
+      },
+      {
+        path: "question-bank",
+        component: () => import("@/views/admin/questionBankManage.vue"),
+      },
+      {
         path: "setting",
         component: () => import("@/views/admin/systemSetting.vue"),
       }
@@ -182,6 +194,12 @@ const routes = [
         component: () => import("@/views/student/studentCourseDetail.vue"),
         props: true,
         name: "studentCourseDetail"
+      },
+      {
+        path: "ku/:knowledgeUnitId/problems",
+        component: () => import("@/views/student/studentKnowledgeProblems.vue"),
+        props: true,
+        name: "studentKnowledgeProblems"
       },
       {
         path: "learning",

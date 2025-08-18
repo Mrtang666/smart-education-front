@@ -20,6 +20,18 @@
             <el-icon><DataLine /></el-icon>
             <span>统计分析</span>
           </el-menu-item>
+          <el-menu-item index="/admin/knowledge">
+            <el-icon><Collection /></el-icon>
+            <span>知识库管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/subject">
+            <el-icon><Files /></el-icon>
+            <span>学科管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/question-bank">
+            <el-icon><QuestionFilled /></el-icon>
+            <span>题库管理</span>
+          </el-menu-item>
           <el-menu-item index="/admin/setting">
             <el-icon><Setting /></el-icon>
             <span>系统设置</span>
@@ -34,7 +46,7 @@
 </template>
 
 <script setup>
-import { User, UserFilled, DataLine, Setting } from '@element-plus/icons-vue'
+import { User, UserFilled, DataLine, Setting, Collection, Files, QuestionFilled } from '@element-plus/icons-vue'
 </script>
 
 <style scoped>

@@ -91,6 +91,7 @@
     <div v-else class="course-list">
       <!-- 课程卡片 -->
       <div v-for="course in displayCourseList" :key="course.id" class="course-item" @click="enterCourse(course)">
+        <el-button class="course-delete-btn" type="danger" size="small" plain @click.stop="handleDeleteCourse(course)">删除</el-button>
         <div class="course-cover" :style="{ backgroundColor: getCategoryColor(course.category) }">
           <el-icon>
             <Reading />
@@ -129,6 +130,11 @@
       <el-form :model="newCourse" label-width="80px" :rules="courseRules" ref="courseFormRef">
         <el-form-item label="课程名称" prop="name">
           <el-input v-model="newCourse.name" placeholder="请输入课程名称" @change="handleNameChange" />
+        </el-form-item>
+        <el-form-item label="所属学科" prop="subjectId">
+          <el-select v-model="newCourse.subjectId" placeholder="请选择所属学科" filterable :loading="subjectsLoading" style="width: 100%">
+            <el-option v-for="s in subjectOptions" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="课程描述">
           <!-- 使用Element Plus的文本框，但添加标签显示区域 -->
@@ -330,9 +336,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Reading, Search } from '@element-plus/icons-vue'
 import { courseAPI, knowledgeAPI } from '@/api/api'
+import { subjectController } from '@/api/apiLearning'
 import BigNumber from 'bignumber.js'
 
 const router = useRouter()
@@ -689,8 +696,32 @@ const newCourse = ref({
   description: '',
   category: '',
   credit: 3,
-  color: '#409EFF'
+  color: '#409EFF',
+  subjectId: ''
 })
+
+// 学科选择相关
+const subjectsLoading = ref(false)
+const subjectOptions = ref([])
+
+async function loadSubjects() {
+  try {
+    subjectsLoading.value = true
+    const data = await subjectController.getAll()
+    let list = []
+    if (Array.isArray(data)) {
+      list = data
+    } else if (data && Array.isArray(data.records)) {
+      list = data.records
+    }
+    subjectOptions.value = list.map(item => ({ id: item.id, name: item.name }))
+  } catch (error) {
+    console.error('获取学科列表失败:', error)
+    subjectOptions.value = []
+  } finally {
+    subjectsLoading.value = false
+  }
+}
 
 // 文本区域相关
 const contentSegments = ref([])
@@ -751,7 +782,7 @@ onMounted(() => {
 })
 
 // 在创建课程对话框打开时重置
-function showCreateCourseDialog() {
+async function showCreateCourseDialog() {
   createCourseDialogVisible.value = true
   // 重置表单
   newCourse.value = {
@@ -759,12 +790,15 @@ function showCreateCourseDialog() {
     description: '',
     category: '其他',
     credit: 3,
-    color: '#DCDFE6' // 浅灰色
+    color: '#DCDFE6', // 浅灰色
+    subjectId: ''
   }
   // 清空已选知识点
   selectedKnowledge.value = []
   // 清空内容片段
   contentSegments.value = []
+  // 加载学科列表
+  loadSubjects()
 }
 
 // 知识点相关
@@ -965,6 +999,17 @@ async function createCourse() {
         courseList.value.push(newCourseItem)
         originalCourseList.value.push(newCourseItem)
 
+        // 如果选择了学科，绑定课程与学科关系
+        try {
+          if (newCourse.value.subjectId && newCourseItem.id) {
+            const subjectId = new BigNumber(newCourse.value.subjectId).toString()
+            const courseId = new BigNumber(newCourseItem.id).toString()
+            await subjectController.addRelation(subjectId, courseId)
+          }
+        } catch (relErr) {
+          console.error('绑定课程与学科关系失败:', relErr)
+        }
+
         // 关闭对话框并重置表单
         createCourseDialogVisible.value = false
         newCourse.value = {
@@ -972,7 +1017,8 @@ async function createCourse() {
           description: '',
           category: '其他',
           credit: 3,
-          color: '#DCDFE6' // 浅灰色
+          color: '#DCDFE6', // 浅灰色
+          subjectId: ''
         }
         // 清空已选知识点
         selectedKnowledge.value = []
@@ -1030,6 +1076,30 @@ function getCategoryColor(category) {
   
   
   return colors[colorIndex];
+}
+
+// 删除课程
+async function handleDeleteCourse(course) {
+  try {
+    await ElMessageBox.confirm(`确定要删除课程“${course.name}”吗？该操作不可恢复。`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+
+    const courseIdStr = course.id ? course.id.toString() : ''
+    await courseAPI.deleteCourse(courseIdStr)
+
+    // 从显示与原始列表中移除
+    courseList.value = courseList.value.filter(c => c.id.toString() !== courseIdStr)
+    originalCourseList.value = originalCourseList.value.filter(c => c.id.toString() !== courseIdStr)
+
+    ElMessage.success('课程已删除')
+  } catch (error) {
+    if (error && error.message === 'cancel') return
+    console.error('删除课程失败:', error)
+    ElMessage.error('删除课程失败，请稍后重试')
+  }
 }
 
 // 根据课程名称自动匹配课程分类
@@ -1104,6 +1174,9 @@ const courseRules = {
   name: [
     { required: true, message: '请输入课程名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
+  ],
+  subjectId: [
+    { required: true, message: '请选择所属学科', trigger: 'change' }
   ],
   credit: [
     { required: true, message: '请选择学分', trigger: 'change' }
@@ -1243,6 +1316,13 @@ function showJoinCourseDialog() {
   justify-content: center;
   position: relative;
   overflow: hidden;
+}
+
+.course-delete-btn {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
 }
 
 .course-cover .el-icon {

@@ -15,6 +15,17 @@
           <el-icon><Edit /></el-icon>
           编辑课程
         </el-button>
+        <el-tag v-if="courseSubjectName" type="info" effect="light" style="margin-left: 10px;">
+          学科：{{ courseSubjectName }}
+        </el-tag>
+        <el-button
+          v-if="courseSubjectId"
+          type="danger"
+          plain
+          size="small"
+          style="margin-left: 10px;"
+          @click="unbindCourseSubject"
+        >解除绑定</el-button>
       </div>
     </div>
 
@@ -124,6 +135,11 @@
       <el-form :model="editCourseForm" label-width="100px">
         <el-form-item label="课程名称">
           <el-input v-model="editCourseForm.name" placeholder="请输入课程名称" />
+        </el-form-item>
+        <el-form-item label="所属学科">
+          <el-select v-model="editCourseForm.subjectId" placeholder="请选择所属学科" filterable :loading="subjectsLoading" style="width: 100%" @visible-change="onEditDialogSubjectDropdown">
+            <el-option v-for="s in subjectOptions" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="课程分类">
           <el-select v-model="editCourseForm.category" placeholder="请选择课程分类">
@@ -808,6 +824,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Edit,  Search } from '@element-plus/icons-vue'
 import { courseAPI, knowledgeAPI, courseFileAPI, studentAPI, courseSelectionAPI, examAPI, attendanceAPI, docAPI, assignmentAPI, problemAPI } from '@/api/api'
+import { subjectController } from '@/api/apiLearning'
 import BigNumber from 'bignumber.js'
 import { getExamStatus, updateExamsStatus, formatDateTime } from '@/utils/examManager'
 import fileDownloadService from '@/services/fileDownloadService'
@@ -838,6 +855,12 @@ const courseName = ref('加载中...')
 const courseDescription = ref('')
 const courseColor = ref('#409EFF')
 const courseData = ref(null)
+const courseSubjectName = ref('')
+const courseSubjectId = ref('')
+
+// 学科选择（编辑课程对话框）
+const subjectsLoading = ref(false)
+const subjectOptions = ref([])
 
 // 当前激活的标签页
 const activeTab = ref('content')
@@ -1367,7 +1390,8 @@ const editCourseForm = ref({
   name: '',
   category: '',
   credit: 3,
-  description: ''
+  description: '',
+  subjectId: ''
 })
 
 // 添加知识点对话框
@@ -1630,6 +1654,24 @@ async function fetchCourseExams() {
 // 显示编辑课程对话框
 function showEditCourseDialog() {
   editCourseDialogVisible.value = true
+  // 打开时加载学科选项并预选
+  onEditDialogSubjectDropdown(true)
+}
+
+// 下拉展开时加载学科
+async function onEditDialogSubjectDropdown(visible) {
+  if (!visible) return
+  try {
+    subjectsLoading.value = true
+    const data = await subjectController.getAll()
+    const list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : [])
+    subjectOptions.value = list.map(item => ({ id: item.id, name: item.name }))
+  } catch (e) {
+    console.error('获取全部学科失败:', e)
+    subjectOptions.value = []
+  } finally {
+    subjectsLoading.value = false
+  }
 }
 
 // 保存课程编辑
@@ -1689,6 +1731,37 @@ async function saveCourseEdit() {
         ElMessage.error('课程已更新，但刷新信息失败，请手动刷新页面')
       } finally {
         loadingInstance.close()
+      }
+      
+      // 若选择了学科，绑定课程与学科关系
+      try {
+        if (editCourseForm.value.subjectId) {
+          const sId = new BigNumber(editCourseForm.value.subjectId).toString()
+          const cId = new BigNumber(courseId).toString()
+          // 校验学科存在
+          const subjectDetail = await subjectController.getById(sId)
+          if (!subjectDetail || !subjectDetail.id) {
+            throw new Error('所选学科不存在或已被删除')
+          }
+          await subjectController.addRelation(sId, cId)
+          ElMessage.success('已绑定课程与学科关系')
+
+          // 绑定成功后刷新页面学科展示
+          try {
+            const latestSubject = await subjectController.getSubjectByCourseId(cId)
+            if (latestSubject && latestSubject.name) {
+              courseSubjectName.value = latestSubject.name
+              courseSubjectId.value = latestSubject.id || ''
+            } else if (latestSubject && latestSubject[0] && latestSubject[0].name) {
+              courseSubjectName.value = latestSubject[0].name
+              courseSubjectId.value = latestSubject[0].id || ''
+            }
+          } catch (refreshErr) {
+            console.warn('刷新课程关联学科失败:', refreshErr)
+          }
+        }
+      } catch (relErr) {
+        console.error('绑定课程与学科关系失败:', relErr)
       }
     } else {
       ElMessage.error('课程更新失败')
@@ -2117,6 +2190,40 @@ function showAddStudentDialog() {
   searchTriggered.value = false
   
   addStudentDialogVisible.value = true
+}
+
+// 解除课程与学科绑定
+async function unbindCourseSubject() {
+  if (!courseSubjectId.value) {
+    ElMessage.warning('当前课程未绑定学科')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确定要解除课程与当前学科的绑定吗？', '解除绑定', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch (_) {
+    return
+  }
+
+  const loading = ElLoading.service({ text: '正在解除绑定...' })
+  try {
+    const sId = String(courseSubjectId.value)
+    const cId = String(route.params.courseId)
+    await subjectController.deleteRelation(sId, cId)
+
+    // 清空本地展示
+    courseSubjectName.value = ''
+    courseSubjectId.value = ''
+    ElMessage.success('已解除课程与学科的绑定')
+  } catch (e) {
+    console.error('解除绑定失败:', e)
+    ElMessage.error('解除绑定失败，请稍后再试')
+  } finally {
+    loading.close()
+  }
 }
 
 // 搜索学生
@@ -2727,10 +2834,31 @@ onMounted(async () => {
         name: response.name || '',
         category: response.category || '',
         credit: response.credit || 3,
-        description: response.description || ''
+        description: response.description || '',
+        subjectId: courseSubjectId.value || ''
       }
       
       console.log('课程数据加载成功:', response)
+      
+      // 加载课程关联的学科
+      try {
+        const subject = await subjectController.getSubjectByCourseId(courseId)
+        if (subject && subject.name) {
+          courseSubjectName.value = subject.name
+          courseSubjectId.value = subject.id || ''
+        } else if (subject && subject[0] && subject[0].name) {
+          // 兼容数组返回
+          courseSubjectName.value = subject[0].name
+          courseSubjectId.value = subject[0].id || ''
+        } else {
+          courseSubjectName.value = ''
+          courseSubjectId.value = ''
+        }
+      } catch (e) {
+        console.warn('获取课程关联学科失败:', e)
+        courseSubjectName.value = ''
+        courseSubjectId.value = ''
+      }
       
       // 加载课程知识点
       await fetchCourseKnowledges()
