@@ -176,8 +176,9 @@
                         />
                     </el-select>
                 </el-form-item>
-                <el-form-item label="总分" prop="totalScore">
-                    <el-input-number v-model="examForm.totalScore" :min="1" :max="1000" />
+                <el-form-item label="总分">
+                    <el-tag type="info">{{ examForm.totalScore || 0 }}分</el-tag>
+                    <div class="status-hint">总分将根据添加的题目自动计算</div>
                 </el-form-item>
                 <el-form-item label="考试时长" prop="durationMinutes">
                     <el-input-number v-model="examForm.durationMinutes" :min="1" :max="300" />
@@ -257,7 +258,6 @@ const examForm = ref({
 const rules = {
     title: [{ required: true, message: '请输入考试标题', trigger: 'blur' }],
     courseId: [{ required: true, message: '请选择所属课程', trigger: 'change' }],
-    totalScore: [{ required: true, message: '请输入总分', trigger: 'blur' }],
     durationMinutes: [{ required: true, message: '请输入考试时长', trigger: 'blur' }],
     examTime: [{ required: true, message: '请选择考试时间', trigger: 'change' }]
 }
@@ -663,6 +663,30 @@ const disablePastDates = (time) => {
 }
 
 // 提交考试表单
+// 计算考试总分
+const calculateTotalScore = async (examId) => {
+    try {
+        let totalScore = 0
+        
+        // 获取常规题目分数
+        const regularQuestions = await examAPI.getQuestionsByExamId(examId)
+        if (regularQuestions && Array.isArray(regularQuestions)) {
+            totalScore += regularQuestions.reduce((sum, question) => sum + (question.scorePoints || 0), 0)
+        }
+        
+        // 获取编程题分数
+        const codeQuestions = await examAPI.getCodeQuestionsByExamId(examId)
+        if (codeQuestions && Array.isArray(codeQuestions)) {
+            totalScore += codeQuestions.reduce((sum, question) => sum + (question.scorePoints || 0), 0)
+        }
+        
+        return totalScore
+    } catch (error) {
+        console.error('计算总分失败:', error)
+        return 0
+    }
+}
+
 const submitExam = async () => {
     if (!examFormRef.value) return
 
@@ -682,12 +706,24 @@ const submitExam = async () => {
 
                 console.log('提交的考试数据:', submitData)
 
+                let examId
                 if (isEdit.value) {
                     await examAPI.updateExam(submitData)
+                    examId = submitData.examId
                     ElMessage.success('考试更新成功')
                 } else {
-                    await examAPI.saveExam(submitData)
+                    const result = await examAPI.saveExam(submitData)
+                    examId = result.examId || result.id
                     ElMessage.success('考试创建成功')
+                }
+
+                // 计算并更新总分
+                if (examId) {
+                    const totalScore = await calculateTotalScore(examId)
+                    if (totalScore > 0) {
+                        await examAPI.updateExam({ ...submitData, examId, totalScore })
+                        console.log('总分已更新为:', totalScore)
+                    }
                 }
 
                 dialogVisible.value = false

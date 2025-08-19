@@ -2753,7 +2753,7 @@ export const examAPI = {
                 typeof scoreData.score === "number"
                   ? scoreData.score
                   : parseFloat(scoreData.score) || 0,
-              submitTime: scoreData.submitTime || scoreData.submittedAt || null,
+              submitTime: scoreData.updateTime || null,
               status: scoreData.status || "已完成",
               // 保留原始数据的其他字段
               ...scoreData,

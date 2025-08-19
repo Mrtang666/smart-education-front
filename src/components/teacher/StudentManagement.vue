@@ -639,9 +639,8 @@ async function authorizeStudent(student) {
   // 写README.md文件内容
   try {
     const readmeContent = `# 欢迎使用在线VSCode，欢迎使用在线VSCode环境！请在此处编写您的代码。`
-    const formData = new FormData()
-    formData.append('file', new Blob([readmeContent], { type: 'text/markdown' }), 'README.md')
-    await scriptForwardAPI.writeFile(userName, formData)
+    // 写入README文件内容
+    await scriptForwardAPI.writeFile(userName, 'README.md', readmeContent)
     ElMessage.success('已成功写入README文件内容')
   } catch (error) {
     console.error('写入README文件内容失败:', error)

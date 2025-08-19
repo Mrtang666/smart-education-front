@@ -443,8 +443,9 @@
         <el-form-item label="考试描述">
           <el-input v-model="examForm.description" type="textarea" :rows="3" placeholder="请输入考试描述" />
         </el-form-item>
-        <el-form-item label="总分" prop="totalScore">
-          <el-input-number v-model="examForm.totalScore" :min="1" :max="1000" />
+        <el-form-item label="总分">
+          <el-tag type="info">{{ examForm.totalScore || 0 }}分</el-tag>
+          <div class="status-hint">总分将根据添加的题目自动计算</div>
         </el-form-item>
         <el-form-item label="考试时长" prop="durationMinutes">
           <el-input-number v-model="examForm.durationMinutes" :min="1" :max="1440" />
@@ -2614,6 +2615,30 @@ function editExam(exam) {
   addExamDialogVisible.value = true
 }
 
+// 计算考试总分
+const calculateTotalScore = async (examId) => {
+  try {
+    let totalScore = 0
+    
+    // 获取常规题目分数
+    const regularQuestions = await examAPI.getQuestionsByExamId(examId)
+    if (regularQuestions && Array.isArray(regularQuestions)) {
+      totalScore += regularQuestions.reduce((sum, question) => sum + (question.scorePoints || 0), 0)
+    }
+    
+    // 获取编程题分数
+    const codeQuestions = await examAPI.getCodeQuestionsByExamId(examId)
+    if (codeQuestions && Array.isArray(codeQuestions)) {
+      totalScore += codeQuestions.reduce((sum, question) => sum + (question.scorePoints || 0), 0)
+    }
+    
+    return totalScore
+  } catch (error) {
+    console.error('计算总分失败:', error)
+    return 0
+  }
+}
+
 // 保存考试
 async function saveExam() {
   examFormRef.value.validate(async (valid) => {
@@ -2652,6 +2677,7 @@ async function saveExam() {
           status = '已结束';
         }
         
+        let examId
         if (examForm.value.examId) {
           // 更新考试
           const examData = {
@@ -2669,8 +2695,9 @@ async function saveExam() {
           }
           
           await examAPI.updateExam(examData)
+          examId = examForm.value.examId
           ElMessage.success('考试更新成功')
-  } else {
+        } else {
           // 创建新考试
           const examData = {
             title: examForm.value.title,
@@ -2685,8 +2712,31 @@ async function saveExam() {
             type: 'exam' // 添加type字段，指定为考试类型
           }
           
-          await examAPI.saveExam(examData)
+          const result = await examAPI.saveExam(examData)
+          examId = result.examId || result.id
           ElMessage.success('考试创建成功')
+        }
+        
+        // 计算并更新总分
+        if (examId) {
+          const totalScore = await calculateTotalScore(examId)
+          if (totalScore > 0) {
+            const updateData = {
+              examId: examId,
+              title: examForm.value.title,
+              description: examForm.value.description,
+              courseId: courseIdStr,
+              teacherId: teacherId,
+              totalScore: totalScore,
+              durationMinutes: examForm.value.durationMinutes,
+              startTime: examForm.value.startTime,
+              endTime: examForm.value.endTime,
+              status: status,
+              type: 'exam'
+            }
+            await examAPI.updateExam(updateData)
+            console.log('总分已更新为:', totalScore)
+          }
         }
         
         // 重新获取考试列表
@@ -2775,10 +2825,6 @@ const examRules = {
   title: [
     { required: true, message: '请输入考试标题', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2 到 50 个字符', trigger: 'blur' }
-  ],
-  totalScore: [
-    { required: true, message: '请输入总分', trigger: 'blur' },
-    { type: 'number', min: 1, message: '总分必须大于0', trigger: 'blur' }
   ],
   durationMinutes: [
     { required: true, message: '请输入考试时长', trigger: 'blur' },
@@ -4551,4 +4597,4 @@ async function publishHomework(homework) {
   justify-content: flex-end;
   gap: 10px;
 }
-</style> 
+</style>

@@ -15,7 +15,7 @@
     </div>
 
     <div class="page-content">
-      <!-- 考试统计信息 -->
+      <!-- 考试统计信息
       <div class="statistics-container" v-if="examStatistics.totalStudents > 0">
         <div class="statistics-cards">
           <div class="stat-card">
@@ -39,7 +39,7 @@
             <div class="stat-label">最低分</div>
           </div>
         </div>
-      </div>
+      </div> -->
 
       <!-- 图表分析区域 -->
       <div class="charts-section">
@@ -169,23 +169,23 @@
           <div class="statistics-cards">
             <div class="stat-card">
               <div class="stat-title">参考人数</div>
-              <div class="stat-value">{{ examStudents.filter(s => s.status === '已完成').length }}</div>
+              <div class="stat-value">{{ examStudents.filter(s => normalizeStatus(s.status) === '已完成').length }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-title">平均分</div>
-              <div class="stat-value">{{ averageScore }}</div>
+              <div class="stat-value">{{ Number(averageScore) || 0 }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-title">最高分</div>
-              <div class="stat-value">{{ maxScore }}</div>
+              <div class="stat-value">{{ Number(maxScore) || 0 }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-title">最低分</div>
-              <div class="stat-value">{{ minScore }}</div>
+              <div class="stat-value">{{ Number(minScore) || 0 }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-title">及格率</div>
-              <div class="stat-value">{{ passRate }}%</div>
+              <div class="stat-value">{{ Number(passRate) || 0 }}%</div>
             </div>
           </div>
         </div>
@@ -741,7 +741,8 @@ import {
   TitleComponent,
   DataZoomComponent,
   MarkLineComponent,
-  MarkPointComponent
+  MarkPointComponent,
+  GraphicComponent
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -759,6 +760,7 @@ echarts.use([
   DataZoomComponent,
   MarkLineComponent,
   MarkPointComponent,
+  GraphicComponent,
   CanvasRenderer
 ])
 
@@ -859,7 +861,7 @@ const filteredQuestions = computed(() => {
 // 计算统计数据
 const averageScore = computed(() => {
   const completedStudents = examStudents.value.filter(s => {
-    if (s.status !== '已完成') return false
+    if (normalizeStatus(s.status) !== '已完成') return false
     let score = s.score
     if (score === null || score === undefined || score === '') return false
     if (typeof score === 'string') {
@@ -884,7 +886,7 @@ const averageScore = computed(() => {
 const maxScore = computed(() => {
   const scores = examStudents.value
     .filter(s => {
-      if (s.status !== '已完成') return false
+      if (normalizeStatus(s.status) !== '已完成') return false
       let score = s.score
       if (score === null || score === undefined || score === '') return false
       if (typeof score === 'string') {
@@ -905,7 +907,7 @@ const maxScore = computed(() => {
 const minScore = computed(() => {
   const scores = examStudents.value
     .filter(s => {
-      if (s.status !== '已完成') return false
+      if (normalizeStatus(s.status) !== '已完成') return false
       let score = s.score
       if (score === null || score === undefined || score === '') return false
       if (typeof score === 'string') {
@@ -925,7 +927,7 @@ const minScore = computed(() => {
 
 const passRate = computed(() => {
   const completedStudents = examStudents.value.filter(s => {
-    if (s.status !== '已完成') return false
+    if (normalizeStatus(s.status) !== '已完成') return false
     let score = s.score
     if (score === null || score === undefined || score === '') return false
     if (typeof score === 'string') {
@@ -986,20 +988,109 @@ async function fetchExamStudents() {
       const regularScores = await examAPI.getExamStudentScores(examIdStr)
       console.log('获取到的普通题目成绩:', regularScores)
       
-      // 获取编程题成绩
-      const codeScores = await codeQuestionAPI.getExamCodeQuestionScores(examIdStr)
-      console.log('获取到的编程题成绩:', codeScores)
+      // 获取编程题成绩 - 使用 getQuestionSubmissions 接口
+      let codeScores = []
+      try {
+        // 先获取考试的编程题列表
+        const codeQuestions = await codeQuestionAPI.getExamCodeQuestions(examIdStr)
+        console.log('获取到的编程题列表:', codeQuestions)
+        
+        if (Array.isArray(codeQuestions) && codeQuestions.length > 0) {
+          // 为每道编程题获取提交记录
+          const codeSubmissionsPromises = codeQuestions.map(async (question) => {
+            try {
+              const submissions = await codeQuestionAPI.getQuestionSubmissions(question.id)
+              console.log(`编程题 ${question.id} 的提交记录:`, submissions)
+              return { questionId: question.id, submissions: submissions || [] }
+            } catch (error) {
+              console.warn(`获取编程题 ${question.id} 提交记录失败:`, error)
+              return { questionId: question.id, submissions: [] }
+            }
+          })
+          
+          const allCodeSubmissions = await Promise.all(codeSubmissionsPromises)
+          
+          // 按学生ID汇总编程题成绩
+          const studentCodeScoreMap = new Map()
+          
+          allCodeSubmissions.forEach(({ questionId, submissions }) => {
+             console.log(`编程题 ${questionId} 的所有提交记录:`, submissions)
+             
+             // 按学生ID分组提交记录
+             const submissionsByStudent = new Map()
+             submissions.forEach(submission => {
+               const studentId = submission.studentId
+               if (!submissionsByStudent.has(studentId)) {
+                 submissionsByStudent.set(studentId, [])
+               }
+               submissionsByStudent.get(studentId).push(submission)
+             })
+             
+             // 对每个学生，只保留最后一次提交
+             submissionsByStudent.forEach((studentSubmissions, studentId) => {
+               console.log(`学生 ${studentId} 对题目 ${questionId} 的提交记录:`, studentSubmissions)
+               
+               // 按提交时间排序，取最后一次提交
+               const sortedSubmissions = studentSubmissions.sort((a, b) => {
+                 const timeA = new Date(a.submitTime || a.createdAt || 0)
+                 const timeB = new Date(b.submitTime || b.createdAt || 0)
+                 return timeB - timeA // 降序排列，最新的在前
+               })
+               
+               const latestSubmission = sortedSubmissions[0]
+               console.log(`学生 ${studentId} 题目 ${questionId} 的最终提交:`, latestSubmission)
+               
+               if (!studentCodeScoreMap.has(studentId)) {
+                 studentCodeScoreMap.set(studentId, { studentId, score: 0, submissions: [] })
+               }
+               const studentData = studentCodeScoreMap.get(studentId)
+               studentData.score += Number(latestSubmission.score || 0)
+               studentData.submissions.push({ questionId, ...latestSubmission })
+             })
+           })
+          
+          codeScores = Array.from(studentCodeScoreMap.values())
+        }
+      } catch (error) {
+        console.warn('获取编程题成绩失败:', error)
+        codeScores = []
+      }
+      console.log('处理后的编程题成绩:', codeScores)
 
-      // 合并成绩
-      completedStudentsScores = regularScores.map(student => {
-        const codeScore = codeScores.find(cs => cs.studentId === student.studentId) || { score: 0 }
-        return {
+      // 合并成绩 - 确保包含所有有成绩的学生
+      const studentScoreMap = new Map()
+      
+      // 处理常规题成绩
+      regularScores.forEach(student => {
+        studentScoreMap.set(student.studentId, {
           ...student,
-          score: Number(student.score || 0) + Number(codeScore.score || 0), // 普通题目分数 + 编程题分数
-          regularScore: Number(student.score || 0), // 保存普通题目分数
-          codeScore: Number(codeScore.score || 0) // 保存编程题分数
+          regularScore: Number(student.score || 0),
+          codeScore: 0,
+          score: Number(student.score || 0)
+        })
+      })
+      
+      // 处理编程题成绩
+      codeScores.forEach(codeStudent => {
+        if (studentScoreMap.has(codeStudent.studentId)) {
+          // 学生已有常规题成绩，添加编程题成绩
+          const existingStudent = studentScoreMap.get(codeStudent.studentId)
+          existingStudent.codeScore = Number(codeStudent.score || 0)
+          existingStudent.score = existingStudent.regularScore + existingStudent.codeScore
+        } else {
+          // 学生只有编程题成绩，创建新记录
+          studentScoreMap.set(codeStudent.studentId, {
+            studentId: codeStudent.studentId,
+            fullName: `学生${codeStudent.studentId}`, // 默认姓名，后续会被课程学生数据覆盖
+            regularScore: 0,
+            codeScore: Number(codeStudent.score || 0),
+            score: Number(codeStudent.score || 0),
+            status: '已完成'
+          })
         }
       })
+      
+      completedStudentsScores = Array.from(studentScoreMap.values())
       
       console.log('合并后的总成绩:', completedStudentsScores)
     } catch (error) {
@@ -1019,6 +1110,9 @@ async function fetchExamStudents() {
         studentId: String(student.studentId),
         fullName: student.fullName || student.name || `学生${student.studentId}`,
         score: typeof student.score === 'number' ? student.score : parseFloat(student.score) || null,
+        // 确保包含常规题和编程题分数
+        regularScore: student.regularScore || 0,
+        codeScore: student.codeScore || 0,
         status: student.status || '已完成'
       }))
     }
@@ -1162,8 +1256,11 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
             }
             return !isNaN(score) && isFinite(score) ? Number(score) : null
           })() : null,
-          submitTime: scoreData ? scoreData.submitTime : null,
-          status: normalizeStatus(scoreData ? (scoreData.status || '已完成') : '未完成')
+          // 添加常规题和编程题分数
+          regularScore: scoreData ? (scoreData.regularScore || 0) : 0,
+          codeScore: scoreData ? (scoreData.codeScore || 0) : 0,
+          submitTime: scoreData ? (scoreData.updateTime) : null,
+          status: scoreData ? normalizeStatus(scoreData.status || (scoreData.updateTime ? '已完成' : '未完成')) : '未完成'
         }
 
         console.log(`学生${index}处理后数据:`, result)
@@ -1184,7 +1281,11 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
           }
           return !isNaN(score) && isFinite(score) ? Number(score) : null
         })(),
-        status: normalizeStatus(student.status || '已完成')
+        // 确保包含常规题和编程题分数
+        regularScore: student.regularScore || 0,
+        codeScore: student.codeScore || 0,
+        submitTime: student.updateTime || null,
+        status: normalizeStatus(student.status || (student.updateTime ? '已完成' : '未完成'))
       }))
     } else {
       console.log('没有任何学生数据')
@@ -1194,6 +1295,23 @@ async function mergeStudentData(allCourseStudents, completedStudentsScores) {
 
     console.log('合并后的学生数据数量:', examStudents.value.length)
     console.log('合并后的学生数据:', examStudents.value)
+    
+    // 调试：检查状态分布
+    const statusDistribution = {}
+    examStudents.value.forEach(student => {
+      const status = normalizeStatus(student.status)
+      statusDistribution[status] = (statusDistribution[status] || 0) + 1
+    })
+    console.log('学生状态分布:', statusDistribution)
+    
+    // 调试：检查有效分数的学生
+    const validScoreStudents = examStudents.value.filter(s => {
+      const status = normalizeStatus(s.status)
+      const score = s.score
+      return status === '已完成' && score !== null && score !== undefined && score !== '' && !isNaN(Number(score))
+    })
+    console.log('有效分数的学生数量:', validScoreStudents.length)
+    console.log('有效分数的学生:', validScoreStudents.map(s => ({ name: s.fullName, score: s.score, status: s.status })))
 
     // 强制触发响应式更新
     nextTick(() => {
@@ -1281,6 +1399,10 @@ async function fetchQuestionTypeAnalysis(examIdStr) {
 
 // 基于现有数据生成题型分析
 function generateQuestionTypeAnalysisFromLocalData() {
+  console.log('=== 开始生成题型分析数据 ===')
+  console.log('examQuestions.value:', examQuestions.value)
+  console.log('examQuestions长度:', examQuestions.value ? examQuestions.value.length : 0)
+  
   if (!examQuestions.value || examQuestions.value.length === 0) {
     console.log('没有题目数据，清空题型分析数据')
     // 如果没有题目数据，清空数据，让图表显示无数据状态
@@ -1289,9 +1411,13 @@ function generateQuestionTypeAnalysisFromLocalData() {
   }
 
   // 统计题型分布
+  console.log('开始统计题型分布...')
   const typeStats = {}
-  examQuestions.value.forEach(question => {
+  examQuestions.value.forEach((question, index) => {
+    console.log(`处理第${index + 1}个题目:`, question)
     const type = question.questionType || 'UNKNOWN'
+    console.log(`题目类型: ${type}, 分数: ${question.scorePoints}`)
+    
     if (!typeStats[type]) {
       typeStats[type] = {
         questionType: type,
@@ -1303,6 +1429,8 @@ function generateQuestionTypeAnalysisFromLocalData() {
     typeStats[type].count++
     typeStats[type].totalPossibleScore += Number(question.scorePoints || 0)
   })
+  
+  console.log('题型统计结果:', typeStats)
 
   // 计算每种题型的平均分（基于已完成的学生）
   const completedStudents = examStudents.value.filter(s => {
@@ -1330,9 +1458,12 @@ function generateQuestionTypeAnalysisFromLocalData() {
 
   questionTypeData.value = Object.values(typeStats)
   console.log('基于现有数据生成的题型分析:', questionTypeData.value)
+  console.log('生成的题型数据长度:', questionTypeData.value.length)
+  console.log('=== 题型分析数据生成完成 ===')
 
   // 重新渲染题型图表
   nextTick(() => {
+    console.log('nextTick中重新初始化题型图表')
     initQuestionTypeChart()
   })
 }
@@ -1343,16 +1474,22 @@ async function fetchExamQuestions() {
     isLoadingQuestions.value = true
     const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
     console.log('开始获取题目数据，examId:', examIdStr)
+    console.log('examId类型:', typeof examId, 'examId值:', examId)
 
     // 获取普通题目列表
+    console.log('正在调用 knowledgeAPI.getQuestionsByExamId...')
     const regularQuestions = await knowledgeAPI.getQuestionsByExamId(examIdStr)
     console.log('获取到的普通题目列表:', regularQuestions)
+    console.log('普通题目数量:', Array.isArray(regularQuestions) ? regularQuestions.length : '不是数组')
 
     // 获取编程题目列表
+    console.log('正在调用 codeQuestionAPI.getExamCodeQuestions...')
     const codeQuestions = await codeQuestionAPI.getExamCodeQuestions(examIdStr)
     console.log('获取到的编程题目列表:', codeQuestions)
+    console.log('编程题目数量:', Array.isArray(codeQuestions) ? codeQuestions.length : '不是数组')
 
     // 合并并处理题目列表
+    console.log('开始合并题目列表...')
     const allQuestions = [
       ...(Array.isArray(regularQuestions) ? regularQuestions : []),
       ...(Array.isArray(codeQuestions) ? codeQuestions.map(q => ({
@@ -1362,6 +1499,9 @@ async function fetchExamQuestions() {
         options: [] // 编程题没有选项
       })) : [])
     ]
+    
+    console.log('合并后的题目列表:', allQuestions)
+    console.log('合并后题目总数:', allQuestions.length)
 
     if (allQuestions.length > 0) {
       examQuestions.value = allQuestions.map(q => ({
@@ -1376,8 +1516,11 @@ async function fetchExamQuestions() {
         createdAt: q.createdAt || q.created_at || '',
         updatedAt: q.updatedAt || q.updated_at || ''
       }))
+      console.log('处理后的examQuestions:', examQuestions.value)
+      console.log('处理后的题目数量:', examQuestions.value.length)
     } else {
       examQuestions.value = []
+      console.log('没有题目数据，设置examQuestions为空数组')
     }
 
     // 计算题目统计信息
@@ -1711,11 +1854,28 @@ function initQuestionTypeChart() {
     return
   }
 
+  console.log('questionTypeChart DOM元素存在:', chartDom)
+  console.log('DOM元素尺寸:', chartDom.offsetWidth, 'x', chartDom.offsetHeight)
+  console.log('DOM元素样式:', window.getComputedStyle(chartDom))
+  console.log('DOM元素可见性:', chartDom.offsetParent !== null)
+  
+  // 确保容器有最小高度
+  if (chartDom.offsetHeight === 0) {
+    console.warn('图表容器高度为0，设置最小高度')
+    chartDom.style.height = '400px'
+  }
+
   if (questionTypeChart) {
     questionTypeChart.dispose()
   }
 
-  questionTypeChart = echarts.init(chartDom)
+  try {
+    questionTypeChart = echarts.init(chartDom)
+    console.log('ECharts实例创建成功:', questionTypeChart)
+  } catch (error) {
+    console.error('ECharts初始化失败:', error)
+    return
+  }
 
   // 检查是否有题型数据
   console.log('题型数据:', questionTypeData.value)
@@ -1725,7 +1885,22 @@ function initQuestionTypeChart() {
   // 如果没有题目数据或题型数据，直接显示无数据状态
   if (!examQuestions.value || examQuestions.value.length === 0) {
     console.log('没有题目数据，显示题型分析无数据状态')
-    questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有题目数据'))
+    try {
+         const noDataOption = createNoDataOption('题型得分分析', '暂时没有题目数据')
+         console.log('无数据选项:', noDataOption)
+         questionTypeChart.setOption(noDataOption)
+         console.log('无数据状态设置成功')
+         
+         // 强制重新渲染图表
+         setTimeout(() => {
+           if (questionTypeChart) {
+             questionTypeChart.resize()
+             console.log('无数据状态图表resize完成')
+           }
+         }, 100)
+       } catch (error) {
+         console.error('设置无数据状态失败:', error)
+       }
     return
   }
 
@@ -1737,7 +1912,22 @@ function initQuestionTypeChart() {
     // 如果生成后仍然没有数据，显示无数据状态
     if (!questionTypeData.value || questionTypeData.value.length === 0) {
       console.log('生成题型数据失败，显示无数据状态')
-      questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有题目数据'))
+      try {
+         const noDataOption = createNoDataOption('题型得分分析', '暂时没有题目数据')
+         console.log('无数据选项:', noDataOption)
+         questionTypeChart.setOption(noDataOption)
+         console.log('无数据状态设置成功')
+         
+         // 强制重新渲染图表
+         setTimeout(() => {
+           if (questionTypeChart) {
+             questionTypeChart.resize()
+             console.log('无数据状态图表resize完成')
+           }
+         }, 100)
+       } catch (error) {
+         console.error('设置无数据状态失败:', error)
+       }
       return
     }
   }
@@ -1755,7 +1945,22 @@ function initQuestionTypeChart() {
   // 如果没有有效数据，显示提示
   if (questionTypes.length === 0 || questionTypes.every(t => t.totalScore === 0 && t.avgScore === 0)) {
     console.log('题型数据为空或无效，显示无数据状态')
-    questionTypeChart.setOption(createNoDataOption('题型得分分析', '暂时没有学生完成'))
+    try {
+       const noDataOption = createNoDataOption('题型得分分析', '暂时没有学生完成')
+       console.log('无数据选项:', noDataOption)
+       questionTypeChart.setOption(noDataOption)
+       console.log('无数据状态设置成功')
+       
+       // 强制重新渲染图表
+       setTimeout(() => {
+         if (questionTypeChart) {
+           questionTypeChart.resize()
+           console.log('无数据状态图表resize完成')
+         }
+       }, 100)
+     } catch (error) {
+       console.error('设置无数据状态失败:', error)
+     }
     return
   }
 
@@ -1829,7 +2034,21 @@ function initQuestionTypeChart() {
     ]
   }
 
-  questionTypeChart.setOption(option)
+  try {
+    console.log('设置题型图表选项:', option)
+    questionTypeChart.setOption(option)
+    console.log('题型图表选项设置成功')
+    
+    // 强制重新渲染图表
+    setTimeout(() => {
+      if (questionTypeChart) {
+        questionTypeChart.resize()
+        console.log('题型图表resize完成')
+      }
+    }, 100)
+  } catch (error) {
+    console.error('设置题型图表选项失败:', error)
+  }
 }
 
 // 初始化及格率统计图表
@@ -2130,10 +2349,44 @@ function initAllCharts() {
       initScoreRangeChart()
       initCompletionChart()
       console.log('所有图表初始化完成')
+      
+      // 延迟强制刷新所有图表
+      setTimeout(() => {
+        refreshAllCharts()
+      }, 200)
     } catch (error) {
       console.error('图表初始化失败:', error)
     }
   })
+}
+
+// 强制刷新所有图表
+function refreshAllCharts() {
+  console.log('强制刷新所有图表')
+  try {
+    if (scoreDistributionChart) {
+      scoreDistributionChart.resize()
+      console.log('分数分布图表刷新完成')
+    }
+    if (questionTypeChart) {
+      questionTypeChart.resize()
+      console.log('题型分析图表刷新完成')
+    }
+    if (passRateChart) {
+      passRateChart.resize()
+      console.log('及格率图表刷新完成')
+    }
+    if (scoreRangeChart) {
+      scoreRangeChart.resize()
+      console.log('分数段图表刷新完成')
+    }
+    if (completionChart) {
+      completionChart.resize()
+      console.log('完成度图表刷新完成')
+    }
+  } catch (error) {
+    console.error('图表刷新失败:', error)
+  }
 }
 
 // 响应窗口大小变化
@@ -2215,8 +2468,21 @@ function getStatusType(status) {
 // 格式化日期时间
 function formatDateTime(dateString) {
   if (!dateString) return ''
-  const date = new Date(dateString)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  
+  try {
+    const date = new Date(dateString)
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      console.warn('无效的日期格式:', dateString)
+      return ''
+    }
+    
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  } catch (error) {
+    console.error('日期格式化错误:', error, dateString)
+    return ''
+  }
 }
 
 // 返回上一页
@@ -2296,6 +2562,8 @@ async function fetchExamInfo() {
 onMounted(async () => {
   console.log('页面加载，开始获取考试数据')
   console.log('考试ID:', examId)
+  console.log('路由参数:', route.params)
+  console.log('路由查询参数:', route.query)
 
   if (!examId) {
     ElMessage.error('考试ID不存在')
@@ -2311,6 +2579,19 @@ onMounted(async () => {
   if (shouldContinue) {
     await fetchExamStudents()
     await fetchExamQuestions() // 获取题目列表和统计信息
+    
+    // 添加调试信息
+    console.log('数据加载完成后的状态:')
+    console.log('examQuestions.value:', examQuestions.value)
+    console.log('examQuestions长度:', examQuestions.value ? examQuestions.value.length : 0)
+    console.log('questionTypeData.value:', questionTypeData.value)
+    console.log('questionTypeData长度:', questionTypeData.value ? questionTypeData.value.length : 0)
+    
+    // 延迟初始化图表，确保数据已加载
+    setTimeout(() => {
+      console.log('延迟初始化所有图表')
+      initAllCharts()
+    }, 500)
   }
 })
 
@@ -3210,6 +3491,8 @@ function copyExerciseText(exercise) {
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   height: 100%;
+  width: 100%;
+  min-height: 350px;
 }
 
 .chart-header {
@@ -3264,11 +3547,7 @@ function copyExerciseText(exercise) {
   color: #303133;
 }
 
-.chart-container {
-  margin-top: 20px;
-  height: 350px;
-  width: 100%;
-}
+/* 移除重复的chart-container样式定义，避免冲突 */
 
 .student-detail {
   padding: 0 10px;
