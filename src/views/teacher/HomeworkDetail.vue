@@ -178,7 +178,7 @@
                     class="exercise-item"
                   >
                     <div class="exercise-header">
-                      <div class="exercise-title">
+                      <!-- <div class="exercise-title">
                         <span class="exercise-number">题目 {{ index + 1 }}</span>
                         <el-tag
                           v-if="exercise.difficulty"
@@ -188,7 +188,7 @@
                         >
                           {{ exercise.difficulty }}
                         </el-tag>
-                      </div>
+                      </div> -->
                       <el-button
                         type="primary"
                         size="small"
@@ -201,9 +201,9 @@
 
                     <div class="exercise-content">
                       <!-- 题目内容 -->
-                      <div class="content-line">
+                      <!-- <div class="content-line">
                         {{ exercise.question || exercise.title || '暂无题目内容' }}
-                      </div>
+                      </div> -->
 
                       <!-- 选项 -->
                       <div v-if="exercise.options && exercise.options.length > 0" class="content-line">
@@ -2457,18 +2457,18 @@ const clearAIExercises = () => {
 }
 
 // 获取难度等级对应的标签类型
-const getDifficultyType = (difficulty) => {
-  switch(difficulty) {
-    case '简单':
-      return 'success'
-    case '中等':
-      return 'warning'
-    case '困难':
-      return 'danger'
-    default:
-      return 'info'
-  }
-}
+// const getDifficultyType = (difficulty) => {
+//   switch(difficulty) {
+//     case '简单':
+//       return 'success'
+//     case '中等':
+//       return 'warning'
+//     case '困难':
+//       return 'danger'
+//     default:
+//       return 'info'
+//   }
+// }
 </script>
 
 <style scoped>

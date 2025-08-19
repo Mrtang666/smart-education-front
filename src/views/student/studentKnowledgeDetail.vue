@@ -65,7 +65,7 @@
             </div>
             
             <!-- 文件分类筛选 -->
-            <div class="file-categories" v-if="files.length > 0">
+            <!-- <div class="file-categories" v-if="files.length > 0">
               <el-radio-group v-model="selectedCategory" @change="filterByCategory" size="small">
                 <el-radio-button label="">全部</el-radio-button>
                 <el-radio-button 
@@ -76,7 +76,7 @@
                   {{ category }}
                 </el-radio-button>
               </el-radio-group>
-            </div>
+            </div> -->
             
             <div class="card-body">
               <div v-if="filesLoading" class="loading-container">

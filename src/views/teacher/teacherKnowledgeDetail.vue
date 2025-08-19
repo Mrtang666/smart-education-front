@@ -210,13 +210,6 @@
         <div class="file-categories">
           <el-radio-group v-model="selectedCategory" @change="filterByCategory" size="small">
             <el-radio-button label="">全部</el-radio-button>
-            <el-radio-button 
-              v-for="category in fileCategories" 
-              :key="category" 
-              :label="category"
-            >
-              {{ category }}
-            </el-radio-button>
           </el-radio-group>
         </div>
         
@@ -1735,7 +1728,6 @@ const uploadDialogVisible = ref(false) // 上传对话框显示状态
 const uploadFile = ref(null) // 要上传的文件
 const uploadFileName = ref('') // 上传文件名
 const isDragOver = ref(false) // 拖拽状态
-const fileCategories = ref(['文档', '图片', '视频', '音频', '其他']) // 文件分类
 const selectedCategory = ref('') // 选中的文件分类
 const showFilePreview = ref(false) // 文件预览对话框
 const currentPreviewFile = ref(null) // 预览的文件

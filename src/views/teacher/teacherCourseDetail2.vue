@@ -638,10 +638,6 @@
       <el-dialog v-model="studentDetailDialogVisible" title="学生详情" width="500px">
         <div v-if="currentStudent" class="student-detail">
           <div class="detail-item">
-            <span class="label">学号:</span>
-            <span class="value">{{ currentStudent.studentId }}</span>
-          </div>
-          <div class="detail-item">
             <span class="label">姓名:</span>
             <span class="value">{{ currentStudent.fullName }}</span>
           </div>

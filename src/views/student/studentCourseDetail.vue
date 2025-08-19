@@ -76,8 +76,8 @@
         <!-- 知识库部分（占位） -->
         <div v-if="activeSection === 'repository'" class="repository-content">
           <div class="repo-header">
-            <div>
-              <h3 style="margin: 0;">知识库</h3>
+            <div class="repo-title-row">
+              <h3 class="repo-title">知识库</h3>
               <div class="repo-subject" v-if="repositorySubject">学科：{{ repositorySubject }}</div>
             </div>
             <el-button size="small" type="primary" @click="loadRepository" :loading="repositoryLoading">刷新</el-button>
@@ -86,7 +86,6 @@
             <template #default>
               <el-empty v-if="repositoryUnitsView.length === 0" :description="repositorySubject ? '该学科暂无启用的知识单元' : '未获取到学科'" />
               <el-table v-else :data="repositoryUnitsView" style="width: 100%">
-                <el-table-column prop="id" label="ID" width="120" />
                 <el-table-column prop="name" label="知识点名称" min-width="220" />
                 <el-table-column prop="subject" label="所属学科" width="160" />
                 <el-table-column prop="status" label="状态" width="120">
@@ -2797,6 +2796,29 @@ export default {
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   min-height: 500px;
+}
+
+/* 知识库头部：标题、学科、刷新 按一行排布 */
+.repo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.repo-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.repo-title {
+  margin: 0;
+}
+
+.repo-subject {
+  color: #606266;
+  font-size: 14px;
 }
 
 .empty-placeholder {

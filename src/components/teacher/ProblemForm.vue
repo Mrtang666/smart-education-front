@@ -228,7 +228,7 @@
             class="ai-exercise-item"
           >
             <div class="exercise-header">
-              <div class="exercise-title">
+              <!-- <div class="exercise-title">
                 <span class="exercise-number">题目 {{ index + 1 }}</span>
                 <el-tag
                   v-if="exercise.difficulty"
@@ -246,16 +246,16 @@
                 >
                   {{ getTypeText(exercise.type) }}
                 </el-tag>
-              </div>
+              </div> -->
               <div class="exercise-actions">
-                <el-button
+                <!-- <el-button
                   size="small"
                   type="primary"
                   @click="copyExerciseToForm(exercise)"
                   :icon="DocumentCopy"
                 >
                   复制到表单
-                </el-button>
+                </el-button> -->
                 <el-button
                   size="small"
                   @click="copyExerciseText(exercise)"
@@ -268,13 +268,13 @@
 
             <div class="exercise-content">
               <!-- 题目内容 -->
-              <div class="content-section">
+              <!-- <div class="content-section">
                 <div class="content-label">题目内容：</div>
                 <div class="content-text">{{ exercise.question || exercise.title || exercise.content || '暂无题目内容' }}</div>
-              </div>
+              </div> -->
 
               <!-- 选项 -->
-              <div v-if="exercise.options && exercise.options.length > 0" class="content-section">
+              <!-- <div v-if="exercise.options && exercise.options.length > 0" class="content-section">
                 <div class="content-label">选项：</div>
                 <div class="options-text">
                   <div
@@ -285,19 +285,19 @@
                     {{ String.fromCharCode(65 + optIndex) }}. {{ option }}
                   </div>
                 </div>
-              </div>
+              </div> -->
 
               <!-- 答案 -->
               <div v-if="exercise.answer" class="content-section">
-                <div class="content-label">答案：</div>
+                <div class="content-label">AI生成题目内容：</div>
                 <div class="answer-text">{{ exercise.answer }}</div>
               </div>
 
               <!-- 解析 -->
-              <div v-if="exercise.explanation" class="content-section">
+              <!-- <div v-if="exercise.explanation" class="content-section">
                 <div class="content-label">解析：</div>
                 <div class="explanation-text">{{ exercise.explanation }}</div>
-              </div>
+              </div> -->
             </div>
           </div>
         </div>
@@ -310,7 +310,9 @@
 /* eslint-disable no-undef */
 import { ref, watch, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
+import { Plus, Delete, MagicStick, CopyDocument } from '@element-plus/icons-vue'
+// import { Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
+
 
 const props = defineProps({
   problemData: {
@@ -757,90 +759,90 @@ function toggleAIExercises() {
 }
 
 // 获取难度标签类型
-function getDifficultyType(difficulty) {
-  const typeMap = {
-    '简单': 'success',
-    '中等': 'warning',
-    '困难': 'danger'
-  }
-  return typeMap[difficulty] || 'info'
-}
+// function getDifficultyType(difficulty) {
+//   const typeMap = {
+//     '简单': 'success',
+//     '中等': 'warning',
+//     '困难': 'danger'
+//   }
+//   return typeMap[difficulty] || 'info'
+// }
 
 // 获取题目类型文本
-function getTypeText(type) {
-  const typeMap = {
-    'SINGLE_CHOICE': '单选题',
-    'MULTI_CHOICE': '多选题',
-    'FILL_BLANK': '填空题',
-    'ESSAY_QUESTION': '简答题',
-    'TRUE_FALSE': '判断题'
-  }
-  return typeMap[type] || type
-}
+// function getTypeText(type) {
+//   const typeMap = {
+//     'SINGLE_CHOICE': '单选题',
+//     'MULTI_CHOICE': '多选题',
+//     'FILL_BLANK': '填空题',
+//     'ESSAY_QUESTION': '简答题',
+//     'TRUE_FALSE': '判断题'
+//   }
+//   return typeMap[type] || type
+// }
 
 // 复制习题到表单
-function copyExerciseToForm(exercise) {
-  try {
-    // 复制题干
-    if (exercise.question || exercise.title || exercise.content) {
-      form.value.title = exercise.question || exercise.title || exercise.content
-    }
+// function copyExerciseToForm(exercise) {
+//   try {
+//     // 复制题干
+//     if (exercise.question || exercise.title || exercise.content) {
+//       form.value.title = exercise.question || exercise.title || exercise.content
+//     }
 
-    // 根据习题类型设置表单类型
-    if (exercise.type) {
-      form.value.type = exercise.type
-      handleTypeChange(exercise.type)
-    } else if (exercise.options && exercise.options.length > 0) {
-      // 如果有选项，判断为选择题
-      form.value.type = exercise.options.length > 4 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE'
-      handleTypeChange(form.value.type)
-    }
+//     // 根据习题类型设置表单类型
+//     if (exercise.type) {
+//       form.value.type = exercise.type
+//       handleTypeChange(exercise.type)
+//     } else if (exercise.options && exercise.options.length > 0) {
+//       // 如果有选项，判断为选择题
+//       form.value.type = exercise.options.length > 4 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE'
+//       handleTypeChange(form.value.type)
+//     }
 
-    // 处理选择题
-    if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type) && exercise.options) {
-      // 设置题干
-      questionStem.value = exercise.question || exercise.title || exercise.content || ''
+//     // 处理选择题
+//     if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(form.value.type) && exercise.options) {
+//       // 设置题干
+//       questionStem.value = exercise.question || exercise.title || exercise.content || ''
 
-      // 设置选项
-      options.value = exercise.options.map((option, index) => ({
-        key: String.fromCharCode(65 + index), // A, B, C, D...
-        content: option
-      }))
+//       // 设置选项
+//       options.value = exercise.options.map((option, index) => ({
+//         key: String.fromCharCode(65 + index), // A, B, C, D...
+//         content: option
+//       }))
 
-      // 更新表单内容
-      updateFormContent()
+//       // 更新表单内容
+//       updateFormContent()
 
-      // 设置答案
-      if (exercise.answer) {
-        form.value.expectedAnswer = exercise.answer
+//       // 设置答案
+//       if (exercise.answer) {
+//         form.value.expectedAnswer = exercise.answer
 
-        // 如果是多选题，解析答案
-        if (form.value.type === 'MULTI_CHOICE') {
-          const answerArray = exercise.answer.split(',').map(a => a.trim())
-          selectedAnswers.value = answerArray
-        }
-      }
-    } else {
-      // 非选择题直接设置内容
-      form.value.content = exercise.question || exercise.title || exercise.content || ''
+//         // 如果是多选题，解析答案
+//         if (form.value.type === 'MULTI_CHOICE') {
+//           const answerArray = exercise.answer.split(',').map(a => a.trim())
+//           selectedAnswers.value = answerArray
+//         }
+//       }
+//     } else {
+//       // 非选择题直接设置内容
+//       form.value.content = exercise.question || exercise.title || exercise.content || ''
 
-      // 设置答案
-      if (exercise.answer) {
-        form.value.expectedAnswer = exercise.answer
-      }
-    }
+//       // 设置答案
+//       if (exercise.answer) {
+//         form.value.expectedAnswer = exercise.answer
+//       }
+//     }
 
-    // 设置分值（如果有）
-    if (exercise.score) {
-      form.value.score = exercise.score
-    }
+//     // 设置分值（如果有）
+//     if (exercise.score) {
+//       form.value.score = exercise.score
+//     }
 
-    ElMessage.success('习题内容已复制到表单')
-  } catch (error) {
-    console.error('复制习题到表单失败:', error)
-    ElMessage.error('复制失败，请手动复制内容')
-  }
-}
+//     ElMessage.success('习题内容已复制到表单')
+//   } catch (error) {
+//     console.error('复制习题到表单失败:', error)
+//     ElMessage.error('复制失败，请手动复制内容')
+//   }
+// }
 
 // 复制习题文本到剪贴板
 function copyExerciseText(exercise) {

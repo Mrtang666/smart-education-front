@@ -27,7 +27,6 @@
         :data="filteredHomeworks"
         style="width: 100%"
         border
-        stripe
         :row-class-name="getHomeworkRowClass"
       >
         <el-table-column prop="title" label="作业标题" min-width="180">
@@ -56,17 +55,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="提交情况" min-width="100">
-          <template #default="scope">
-            <div>
-              <el-progress 
-                :percentage="calculateSubmissionRate(scope.row)" 
-                :status="getSubmissionStatus(scope.row)"
-              />
-              <div>提交率: {{ calculateSubmissionRate(scope.row) }}%</div>
-            </div>
-          </template>
-        </el-table-column>
+        
         <el-table-column label="状态" min-width="100">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
@@ -222,19 +211,10 @@ function formatDate(dateString) {
 }
 
 // 计算提交率
-function calculateSubmissionRate(homework) {
-  // 此处应该使用实际的提交人数和总人数
-  // 目前使用模拟数据，实际应用时需要通过API获取
-  return homework.submissionRate || 0
-}
+// 已移除“提交情况”列，提交率计算函数不再需要
 
 // 获取提交状态
-function getSubmissionStatus(homework) {
-  const rate = calculateSubmissionRate(homework)
-  if (rate >= 80) return 'success'
-  if (rate >= 50) return 'warning'
-  return 'exception'
-}
+// 已移除“提交情况”列，保留占位方法会导致未使用告警，故删除
 
 // 获取作业行样式
 function getHomeworkRowClass(row) {
@@ -307,11 +287,12 @@ function handlePublishHomework(homework) {
   margin-top: 5px;
 }
 
+/* 统一表格底色为白色，禁用特殊行底色 */
 :deep(.homework-ended) {
-  background-color: #f5f7fa;
+  background-color: #ffffff !important;
 }
 
 :deep(.homework-overdue) {
-  background-color: #fef0f0;
+  background-color: #ffffff !important;
 }
 </style> 

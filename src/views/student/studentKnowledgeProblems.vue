@@ -2,7 +2,7 @@
   <div class="ku-problems-page">
     <div class="header">
       <h3 style="margin:0">知识单元题目</h3>
-      <div class="sub">知识单元ID：{{ knowledgeUnitId }}</div>
+      <!-- <div class="sub">知识单元ID：{{ knowledgeUnitId }}</div> -->
       <div class="actions">
         <el-button size="small" @click="$router.back()">返回</el-button>
         <el-button size="small" type="primary" @click="loadProblems" :loading="loading">刷新</el-button>
@@ -13,7 +13,7 @@
       <template #default>
         <el-empty v-if="problems.length === 0" description="暂无题目" />
         <el-table v-else :data="problems" style="width: 100%">
-          <el-table-column prop="id" label="题目ID" width="180" />
+          <!-- <el-table-column prop="id" label="题目ID" width="180" /> -->
           <el-table-column prop="title" label="标题" min-width="220" />
           <el-table-column prop="content" label="内容" min-width="300" />
           <el-table-column prop="type" label="题型" width="140" />

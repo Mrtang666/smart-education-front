@@ -96,7 +96,6 @@ import {
   // Position,      // AI助手相关 - 已注释
   Reading,
   Document,
-  DataAnalysis,
   Setting,
   HomeFilled
 } from '@element-plus/icons-vue'
@@ -205,7 +204,6 @@ const menuList = [
   { name: '知识', icon: Document },
   { name: '作业', icon: Document },
   { name: '考试', icon: Document },
-  { name: '分析', icon: DataAnalysis },
   { name: '设置', icon: Setting },
 ]
 

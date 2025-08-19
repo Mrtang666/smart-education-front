@@ -37,7 +37,6 @@
         <el-table :data="filteredStudents" style="width: 100%" @selection-change="handleSelectionChange"
           v-loading="isLoading" height="100%">
           <el-table-column type="selection" width="55" />
-          <el-table-column prop="studentId" label="学号" width="120" />
           <el-table-column prop="fullName" label="姓名" width="120" />
           <el-table-column prop="email" label="邮箱" />
           <el-table-column prop="phone" label="电话" width="120" />
@@ -83,7 +82,7 @@
           <div class="analyzing-header">
             <div class="student-info-simple">
               <h3>{{ selectedStudent?.fullName }}</h3>
-              <p>学号：{{ selectedStudent?.studentId }} | 课程：{{ courseName }}</p>
+              <p>课程：{{ courseName }}</p>
             </div>
           </div>
 
@@ -108,7 +107,6 @@
           <div class="student-info-bar">
             <div class="student-basic-info">
               <span class="student-name">{{ selectedStudent?.fullName }}</span>
-              <span class="student-id">学号：{{ selectedStudent?.studentId }}</span>
               <span class="course-name">课程：{{ courseName }}</span>
             </div>
             <el-tag size="small" type="success">AI分析报告</el-tag>

@@ -132,11 +132,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="submitTime" label="提交时间" min-width="180" sortable align="center" header-align="center">
-              <template #default="scope">
-                {{ formatDateTime(scope.row.submitTime) || '未提交' }}
-              </template>
-            </el-table-column>
+            
             <el-table-column prop="status" label="状态" min-width="120" align="center" header-align="center">
               <template #default="scope">
                 <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status || '未知' }}</el-tag>
@@ -339,10 +335,6 @@
       <div v-if="currentStudent" class="student-detail">
         <div class="detail-header">
           <div class="detail-info">
-            <div class="info-item">
-              <span class="label">学号:</span>
-              <span class="value">{{ currentStudent.studentId }}</span>
-            </div>
             <div class="info-item">
               <span class="label">姓名:</span>
               <span class="value">{{ currentStudent.fullName }}</span>
@@ -563,7 +555,7 @@
               >
                 <div class="exercise-header">
                   <div class="exercise-title">
-                    <span class="exercise-number">题目 {{ index + 1 }}</span>
+                    <!-- <span class="exercise-number">题目 {{ index + 1 }}</span> -->
                     <el-tag
                       v-if="exercise.difficulty"
                       :type="getAIDifficultyType(exercise.difficulty)"
@@ -582,14 +574,14 @@
                     </el-tag>
                   </div>
                   <div class="exercise-actions">
-                    <el-button
+                    <!-- <el-button
                       size="small"
                       type="primary"
                       @click="copyExerciseToForm(exercise)"
                       :icon="DocumentCopy"
                     >
                       复制到表单
-                    </el-button>
+                    </el-button> -->
                     <el-button
                       size="small"
                       @click="copyExerciseText(exercise)"
@@ -601,36 +593,11 @@
                 </div>
 
                 <div class="exercise-content">
-                  <!-- 题目内容 -->
-                  <div class="content-section">
-                    <div class="content-label">题目内容：</div>
-                    <div class="content-text">{{ exercise.question || exercise.title || exercise.content || '暂无题目内容' }}</div>
-                  </div>
 
-                  <!-- 选项 -->
-                  <div v-if="exercise.options && exercise.options.length > 0" class="content-section">
-                    <div class="content-label">选项：</div>
-                    <div class="options-text">
-                      <div
-                        v-for="(option, optIndex) in exercise.options"
-                        :key="optIndex"
-                        class="option-line"
-                      >
-                        {{ String.fromCharCode(65 + optIndex) }}. {{ option }}
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 答案 -->
+                  <!-- AI生成的具体题目 -->
                   <div v-if="exercise.answer" class="content-section">
-                    <div class="content-label">答案：</div>
+                    <div class="content-label">题目内容：</div>
                     <div class="answer-text">{{ exercise.answer }}</div>
-                  </div>
-
-                  <!-- 解析 -->
-                  <div v-if="exercise.explanation" class="content-section">
-                    <div class="content-label">解析：</div>
-                    <div class="explanation-text">{{ exercise.explanation }}</div>
                   </div>
                 </div>
               </div>
@@ -728,7 +695,8 @@ const saveLastSetScore = (questionType, score) => {
 }
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Loading, Refresh, Search, Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
+// import { ArrowLeft, Loading, Refresh, Search, Plus, Delete, MagicStick, DocumentCopy, CopyDocument } from '@element-plus/icons-vue'
+import { ArrowLeft, Loading, Refresh, Search, Plus, Delete, MagicStick, CopyDocument } from '@element-plus/icons-vue'
 import { examAPI, courseAPI, courseSelectionAPI, knowledgeAPI, studentAssistantAPI, codeQuestionAPI } from '@/api/api'
 import { getTeacherId, refreshUserInfo } from '@/utils/auth'
 import BigNumber from 'bignumber.js'
@@ -3198,59 +3166,59 @@ function getAITypeText(type) {
 }
 
 // 复制习题到表单
-function copyExerciseToForm(exercise) {
-  try {
-    // 复制题目内容
-    if (exercise.question || exercise.title || exercise.content) {
-      editForm.value.content = exercise.question || exercise.title || exercise.content
-    }
+// function copyExerciseToForm(exercise) {
+//   try {
+//     // 复制题目内容
+//     if (exercise.question || exercise.title || exercise.content) {
+//       editForm.value.content = exercise.question || exercise.title || exercise.content
+//     }
 
-    // 根据习题类型设置表单类型
-    if (exercise.type) {
-      editForm.value.questionType = exercise.type
-    } else if (exercise.options && exercise.options.length > 0) {
-      editForm.value.questionType = exercise.options.length > 4 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE'
-    }
+//     // 根据习题类型设置表单类型
+//     if (exercise.type) {
+//       editForm.value.questionType = exercise.type
+//     } else if (exercise.options && exercise.options.length > 0) {
+//       editForm.value.questionType = exercise.options.length > 4 ? 'MULTI_CHOICE' : 'SINGLE_CHOICE'
+//     }
 
-    // 处理选择题选项
-    if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(editForm.value.questionType) && exercise.options) {
-      editForm.value.options = exercise.options.map((option, index) => ({
-        key: String.fromCharCode(65 + index), // A, B, C, D...
-        text: option
-      }))
-    } else if (editForm.value.questionType === 'TRUE_FALSE') {
-      editForm.value.options = [
-        { key: 'A', text: '正确' },
-        { key: 'B', text: '错误' }
-      ]
-    }
+//     // 处理选择题选项
+//     if (['SINGLE_CHOICE', 'MULTI_CHOICE'].includes(editForm.value.questionType) && exercise.options) {
+//       editForm.value.options = exercise.options.map((option, index) => ({
+//         key: String.fromCharCode(65 + index), // A, B, C, D...
+//         text: option
+//       }))
+//     } else if (editForm.value.questionType === 'TRUE_FALSE') {
+//       editForm.value.options = [
+//         { key: 'A', text: '正确' },
+//         { key: 'B', text: '错误' }
+//       ]
+//     }
 
-    // 设置答案
-    if (exercise.answer) {
-      editForm.value.referenceAnswer = exercise.answer
-    }
+//     // 设置答案
+//     if (exercise.answer) {
+//       editForm.value.referenceAnswer = exercise.answer
+//     }
 
-    // 设置难度
-    if (exercise.difficulty) {
-      const difficultyMap = {
-        '简单': 'EASY',
-        '中等': 'MEDIUM',
-        '困难': 'HARD'
-      }
-      editForm.value.difficulty = difficultyMap[exercise.difficulty] || 'MEDIUM'
-    }
+//     // 设置难度
+//     if (exercise.difficulty) {
+//       const difficultyMap = {
+//         '简单': 'EASY',
+//         '中等': 'MEDIUM',
+//         '困难': 'HARD'
+//       }
+//       editForm.value.difficulty = difficultyMap[exercise.difficulty] || 'MEDIUM'
+//     }
 
-    // 设置分值
-    if (exercise.score) {
-      editForm.value.scorePoints = exercise.score
-    }
+//     // 设置分值
+//     if (exercise.score) {
+//       editForm.value.scorePoints = exercise.score
+//     }
 
-    ElMessage.success('习题内容已复制到表单')
-  } catch (error) {
-    console.error('复制习题到表单失败:', error)
-    ElMessage.error('复制失败，请手动复制内容')
-  }
-}
+//     ElMessage.success('习题内容已复制到表单')
+//   } catch (error) {
+//     console.error('复制习题到表单失败:', error)
+//     ElMessage.error('复制失败，请手动复制内容')
+//   }
+// }
 
 // 复制习题文本到剪贴板
 function copyExerciseText(exercise) {

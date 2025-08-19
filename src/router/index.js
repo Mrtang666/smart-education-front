@@ -109,10 +109,10 @@ const routes = [
         props: true,
         name: "StudentExamDetail"
       },
-      {
-        path: "analysis",
-        component: () => import("@/views/teacher/teacherAnalysis.vue"),
-      },
+      // {
+      //   path: "analysis",
+      //   component: () => import("@/views/teacher/teacherAnalysis.vue"),
+      // },
       {
         path: "setting",
         component: () => import("@/views/teacher/teacherSetting.vue"),
