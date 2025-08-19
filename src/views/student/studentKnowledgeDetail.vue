@@ -10,7 +10,13 @@
         
         <div v-else class="knowledge-content">
           <div class="knowledge-header">
-            <h2>{{ knowledgeName }}</h2>
+            <div class="header-row">
+              <el-button class="back-button" link @click="goBack">
+                <el-icon><ArrowLeft /></el-icon>
+                返回
+              </el-button>
+              <h2>{{ knowledgeName }}</h2>
+            </div>
             <div class="knowledge-meta">
               <span class="course-name">{{ courseName }}</span>
             </div>
@@ -442,7 +448,7 @@ import { knowledgeAPI, learningProgressAPI } from '@/api/api';
 import { BigNumber } from 'bignumber.js';
 import { getUserInfo } from '@/utils/auth';
 import { minioController } from '@/api/api';
-import { Search, Refresh, Download, Folder, View, Document } from '@element-plus/icons-vue';
+import { Search, Refresh, Download, Folder, View, Document, ArrowLeft } from '@element-plus/icons-vue';
 
 export default {
   name: 'StudentKnowledgeDetail',
@@ -452,7 +458,8 @@ export default {
     Download,
     Folder,
     View,
-    Document
+    Document,
+    ArrowLeft
   },
   data() {
     return {
@@ -603,6 +610,19 @@ export default {
     this.fetchFiles();
   },
   methods: {
+    goBack() {
+      // 优先按课程详情页路由返回
+      if (this.courseId) {
+        this.$router.push({
+          name: 'studentCourseDetail',
+          params: { courseId: String(this.courseId) },
+          query: { courseName: this.courseName }
+        })
+        return
+      }
+      // 兜底：浏览器后退
+      this.$router.back()
+    },
     // 获取知识点详情
     async fetchKnowledgeDetail() {
       this.loading = true;
@@ -1224,6 +1244,16 @@ export default {
   margin-bottom: 20px;
   padding-bottom: 15px;
   border-bottom: 1px solid #ebeef5;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-button {
+  color: #409EFF;
 }
 
 .knowledge-header h2 {

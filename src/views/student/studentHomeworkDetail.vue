@@ -9,7 +9,7 @@
 
     <div v-else-if="!assignmentId" class="error-container">
       <el-empty description="未找到作业ID">
-        <el-button type="primary" @click="$router.go(-1)">返回上一页</el-button>
+        <el-button type="primary" @click="goBack">返回上一页</el-button>
       </el-empty>
     </div>
 
@@ -570,6 +570,34 @@ export default {
     }
   },
   methods: {
+    // 返回到引用地址
+    goBack() {
+      try {
+        const q = this.$route?.query || {}
+        // 优先：课程详情
+        if (q.courseId) {
+          this.$router.push({
+            name: 'studentCourseDetail',
+            params: { courseId: String(q.courseId) },
+            query: q.courseName ? { courseName: q.courseName } : {}
+          })
+          return
+        }
+        // 其次：通用引用路由
+        if (q.refRouteName) {
+          let refParams = {}
+          let refQuery = {}
+          try { refParams = q.refParams ? JSON.parse(q.refParams) : {} } catch (e) { refParams = {} }
+          try { refQuery = q.refQuery ? JSON.parse(q.refQuery) : {} } catch (e) { refQuery = {} }
+          this.$router.push({ name: q.refRouteName, params: refParams, query: refQuery })
+          return
+        }
+        // 兜底
+        this.$router.back()
+      } catch (e) {
+        this.$router.back()
+      }
+    },
     // 获取作业详情
     async fetchHomeworkDetail() {
       try {

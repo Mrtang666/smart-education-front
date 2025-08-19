@@ -4,7 +4,7 @@
       <h3 style="margin:0">知识单元题目</h3>
       <!-- <div class="sub">知识单元ID：{{ knowledgeUnitId }}</div> -->
       <div class="actions">
-        <el-button size="small" @click="$router.back()">返回</el-button>
+        <el-button size="small" @click="goBack">返回</el-button>
         <el-button size="small" type="primary" @click="loadProblems" :loading="loading">刷新</el-button>
       </div>
     </div>
@@ -50,6 +50,36 @@ export default {
     }
   },
   methods: {
+    goBack() {
+      try {
+        const q = this.$route?.query || {}
+        // 优先：按课程详情页返回
+        if (q.courseId) {
+          this.$router.push({
+            name: 'studentCourseDetail',
+            params: { courseId: String(q.courseId) },
+            query: q.courseName ? { courseName: q.courseName } : {}
+          })
+          return
+        }
+
+        // 其次：如果提供了通用引用路由信息，则按引用跳转
+        if (q.refRouteName) {
+          let refParams = {}
+          let refQuery = {}
+          try { refParams = q.refParams ? JSON.parse(q.refParams) : {} } catch (e) { refParams = {} }
+          try { refQuery = q.refQuery ? JSON.parse(q.refQuery) : {} } catch (e) { refQuery = {} }
+          this.$router.push({ name: q.refRouteName, params: refParams, query: refQuery })
+          return
+        }
+
+        // 兜底：浏览器后退
+        this.$router.back()
+      } catch (e) {
+        // 发生异常时也回退
+        this.$router.back()
+      }
+    },
     async loadProblems() {
       try {
         this.loading = true
