@@ -138,11 +138,11 @@
                 <el-tag :type="getStatusType(scope.row.status)">{{ scope.row.status || '未知' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" min-width="150" fixed="right" align="center" header-align="center">
+            <!-- <el-table-column label="操作" min-width="150" fixed="right" align="center" header-align="center">
               <template #default="scope">
                 <el-button link type="primary" @click="viewStudentDetail(scope.row)" :disabled="!scope.row.score">查看详情</el-button>
               </template>
-            </el-table-column>
+            </el-table-column> -->
           </el-table>
           
           <div class="pagination-container" v-if="examStudents.length > pageSize">
@@ -1715,47 +1715,47 @@ function truncateText(text, maxLength) {
 }
 
 // 查看学生详情
-async function viewStudentDetail(student) {
-  currentStudent.value = student
-  studentDetailVisible.value = true
-  studentAnswers.value = []
+// async function viewStudentDetail(student) {
+//   currentStudent.value = student
+//   studentDetailVisible.value = true
+//   studentAnswers.value = []
 
-  try {
-    isLoadingDetail.value = true
+//   try {
+//     isLoadingDetail.value = true
 
-    // 确保ID是字符串形式
-    const studentIdStr = student.studentId ? new BigNumber(student.studentId).toString() : String(student.studentId)
-    const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
+//     // 确保ID是字符串形式
+//     const studentIdStr = student.studentId ? new BigNumber(student.studentId).toString() : String(student.studentId)
+//     const examIdStr = examId ? new BigNumber(examId).toString() : String(examId)
 
-    console.log('获取学生答题详情，学生ID:', studentIdStr, '考试ID:', examIdStr)
+//     console.log('获取学生答题详情，学生ID:', studentIdStr, '考试ID:', examIdStr)
 
-    // 调用API获取学生答题详情
-    const response = await examAPI.getStudentExamAnswers(examIdStr, studentIdStr)
-    console.log('获取到的学生答题详情:', response)
+//     // 调用API获取学生答题详情
+//     const response = await examAPI.getStudentExamAnswers(examIdStr, studentIdStr)
+//     console.log('获取到的学生答题详情:', response)
 
-    if (Array.isArray(response)) {
-      studentAnswers.value = response.map(answer => ({
-        ...answer,
-        answerId: String(answer.answerId || answer.id),
-        questionId: String(answer.questionId),
-        questionContent: answer.questionContent || answer.question || '题目内容',
-        answerContent: answer.answerContent || answer.answer || '未作答',
-        score: answer.score || 0,
-        totalScore: answer.totalScore || answer.maxScore || 0,
-        questionType: answer.questionType || 'unknown'
-      }))
-    } else {
-      studentAnswers.value = []
-    }
+//     if (Array.isArray(response)) {
+//       studentAnswers.value = response.map(answer => ({
+//         ...answer,
+//         answerId: String(answer.answerId || answer.id),
+//         questionId: String(answer.questionId),
+//         questionContent: answer.questionContent || answer.question || '题目内容',
+//         answerContent: answer.answerContent || answer.answer || '未作答',
+//         score: answer.score || 0,
+//         totalScore: answer.totalScore || answer.maxScore || 0,
+//         questionType: answer.questionType || 'unknown'
+//       }))
+//     } else {
+//       studentAnswers.value = []
+//     }
 
-  } catch (error) {
-    console.error('获取学生答题详情失败:', error)
-    ElMessage.error('获取学生答题详情失败，请稍后重试')
-    studentAnswers.value = []
-  } finally {
-    isLoadingDetail.value = false
-  }
-}
+//   } catch (error) {
+//     console.error('获取学生答题详情失败:', error)
+//     ElMessage.error('获取学生答题详情失败，请稍后重试')
+//     studentAnswers.value = []
+//   } finally {
+//     isLoadingDetail.value = false
+//   }
+// }
 
 // 初始化成绩分布图表
 function initScoreDistributionChart() {

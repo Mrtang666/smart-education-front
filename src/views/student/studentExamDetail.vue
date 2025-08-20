@@ -829,6 +829,13 @@ const submitAnswer = async (question) => {
       try {
         console.log('开始处理编程题提交:', { questionId: question.questionId, studentId });
         
+        // 验证studentId是否有效
+        if (!studentId) {
+          console.error('studentId为空，无法提交编程题');
+          ElMessage.error('用户信息获取失败，请重新登录');
+          return;
+        }
+        
         // 获取编程题详情
         const questionDetail = await codeQuestionAPI.getCodeQuestionById(question.questionId)
         console.log('获取到的编程题详情:', questionDetail);
@@ -847,8 +854,8 @@ const submitAnswer = async (question) => {
         if (typeof codeContent === 'string') {
           studentCodeString = codeContent
         } else if (codeContent && typeof codeContent === 'object') {
-          // 如果是对象，尝试提取content字段或转换为JSON字符串
-          studentCodeString = codeContent.content || codeContent.data || JSON.stringify(codeContent)
+          // 如果是对象，优先提取details字段，然后是content或data字段
+          studentCodeString = codeContent.details || codeContent.content || codeContent.data || JSON.stringify(codeContent)
         } else {
           studentCodeString = String(codeContent || '')
         }
@@ -982,6 +989,14 @@ const submitExam = async () => {
     console.log('编程题数量:', codeQuestions.length)
     console.log('其他题目数量:', otherQuestions.length)
 
+    // 验证studentId是否有效
+    if (!studentId) {
+      console.error('studentId为空，无法提交考试');
+      ElMessage.error('用户信息获取失败，请重新登录');
+      submitting.value = false;
+      return;
+    }
+
     // 处理编程题提交
     for (const question of codeQuestions) {
       const questionId = question.questionId
@@ -1002,8 +1017,8 @@ const submitExam = async () => {
           if (typeof codeContent === 'string') {
             studentCodeString = codeContent
           } else if (codeContent && typeof codeContent === 'object') {
-            // 如果是对象，尝试提取content字段或转换为JSON字符串
-            studentCodeString = codeContent.content || codeContent.data || JSON.stringify(codeContent)
+            // 如果是对象，优先提取details字段，然后是content或data字段
+            studentCodeString = codeContent.details || codeContent.content || codeContent.data || JSON.stringify(codeContent)
           } else {
             studentCodeString = String(codeContent || '')
           }
