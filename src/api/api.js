@@ -6691,11 +6691,9 @@ export const scriptForwardAPI = {
   async writeFile(studentId, fileName, content) {
     try {
       const fullFileName = `/root/docker/code_server/program/${studentId}/${fileName}`;
-      const formData = new FormData();
-      formData.append('content', content);
-      const response = await scriptForwardAxios.post("/api/file/write?fileName=" + encodeURIComponent(fullFileName), formData, {
+      const response = await scriptForwardAxios.post("/api/file/write?fileName=" + encodeURIComponent(fullFileName), content, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'text/plain'
         }
       });
       return response.data;
