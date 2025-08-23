@@ -631,7 +631,7 @@
               </div>
 
               <!-- 快捷问题 -->
-              <div v-if="aiMessages.length === 0" class="quick-questions">
+              <div class="quick-questions">
                 <div class="quick-questions-title">快捷问题：</div>
                 <div class="quick-questions-list">
                   <el-button
@@ -826,6 +826,56 @@ export default {
         '考试重点是什么？',
         '有什么好的学习方法推荐？'
       ],
+      
+      // 模拟数据配置
+      mockDataConfig: {
+        '这门课程的主要内容是什么？': [
+          '《' + (this.courseName || '课程') + '》是一门重要的专业课程，主要内容包括：',
+          '1. 基础理论部分：涵盖核心概念、基本原理和基本方法',
+          '2. 实践应用部分：通过案例分析和实际操作来加深理解',
+          '3. 技能训练部分：培养解决实际问题的能力和技巧',
+          '4. 前沿发展部分：了解该领域的最新研究进展和应用',
+          '本课程注重理论与实践相结合，旨在培养学生的综合素质和专业技能。'
+        ],
+        '如何提高学习效率？': [
+          '针对《' + (this.courseName || '课程') + '》，我建议以下学习方法：',
+          '1. 制定学习计划：根据课程大纲制定详细的学习计划，合理分配时间',
+          '2. 课前预习：提前阅读教材和相关资料，了解基本概念',
+          '3. 课堂专注：认真听讲，做好笔记，及时提问',
+          '4. 课后复习：及时巩固所学知识，完成相关练习',
+          '5. 实践应用：多动手操作，将理论知识应用到实际问题中',
+          '6. 定期总结：定期回顾和总结，形成知识体系'
+        ],
+        '作业提交的注意事项有哪些？': [
+          '作业提交需要注意以下几个方面：',
+          '1. 时间要求：严格按照截止时间提交，避免逾期',
+          '2. 格式规范：按照老师要求的格式和标准完成作业',
+          '3. 内容质量：确保作业内容完整、准确、有深度',
+          '4. 原创性：独立完成作业，避免抄袭和剽窃',
+          '5. 文件命名：使用规范的命名格式，便于老师批改',
+          '6. 备份保存：提交前做好备份，防止文件丢失',
+          '7. 及时确认：提交后确认是否成功，如有问题及时联系老师'
+        ],
+        '考试重点是什么？': [
+          '根据《' + (this.courseName || '课程') + '》的教学大纲，考试重点包括：',
+          '1. 核心概念：掌握课程中的基本概念和定义',
+          '2. 基本原理：理解重要的理论原理和推导过程',
+          '3. 计算方法：熟练掌握相关的计算方法和公式',
+          '4. 应用能力：能够运用所学知识解决实际问题',
+          '5. 综合分析：具备分析复杂问题的综合思维能力',
+          '建议重点复习老师强调的内容和课后习题中的重点题目。'
+        ],
+        '有什么好的学习方法推荐？': [
+          '针对《' + (this.courseName || '课程') + '》，推荐以下学习方法：',
+          '1. 费曼学习法：尝试向他人解释所学知识，加深理解',
+          '2. 思维导图：使用思维导图整理知识点，建立知识体系',
+          '3. 番茄工作法：专注学习25分钟，休息5分钟，提高效率',
+          '4. 错题本：记录做错的题目，定期复习，避免重复错误',
+          '5. 小组学习：与同学组成学习小组，互相讨论和帮助',
+          '6. 实践操作：多动手实践，理论联系实际',
+          '7. 定期复习：制定复习计划，定期回顾和巩固知识'
+        ]
+      }
     }
   },
   computed: {
@@ -2610,6 +2660,14 @@ export default {
 
     // 快捷问题
     askQuickQuestion(question) {
+      // 检查是否有对应的模拟数据
+      if (this.mockDataConfig[question]) {
+        // 使用模拟数据，以流式方式显示
+        this.showMockStreamingResponse(question);
+        return;
+      }
+      
+      // 如果没有模拟数据，使用正常的聊天功能
       this.currentQuestion = question;
       this.sendQuestion();
     },
@@ -2685,6 +2743,80 @@ export default {
       // 使用marked库渲染Markdown为HTML
       return marked.parse(content)
     },
+    
+    // 显示模拟数据的流式响应
+    showMockStreamingResponse(question) {
+      // 添加用户消息
+      this.addAIMessage('user', question);
+      
+      // 先添加一个空的AI消息，用于流式更新
+      this.addAIMessage('ai', '');
+      
+      // 开始流式显示
+      this.aiLoading = true;
+      
+      // 获取对应的模拟数据
+      const mockData = this.mockDataConfig[question];
+      
+      let sentenceIndex = 0;
+      let charIndex = 0;
+      let currentSentence = mockData[sentenceIndex] || '';
+      let streamingContent = '';
+      
+      const streamInterval = setInterval(() => {
+        if (sentenceIndex < mockData.length) {
+          // 逐字符显示当前句子
+          if (charIndex < currentSentence.length) {
+            streamingContent += currentSentence[charIndex];
+            charIndex++;
+            
+            // 更新最后一条AI消息的内容
+            if (this.aiMessages.length > 0) {
+              const lastMessage = this.aiMessages[this.aiMessages.length - 1];
+              if (lastMessage.type === 'ai') {
+                lastMessage.content = streamingContent;
+              }
+            }
+            
+            // 滚动到底部
+            this.$nextTick(() => {
+              this.scrollChatToBottom();
+            });
+          } else {
+            // 当前句子显示完成，添加空格并准备下一句
+            streamingContent += ' ';
+            sentenceIndex++;
+            charIndex = 0;
+            currentSentence = mockData[sentenceIndex] || '';
+            
+            // 如果还有下一句，继续显示
+            if (sentenceIndex < mockData.length) {
+              // 短暂停顿，模拟思考
+              setTimeout(() => {
+                // 继续下一句
+              }, 100);
+            }
+          }
+        } else {
+          // 所有内容显示完成
+          clearInterval(streamInterval);
+          this.aiLoading = false;
+          
+          // 确保最后一条消息内容完整
+          if (this.aiMessages.length > 0) {
+            const lastMessage = this.aiMessages[this.aiMessages.length - 1];
+            if (lastMessage.type === 'ai') {
+              lastMessage.content = streamingContent.trim();
+            }
+          }
+          
+          // 滚动到底部
+          this.$nextTick(() => {
+            this.scrollChatToBottom();
+          });
+        }
+      }, 50); // 每50ms显示一个字符，模拟真实的打字效果
+    }
   }
 }
 </script>

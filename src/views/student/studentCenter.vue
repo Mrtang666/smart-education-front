@@ -1,3 +1,4 @@
+<!--  -->
 <template>
     <div class="student-center">
         <!-- 顶部导航栏 -->
@@ -72,6 +73,7 @@
                                     <span></span>
                                     <span></span>
                                 </span>
+                                <span class="streaming-text">正在生成中...</span>
                             </div>
                         </div>
                     </div>
@@ -208,6 +210,45 @@ const chatSuggestions = ref([
     '我的学习进度如何?',
     '帮我分析考试结果'
 ])
+
+// 模拟数据配置
+const mockDataConfig = {
+    '如何提高学习效率?': [
+        '提高学习效率需要科学的方法和良好的习惯。',
+        '首先，制定明确的学习计划和目标，将大目标分解为小任务。',
+        '其次，采用番茄工作法，专注25分钟后休息5分钟，保持注意力集中。',
+        '第三，使用费曼学习法，尝试向他人解释你学到的知识，这样可以加深理解。',
+        '第四，定期复习和总结，建立知识体系，避免遗忘。',
+        '最后，保持良好的作息和运动习惯，大脑需要充足的休息和营养。'
+    ],
+    '推荐学习资源': [
+        '根据你的学习需求，我推荐以下优质学习资源：',
+        '在线课程平台：Coursera、edX、Udemy等，提供各领域的专业课程。',
+        '编程学习：LeetCode、HackerRank、Codecademy等，适合练习编程技能。',
+        '语言学习：Duolingo、Memrise、Anki等，支持多种语言学习。',
+        '学术资源：Google Scholar、ResearchGate、arXiv等，获取最新研究成果。',
+        '技能提升：LinkedIn Learning、Skillshare、MasterClass等，学习实用技能。',
+        '建议根据个人兴趣和学习目标选择合适的平台。'
+    ],
+    '我的学习进度如何?': [
+        '根据系统记录，你的学习进度表现良好：',
+        '课程完成率：85%，超过班级平均水平。',
+        '作业提交率：92%，按时完成作业的习惯很好。',
+        '考试成绩：平均分87分，在班级中排名前30%。',
+        '学习时长：本周累计学习12小时，日均1.7小时。',
+        '知识掌握：核心知识点掌握度达到80%。',
+        '建议继续保持当前的学习节奏，重点加强薄弱环节的练习。'
+    ],
+    '帮我分析考试结果': [
+        '让我帮你分析一下最近的考试结果：',
+        '总体表现：本次考试得分78分，相比上次提升了5分。',
+        '优势科目：数学和英语表现突出，分别得分85分和82分。',
+        '需要改进：物理和化学相对较弱，得分分别为70分和72分。',
+        '错题分析：主要问题集中在力学计算和化学反应方程式上。',
+        '学习建议：建议多练习物理计算题，加强化学基础概念的理解。',
+        '下次目标：设定目标分数82分，重点提升理科成绩。'
+    ]
+}
 
 // 左侧菜单栏
 const menuList = [
@@ -383,8 +424,71 @@ function scrollToBottom() {
 
 // 建议点击函数
 function suggestClick(suggest) {
+    // 检查是否有对应的模拟数据
+    if (mockDataConfig[suggest]) {
+        // 使用模拟数据，以流式方式显示
+        showMockStreamingResponse(suggest)
+        return
+    }
+    
+    // 如果没有模拟数据，使用正常的聊天功能
     chatInput.value = suggest
     sendChat()
+}
+
+// 显示模拟数据的流式响应
+function showMockStreamingResponse(suggest) {
+    // 添加用户消息
+    chatMessages.value.push({ role: 'user', content: suggest })
+    
+    // 开始流式显示
+    isStreaming.value = true
+    streamingContent.value = ''
+    
+    // 获取对应的模拟数据
+    const mockData = mockDataConfig[suggest]
+    
+    let sentenceIndex = 0
+    let charIndex = 0
+    let currentSentence = mockData[sentenceIndex] || ''
+    
+    const streamInterval = setInterval(() => {
+        if (sentenceIndex < mockData.length) {
+            // 逐字符显示当前句子
+            if (charIndex < currentSentence.length) {
+                streamingContent.value += currentSentence[charIndex]
+                charIndex++
+                scrollToBottom()
+            } else {
+                // 当前句子显示完成，添加空格并准备下一句
+                streamingContent.value += ' '
+                sentenceIndex++
+                charIndex = 0
+                currentSentence = mockData[sentenceIndex] || ''
+                
+                // 如果还有下一句，继续显示
+                if (sentenceIndex < mockData.length) {
+                    // 短暂停顿，模拟思考
+                    setTimeout(() => {
+                        // 继续下一句
+                    }, 100)
+                }
+            }
+        } else {
+            // 所有内容显示完成
+            clearInterval(streamInterval)
+            isStreaming.value = false
+            
+            // 添加到聊天记录
+            chatMessages.value.push({
+                role: 'assistant',
+                content: streamingContent.value.trim()
+            })
+            
+            // 清空流式内容
+            streamingContent.value = ''
+        }
+    }, 50) // 每50ms显示一个字符，模拟真实的打字效果
 }
 
 function handleSearchInput(value) {
@@ -1035,6 +1139,19 @@ function handleJoinCourse(code) {
     margin-top: 8px;
     display: flex;
     align-items: center;
+    gap: 8px;
+}
+
+.streaming-text {
+    font-size: 12px;
+    color: #909399;
+    font-style: italic;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
 }
 
 .typing-dots {

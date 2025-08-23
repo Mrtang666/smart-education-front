@@ -5,6 +5,15 @@ const { defineConfig } = require("@vue/cli-service");
 
 module.exports = defineConfig({
   transpileDependencies: true,
+  // 设置网页标题
+  chainWebpack: config => {
+    config
+      .plugin('html')
+      .tap(args => {
+        args[0].title = '慧课';
+        return args;
+      });
+  },
   devServer: {
     port: 8080,
     client: {
