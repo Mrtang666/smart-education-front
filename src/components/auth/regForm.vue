@@ -71,9 +71,6 @@
         <van-button type="primary" block @click="handleRegister" class="reg-button">注 册</van-button>
         <div class="additional-options">
             <van-checkbox v-model="agreeTerms" class="agree-terms">同意用户协议和隐私条款</van-checkbox>
-            <div class="right-links">
-                <span class="login-link" @click="goToLogin">已有账号？去登录</span>
-            </div>
         </div>
     </div>
 </template>
@@ -219,9 +216,6 @@ const handleRegister = async () => {
     }
 };
 
-const goToLogin = () => {
-    router.push('/login');
-};
 </script>
 
 <style scoped>
