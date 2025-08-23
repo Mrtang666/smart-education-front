@@ -1,103 +1,167 @@
 <template>
   <div class="knowledge-manage">
-         <div class="page-header">
-       <h2>知识库管理</h2>
-       <div class="header-actions">
-         <el-button 
-           type="warning" 
-           :disabled="selectedRows.length === 0"
-           @click="batchUpdateStatus(0)"
-         >
-           <el-icon><Lock /></el-icon>
-           批量禁用
-         </el-button>
-         <el-button 
-           type="success" 
-           :disabled="selectedRows.length === 0"
-           @click="batchUpdateStatus(1)"
-         >
-           <el-icon><Unlock /></el-icon>
-           批量启用
-         </el-button>
-         <el-button type="primary" @click="showAddDialog">
-           <el-icon><Plus /></el-icon>
-           添加知识点
-         </el-button>
-       </div>
-     </div>
+    <!-- 页面标题区域 -->
+    <div class="page-header">
+      <div class="header-content">
+        <h2 class="page-title">知识库管理</h2>
+        <!-- <p class="page-subtitle">管理系统知识点与题目关联关系</p> -->
+      </div>
+      <div class="header-actions">
+        <el-button 
+          type="warning" 
+          :disabled="selectedRows.length === 0"
+          @click="batchUpdateStatus(0)"
+          size="large"
+        >
+          <el-icon><Lock /></el-icon>
+          批量禁用
+        </el-button>
+        <el-button 
+          type="success" 
+          :disabled="selectedRows.length === 0"
+          @click="batchUpdateStatus(1)"
+          size="large"
+        >
+          <el-icon><Unlock /></el-icon>
+          批量启用
+        </el-button>
+        <el-button type="primary" @click="showAddDialog" size="large">
+          <el-icon><Plus /></el-icon>
+          添加知识点
+        </el-button>
+      </div>
+    </div>
 
-         <div class="search-section">
-       <el-input
-         v-model="searchKeyword"
-         placeholder="搜索知识点名称或描述"
-         style="width: 300px; margin-right: 15px;"
-         clearable
-         @input="handleSearch"
-       >
-         <template #prefix>
-           <el-icon><Search /></el-icon>
-         </template>
-       </el-input>
-       
-       <el-input
-         v-model="subjectFilter"
-         placeholder="输入学科名称筛选"
-         style="width: 200px; margin-right: 15px;"
-         clearable
-         @keyup.enter="searchBySubject"
-       >
-         <template #prefix>
-           <el-icon><Collection /></el-icon>
-         </template>
-       </el-input>
-       
-       <el-button type="primary" @click="searchBySubject" :loading="subjectLoading">
-         <el-icon><Search /></el-icon>
-         按学科筛选
-       </el-button>
-       
-       <el-button type="info" @click="resetSearch">重置</el-button>
-     </div>
+    <!-- 搜索和筛选区域 -->
+    <div class="search-section">
+      <div class="search-content">
+        <div class="search-group">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索知识点名称或描述"
+            style="width: 300px;"
+            clearable
+            @input="handleSearch"
+            size="large"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          
+          <el-input
+            v-model="subjectFilter"
+            placeholder="输入学科名称筛选"
+            style="width: 200px;"
+            clearable
+            @keyup.enter="searchBySubject"
+            size="large"
+          >
+            <template #prefix>
+              <el-icon><Collection /></el-icon>
+            </template>
+          </el-input>
+        </div>
+        
+        <div class="search-actions">
+          <el-button type="primary" @click="searchBySubject" :loading="subjectLoading" size="large">
+            <el-icon><Search /></el-icon>
+            按学科筛选
+          </el-button>
+          
+          <el-button type="info" @click="resetSearch" size="large">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
+        </div>
+      </div>
+    </div>
 
-         <el-table 
-       :data="knowledgeList" 
-       style="width: 100%" 
-       v-loading="loading"
-       @selection-change="handleSelectionChange"
-     >
-       <el-table-column type="selection" width="55" />
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="name" label="知识点名称" min-width="200" />
-      <el-table-column prop="subject" label="所属学科" width="120" />
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="scope">
-          <el-tag :type="getStateType(scope.row.status)">
-            {{ getStateText(scope.row.status) }}
-          </el-tag>
+    <!-- 数据表格区域 -->
+    <div class="table-section">
+      <el-card class="table-card" shadow="never">
+        <template #header>
+          <div class="table-header">
+            <div class="table-title">
+              <el-icon><Document /></el-icon>
+              <span>知识点列表</span>
+            </div>
+            <div class="table-info">
+              <el-tag type="info" size="large">
+                共 {{ total }} 条记录
+              </el-tag>
+            </div>
+          </div>
         </template>
-      </el-table-column>
-      <el-table-column prop="createdAt" label="创建时间" width="180">
-        <template #default="scope">
-          {{ formatDateTime(scope.row.createdAt) }}
-        </template>
-      </el-table-column>
-             <el-table-column label="操作" width="420" fixed="right">
-         <template #default="scope">
-           <el-button size="small" @click="editKnowledge(scope.row)">编辑</el-button>
-           <el-button 
-             size="small" 
-             :type="scope.row.status === 1 ? 'warning' : 'success'"
-             @click="toggleStatus(scope.row)"
-           >
-             {{ scope.row.status === 1 ? '禁用' : '启用' }}
-           </el-button>
-                       <el-button size="small" type="primary" @click="showAddRelationDialog(scope.row)">添加题目关系</el-button>
-            <el-button size="small" type="info" @click="showViewRelationDialog(scope.row)">查看题目关系</el-button>
-            <el-button size="small" type="warning" @click="deleteAllRelations(scope.row)">删除所有关系</el-button>
-            <el-button size="small" type="danger" @click="deleteKnowledge(scope.row)">删除</el-button>
-         </template>
-       </el-table-column>
-    </el-table>
+        
+        <el-table 
+          :data="knowledgeList" 
+          style="width: 100%" 
+          v-loading="loading"
+          @selection-change="handleSelectionChange"
+          border
+          stripe
+          :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+          :cell-style="{ padding: '12px 0' }"
+        >
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column label="序号" width="80" align="center">
+            <template #default="scope">
+              {{ (currentPage - 1) * pageSize + scope.$index + 1 }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="id" label="ID" width="80" align="center" />
+          <el-table-column prop="name" label="知识点名称" min-width="200" />
+          <el-table-column prop="subject" label="所属学科" width="120" align="center" />
+          <el-table-column prop="status" label="状态" width="100" align="center">
+            <template #default="scope">
+              <el-tag :type="getStateType(scope.row.status)" size="large">
+                {{ getStateText(scope.row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="创建时间" width="180" align="center">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="320" fixed="right" align="center">
+            <template #default="scope">
+              <div class="action-buttons">
+                <div class="action-row">
+                  <el-button size="small" @click="editKnowledge(scope.row)" type="primary">
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button 
+                    size="small" 
+                    :type="scope.row.status === 1 ? 'warning' : 'success'"
+                    @click="toggleStatus(scope.row)"
+                  >
+                    <el-icon><Setting /></el-icon>
+                    {{ scope.row.status === 1 ? '禁用' : '启用' }}
+                  </el-button>
+                  <el-button size="small" type="primary" @click="showAddRelationDialog(scope.row)">
+                    <el-icon><Link /></el-icon>
+                    添加关系
+                  </el-button>
+                </div>
+                <div class="action-row">
+                  <el-button size="small" type="info" @click="showViewRelationDialog(scope.row)">
+                    <el-icon><View /></el-icon>
+                    查看关系
+                  </el-button>
+                  <el-button size="small" type="danger" @click="deleteKnowledge(scope.row)">
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </div>
 
     <!-- 分页组件 -->
     <div class="pagination-container">
@@ -109,6 +173,8 @@
         layout="total, sizes, prev, pager, next, jumper"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
+        background
+        :pager-count="7"
       />
     </div>
 
@@ -117,18 +183,20 @@
       v-model="dialogVisible" 
       :title="isEdit ? '编辑知识点' : '添加知识点'"
       width="600px"
+      :close-on-click-modal="false"
+      class="knowledge-dialog"
     >
       <el-form :model="knowledgeForm" :rules="formRules" ref="knowledgeFormRef" label-width="100px">
         <el-form-item label="知识点名称" prop="name">
-          <el-input v-model="knowledgeForm.name" placeholder="请输入知识点名称" />
+          <el-input v-model="knowledgeForm.name" placeholder="请输入知识点名称" size="large" />
         </el-form-item>
         
         <el-form-item label="所属学科" prop="subject">
-          <el-input v-model="knowledgeForm.subject" placeholder="请输入所属学科" />
+          <el-input v-model="knowledgeForm.subject" placeholder="请输入所属学科" size="large" />
         </el-form-item>
         
         <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="knowledgeForm.status">
+          <el-radio-group v-model="knowledgeForm.status" size="large">
             <el-radio :value="1">启用</el-radio>
             <el-radio :value="0">禁用</el-radio>
           </el-radio-group>
@@ -137,8 +205,8 @@
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveKnowledge" :loading="saving">
+          <el-button @click="dialogVisible = false" size="large">取消</el-button>
+          <el-button type="primary" @click="saveKnowledge" :loading="saving" size="large">
             {{ isEdit ? '更新' : '添加' }}
           </el-button>
         </span>
@@ -150,10 +218,12 @@
       v-model="relationDialogVisible" 
       title="添加题目关系"
       width="600px"
+      :close-on-click-modal="false"
+      class="relation-dialog"
     >
       <el-form :model="relationForm" :rules="relationRules" ref="relationFormRef" label-width="120px">
         <el-form-item label="知识点名称">
-          <el-input v-model="currentKnowledgeUnit.name" disabled />
+          <el-input v-model="currentKnowledgeUnit.name" disabled size="large" />
         </el-form-item>
         
         <el-form-item label="题目ID列表" prop="problemIds">
@@ -162,20 +232,22 @@
             type="textarea" 
             :rows="4"
             placeholder="请输入题目ID，多个ID用逗号分隔，例如：123,456,789"
+            size="large"
           />
         </el-form-item>
         
         <el-form-item label="说明">
-          <div style="color: #909399; font-size: 12px;">
-            请输入要关联的题目ID，多个ID之间用逗号分隔。题目ID可以从题库管理页面获取。
+          <div class="form-help">
+            <el-icon><InfoFilled /></el-icon>
+            <span>请输入要关联的题目ID，多个ID之间用逗号分隔。题目ID可以从题库管理页面获取。</span>
           </div>
         </el-form-item>
       </el-form>
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="relationDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveRelation" :loading="relationSaving">
+          <el-button @click="relationDialogVisible = false" size="large">取消</el-button>
+          <el-button type="primary" @click="saveRelation" :loading="relationSaving" size="large">
             添加关系
           </el-button>
         </span>
@@ -187,42 +259,63 @@
       v-model="viewRelationDialogVisible" 
       title="查看题目关系"
       width="600px"
+      :close-on-click-modal="false"
+      class="view-relation-dialog"
     >
       <div v-if="currentKnowledgeUnit.name" class="relation-detail">
         <div class="detail-item">
-          <strong>知识点名称：</strong>{{ currentKnowledgeUnit.name }}
+          <div class="detail-label">
+            <el-icon><Document /></el-icon>
+            <span>知识点名称：</span>
+          </div>
+          <div class="detail-value">{{ currentKnowledgeUnit.name }}</div>
         </div>
         <div class="detail-item">
-          <strong>所属学科：</strong>{{ currentKnowledgeUnit.subject }}
+          <div class="detail-label">
+            <el-icon><Collection /></el-icon>
+            <span>所属学科：</span>
+          </div>
+          <div class="detail-value">{{ currentKnowledgeUnit.subject }}</div>
         </div>
         <div class="detail-item">
-          <strong>关联题目数量：</strong>
-          <el-tag type="primary">{{ relatedProblemIds.length }}</el-tag>
+          <div class="detail-label">
+            <el-icon><Link /></el-icon>
+            <span>关联题目数量：</span>
+          </div>
+          <div class="detail-value">
+            <el-tag type="primary" size="large">{{ relatedProblemIds.length }}</el-tag>
+          </div>
         </div>
         
         <div class="detail-item">
-          <strong>关联题目ID列表：</strong>
-          <div v-if="relatedProblemIds.length > 0" class="problem-ids-list">
-            <el-tag 
-              v-for="problemId in relatedProblemIds" 
-              :key="problemId"
-              type="success"
-              style="margin: 2px;"
-              closable
-              @close="deleteSingleRelation(problemId)"
-            >
-              {{ problemId }}
-            </el-tag>
+          <div class="detail-label">
+            <el-icon><List /></el-icon>
+            <span>关联题目ID列表：</span>
           </div>
-          <div v-else class="no-data">
-            <el-empty description="暂无关联题目" />
+          <div class="detail-value">
+            <div v-if="relatedProblemIds.length > 0" class="problem-ids-list">
+              <el-tag 
+                v-for="problemId in relatedProblemIds" 
+                :key="problemId"
+                type="success"
+                size="large"
+                closable
+                @close="deleteSingleRelation(problemId)"
+                class="problem-tag"
+              >
+                {{ problemId }}
+              </el-tag>
+            </div>
+            <div v-else class="no-data">
+              <el-empty description="暂无关联题目" />
+            </div>
           </div>
         </div>
       </div>
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="viewRelationDialogVisible = false">关闭</el-button>
+          <el-button @click="viewRelationDialogVisible = false" size="large">关闭</el-button>
         </span>
       </template>
     </el-dialog>
@@ -232,7 +325,11 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Collection, Lock, Unlock } from '@element-plus/icons-vue'
+import { 
+  Plus, Search, Collection, Lock, Unlock, Edit, 
+  Setting, Link, View, Delete, Document, InfoFilled, 
+  Refresh, List 
+} from '@element-plus/icons-vue'
 import { knowledgeUnitController, problemKnowledgeUnit } from '@/api/apiLearning'
 
 // 响应式数据
@@ -331,32 +428,6 @@ const handleSizeChange = (newSize) => {
     searchBySubject()
   } else {
     loadKnowledgeUnits()
-  }
-}
-
-const deleteAllRelations = async (row) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除知识点"${row.name}"的所有题目关系吗？`,
-      '删除所有关系确认',
-      {
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await problemKnowledgeUnit.deleteByKnowledgeUnitId(row.id)
-    ElMessage.success('已删除该知识单元的所有题目关系')
-
-    // 如果当前打开了查看关系对话框且是同一个知识单元，则刷新列表
-    if (viewRelationDialogVisible.value && currentKnowledgeUnit.value.id === row.id) {
-      relatedProblemIds.value = []
-    }
-  } catch (error) {
-    if (error.message !== 'cancel') {
-      console.error('删除所有关系失败:', error);
-    }
   }
 }
 
@@ -781,24 +852,58 @@ onMounted(async () => {
   border-bottom: 1px solid #e4e7ed;
 }
 
-.header-actions {
+.header-content {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-.page-header h2 {
+.page-title {
   margin: 0;
   color: #303133;
   font-size: 24px;
   font-weight: 600;
 }
 
+.page-subtitle {
+  color: #909399;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .search-section {
   margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.search-content {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .dialog-footer {
@@ -812,6 +917,58 @@ onMounted(async () => {
   justify-content: center;
   margin-top: 20px;
   padding: 20px 0;
+}
+
+.table-section {
+  margin-top: 20px;
+}
+
+.table-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.table-info {
+  color: #909399;
+  font-size: 14px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-row:last-child {
+  justify-content: flex-end;
+}
+
+.action-row .el-button {
+  min-width: 80px;
 }
 
 .relation-detail {
@@ -841,5 +998,68 @@ onMounted(async () => {
 .no-data {
   margin-top: 10px;
   text-align: center;
+}
+
+.problem-tag {
+  margin: 2px;
+}
+
+.form-help {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #909399;
+  font-size: 12px;
+}
+
+.form-help .el-icon {
+  font-size: 14px;
+}
+
+.detail-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #303133;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detail-value {
+  color: #606266;
+  font-size: 14px;
+}
+
+.knowledge-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.knowledge-dialog .el-dialog__title {
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.relation-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.relation-dialog .el-dialog__title {
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.view-relation-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.view-relation-dialog .el-dialog__title {
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
 }
 </style>

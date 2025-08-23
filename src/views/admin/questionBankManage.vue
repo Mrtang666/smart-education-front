@@ -1,70 +1,150 @@
 <template>
   <div class="question-bank-manage">
+    <!-- 页面标题区域 -->
     <div class="page-header">
-      <h2>题库管理</h2>
-      <el-button type="primary" @click="showAddDialog">
+      <div class="header-content">
+        <h2 class="page-title">题库管理</h2>
+      </div>
+      <el-button type="primary" @click="showAddDialog" size="large">
         <el-icon><Plus /></el-icon>
         添加题目
       </el-button>
     </div>
 
+    <!-- 搜索和筛选区域 -->
     <div class="search-section">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索题目内容或标题"
-        style="width: 300px; margin-right: 15px;"
-        clearable
-        @input="handleSearch"
-      >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      
-      <el-select v-model="selectedType" placeholder="题目类型" style="width: 150px; margin-right: 15px;" clearable @change="handleFilterChange">
-        <el-option label="单选题" value="SINGLE_CHOICE" />
-        <el-option label="多选题" value="MULTIPLE_CHOICE" />
-        <el-option label="判断题" value="JUDGE" />
-        <el-option label="填空题" value="FILL" />
-        <el-option label="简答题" value="ESSAY" />
-      </el-select>
-      
-      <el-button type="info" @click="resetSearch">重置</el-button>
+      <div class="search-content">
+        <div class="search-group">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索题目内容或标题"
+            style="width: 300px;"
+            clearable
+            @input="handleSearch"
+            size="large"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          
+          <el-select 
+            v-model="selectedType" 
+            placeholder="题目类型" 
+            style="width: 150px;" 
+            clearable 
+            @change="handleFilterChange"
+            size="large"
+          >
+            <el-option label="单选题" value="SINGLE_CHOICE" />
+            <el-option label="多选题" value="MULTIPLE_CHOICE" />
+            <el-option label="判断题" value="JUDGE" />
+            <el-option label="填空题" value="FILL" />
+            <el-option label="简答题" value="ESSAY" />
+          </el-select>
+        </div>
+        
+        <div class="search-actions">
+          <el-button type="info" @click="resetSearch" size="large">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
+        </div>
+      </div>
     </div>
 
-    <el-table :data="questionList" style="width: 100%" v-loading="loading">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="title" label="题目标题" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="type" label="类型" width="100">
-        <template #default="scope">
-          <el-tag :type="getTypeTag(scope.row.type)">
-            {{ getTypeText(scope.row.type) }}
-          </el-tag>
+    <!-- 数据表格区域 -->
+    <div class="table-section">
+      <el-card class="table-card" shadow="never">
+        <template #header>
+          <div class="table-header">
+            <div class="table-title">
+              <el-icon><Document /></el-icon>
+              <span>题目列表</span>
+            </div>
+            <div class="table-info">
+              <el-tag type="info" size="large">
+                共 {{ total }} 条记录
+              </el-tag>
+            </div>
+          </div>
         </template>
-      </el-table-column>
-      <el-table-column prop="score" label="分值" width="80" />
-      <el-table-column prop="origin" label="来源" width="100">
-        <template #default="scope">
-          <el-tag :type="scope.row.origin === 'PRESET' ? 'success' : 'info'">
-            {{ scope.row.origin === 'PRESET' ? '预设' : '自定义' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="createdAt" label="创建时间" width="180">
-        <template #default="scope">
-          {{ formatDateTime(scope.row.createdAt) }}
-        </template>
-      </el-table-column>
-             <el-table-column label="操作" width="360" fixed="right">
-         <template #default="scope">
-           <el-button size="small" @click="viewQuestion(scope.row)">查看</el-button>
-           <el-button size="small" @click="editQuestion(scope.row)">编辑</el-button>
-           <el-button size="small" type="info" @click="showViewKnowledgeRelationDialog(scope.row)">查看知识单元关系</el-button>
-           <el-button size="small" type="warning" @click="deleteKnowledgeRelations(scope.row)">删除知识单元关系</el-button>
-           <el-button size="small" type="danger" @click="deleteQuestion(scope.row)">删除</el-button>
-         </template>
-       </el-table-column>
-    </el-table>
+        
+        <el-table 
+          :data="questionList" 
+          style="width: 100%" 
+          v-loading="loading"
+          border
+          stripe
+          :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+          :cell-style="{ padding: '12px 0' }"
+        >
+          <el-table-column label="序号" width="80" align="center">
+            <template #default="scope">
+              {{ (currentPage - 1) * pageSize + scope.$index + 1 }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="id" label="ID" width="80" align="center" />
+          <el-table-column prop="title" label="题目标题" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="type" label="类型" width="100" align="center">
+            <template #default="scope">
+              <el-tag :type="getTypeTag(scope.row.type)" size="large">
+                {{ getTypeText(scope.row.type) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="score" label="分值" width="80" align="center">
+            <template #default="scope">
+              <el-tag type="warning" size="large">
+                {{ scope.row.score }}分
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="origin" label="来源" width="100" align="center">
+            <template #default="scope">
+              <el-tag :type="scope.row.origin === 'PRESET' ? 'success' : 'info'" size="large">
+                {{ scope.row.origin === 'PRESET' ? '预设' : '自定义' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="创建时间" width="180" align="center">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="320" fixed="right" align="center">
+            <template #default="scope">
+              <div class="action-buttons">
+                <div class="action-row">
+                  <el-button size="small" @click="viewQuestion(scope.row)" type="info">
+                    <el-icon><View /></el-icon>
+                    查看
+                  </el-button>
+                  <el-button size="small" @click="editQuestion(scope.row)" type="primary">
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button size="small" type="warning" @click="showViewKnowledgeRelationDialog(scope.row)">
+                    <el-icon><Link /></el-icon>
+                    查看关系
+                  </el-button>
+                </div>
+                <div class="action-row">
+                  <el-button size="small" type="warning" @click="deleteKnowledgeRelations(scope.row)">
+                    <el-icon><Delete /></el-icon>
+                    删除关系
+                  </el-button>
+                  <el-button size="small" type="danger" @click="deleteQuestion(scope.row)">
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </div>
 
     <!-- 分页组件 -->
     <div class="pagination-container">
@@ -76,6 +156,8 @@
         layout="total, sizes, prev, pager, next, jumper"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
+        background
+        :pager-count="7"
       />
     </div>
 
@@ -84,14 +166,16 @@
       v-model="dialogVisible" 
       :title="isEdit ? '编辑题目' : '添加题目'"
       width="800px"
+      :close-on-click-modal="false"
+      class="question-dialog"
     >
       <el-form :model="questionForm" :rules="formRules" ref="questionFormRef" label-width="100px">
         <el-form-item label="题目标题" prop="title">
-          <el-input v-model="questionForm.title" placeholder="请输入题目标题" />
+          <el-input v-model="questionForm.title" placeholder="请输入题目标题" size="large" />
         </el-form-item>
         
         <el-form-item label="题目类型" prop="type">
-          <el-select v-model="questionForm.type" placeholder="请选择题目类型" style="width: 100%;">
+          <el-select v-model="questionForm.type" placeholder="请选择题目类型" style="width: 100%;" size="large">
             <el-option label="单选题" value="SINGLE_CHOICE" />
             <el-option label="多选题" value="MULTIPLE_CHOICE" />
             <el-option label="判断题" value="JUDGE" />
@@ -106,14 +190,13 @@
             type="textarea" 
             :rows="4"
             placeholder="请输入题目内容"
+            size="large"
           />
         </el-form-item>
         
         <el-form-item label="分值" prop="score">
-          <el-input-number v-model="questionForm.score" :min="1" :max="100" style="width: 100%;" />
+          <el-input-number v-model="questionForm.score" :min="1" :max="100" style="width: 100%;" size="large" />
         </el-form-item>
-        
-
         
         <!-- 答案 -->
         <el-form-item label="正确答案" prop="expectedAnswer">
@@ -122,14 +205,15 @@
             type="textarea" 
             :rows="3"
             placeholder="请输入正确答案"
+            size="large"
           />
         </el-form-item>
       </el-form>
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveQuestion" :loading="saving">
+          <el-button @click="dialogVisible = false" size="large">取消</el-button>
+          <el-button type="primary" @click="saveQuestion" :loading="saving" size="large">
             {{ isEdit ? '更新' : '添加' }}
           </el-button>
         </span>
@@ -141,38 +225,71 @@
       v-model="viewDialogVisible" 
       title="题目详情"
       width="800px"
+      :close-on-click-modal="false"
+      class="view-question-dialog"
     >
       <div v-if="viewingQuestion" class="question-detail">
         <div class="detail-item">
-          <strong>题目标题：</strong>{{ viewingQuestion.title }}
+          <div class="detail-label">
+            <el-icon><Document /></el-icon>
+            <span>题目标题：</span>
+          </div>
+          <div class="detail-value">{{ viewingQuestion.title }}</div>
         </div>
         <div class="detail-item">
-          <strong>题目类型：</strong>
-          <el-tag :type="getTypeTag(viewingQuestion.type)">
-            {{ getTypeText(viewingQuestion.type) }}
-          </el-tag>
+          <div class="detail-label">
+            <el-icon><Collection /></el-icon>
+            <span>题目类型：</span>
+          </div>
+          <div class="detail-value">
+            <el-tag :type="getTypeTag(viewingQuestion.type)" size="large">
+              {{ getTypeText(viewingQuestion.type) }}
+            </el-tag>
+          </div>
         </div>
         <div class="detail-item">
-          <strong>题目内容：</strong>
-          <div class="content-text">{{ viewingQuestion.content }}</div>
+          <div class="detail-label">
+            <el-icon><Edit /></el-icon>
+            <span>题目内容：</span>
+          </div>
+          <div class="detail-value">
+            <div class="content-text">{{ viewingQuestion.content }}</div>
+          </div>
         </div>
         <div class="detail-item">
-          <strong>来源：</strong>
-          <el-tag :type="viewingQuestion.origin === 'PRESET' ? 'success' : 'info'">
-            {{ viewingQuestion.origin === 'PRESET' ? '预设' : '自定义' }}
-          </el-tag>
+          <div class="detail-label">
+            <el-icon><InfoFilled /></el-icon>
+            <span>来源：</span>
+          </div>
+          <div class="detail-value">
+            <el-tag :type="viewingQuestion.origin === 'PRESET' ? 'success' : 'info'" size="large">
+              {{ viewingQuestion.origin === 'PRESET' ? '预设' : '自定义' }}
+            </el-tag>
+          </div>
         </div>
         <div class="detail-item">
-          <strong>分值：</strong>{{ viewingQuestion.score }}分
+          <div class="detail-label">
+            <el-icon><Star /></el-icon>
+            <span>分值：</span>
+          </div>
+          <div class="detail-value">
+            <el-tag type="warning" size="large">{{ viewingQuestion.score }}分</el-tag>
+          </div>
         </div>
         <div class="detail-item">
-          <strong>正确答案：</strong>{{ viewingQuestion.expectedAnswer }}
+          <div class="detail-label">
+            <el-icon><Check /></el-icon>
+            <span>正确答案：</span>
+          </div>
+          <div class="detail-value">{{ viewingQuestion.expectedAnswer }}</div>
         </div>
         
-
-        
         <div class="detail-item">
-          <strong>创建时间：</strong>{{ formatDateTime(viewingQuestion.createdAt) }}
+          <div class="detail-label">
+            <el-icon><Clock /></el-icon>
+            <span>创建时间：</span>
+          </div>
+          <div class="detail-value">{{ formatDateTime(viewingQuestion.createdAt) }}</div>
         </div>
       </div>
     </el-dialog>
@@ -182,43 +299,65 @@
       v-model="knowledgeRelationDialogVisible" 
       title="查看知识单元关系"
       width="600px"
+      :close-on-click-modal="false"
+      class="knowledge-relation-dialog"
     >
       <div v-if="currentQuestion" class="knowledge-relation-detail">
         <div class="detail-item">
-          <strong>题目标题：</strong>{{ currentQuestion.title }}
+          <div class="detail-label">
+            <el-icon><Document /></el-icon>
+            <span>题目标题：</span>
+          </div>
+          <div class="detail-value">{{ currentQuestion.title }}</div>
         </div>
         <div class="detail-item">
-          <strong>题目类型：</strong>
-          <el-tag :type="getTypeTag(currentQuestion.type)">
-            {{ getTypeText(currentQuestion.type) }}
-          </el-tag>
+          <div class="detail-label">
+            <el-icon><Collection /></el-icon>
+            <span>题目类型：</span>
+          </div>
+          <div class="detail-value">
+            <el-tag :type="getTypeTag(currentQuestion.type)" size="large">
+              {{ getTypeText(currentQuestion.type) }}
+            </el-tag>
+          </div>
         </div>
         <div class="detail-item">
-          <strong>关联知识单元数量：</strong>
-          <el-tag type="primary">{{ relatedKnowledgeUnitIds.length }}</el-tag>
+          <div class="detail-label">
+            <el-icon><Link /></el-icon>
+            <span>关联知识单元数量：</span>
+          </div>
+          <div class="detail-value">
+            <el-tag type="primary" size="large">{{ relatedKnowledgeUnitIds.length }}</el-tag>
+          </div>
         </div>
         
         <div class="detail-item">
-          <strong>关联知识单元ID列表：</strong>
-          <div v-if="relatedKnowledgeUnitIds.length > 0" class="knowledge-unit-ids-list">
-            <el-tag 
-              v-for="knowledgeUnitId in relatedKnowledgeUnitIds" 
-              :key="knowledgeUnitId"
-              type="success"
-              style="margin: 2px;"
-            >
-              {{ knowledgeUnitId }}
-            </el-tag>
+          <div class="detail-label">
+            <el-icon><List /></el-icon>
+            <span>关联知识单元ID列表：</span>
           </div>
-          <div v-else class="no-data">
-            <el-empty description="暂无关联知识单元" />
+          <div class="detail-value">
+            <div v-if="relatedKnowledgeUnitIds.length > 0" class="knowledge-unit-ids-list">
+              <el-tag 
+                v-for="knowledgeUnitId in relatedKnowledgeUnitIds" 
+                :key="knowledgeUnitId"
+                type="success"
+                size="large"
+                class="knowledge-unit-tag"
+              >
+                {{ knowledgeUnitId }}
+              </el-tag>
+            </div>
+            <div v-else class="no-data">
+              <el-empty description="暂无关联知识单元" />
+            </div>
           </div>
         </div>
       </div>
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="knowledgeRelationDialogVisible = false">关闭</el-button>
+          <el-button @click="knowledgeRelationDialogVisible = false" size="large">关闭</el-button>
         </span>
       </template>
     </el-dialog>
@@ -228,7 +367,11 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { 
+  Plus, Search, Refresh, Edit, Link, Delete, 
+  Document, Collection, InfoFilled, Star, Check, 
+  Clock, View, List 
+} from '@element-plus/icons-vue'
 import { problemBank, problemKnowledgeUnit } from '@/api/apiLearning'
 
 // 响应式数据
@@ -590,15 +733,48 @@ onMounted(async () => {
   border-bottom: 1px solid #e4e7ed;
 }
 
-.page-header h2 {
+.header-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.page-title {
   margin: 0;
   color: #303133;
   font-size: 24px;
   font-weight: 600;
 }
 
+.page-subtitle {
+  color: #909399;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
 .search-section {
   margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -625,18 +801,61 @@ onMounted(async () => {
   gap: 10px;
 }
 
+.table-section {
+  margin-top: 20px;
+}
+
+.table-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.table-info {
+  color: #909399;
+  font-size: 14px;
+}
+
 .question-detail {
   padding: 20px;
 }
 
 .detail-item {
   margin-bottom: 15px;
+  display: flex;
+  align-items: center;
 }
 
-.detail-item strong {
-  display: inline-block;
-  width: 100px;
+.detail-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.detail-value {
+  flex: 1;
   color: #303133;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .content-text {
@@ -679,12 +898,24 @@ onMounted(async () => {
 
 .knowledge-relation-detail .detail-item {
   margin-bottom: 15px;
+  display: flex;
+  align-items: center;
 }
 
-.knowledge-relation-detail .detail-item strong {
-  display: inline-block;
-  width: 120px;
+.knowledge-relation-detail .detail-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.knowledge-relation-detail .detail-value {
+  flex: 1;
   color: #303133;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .knowledge-unit-ids-list {
@@ -697,8 +928,69 @@ onMounted(async () => {
   background-color: #f5f7fa;
 }
 
+.knowledge-unit-tag {
+  margin: 2px;
+}
+
 .no-data {
   margin-top: 10px;
   text-align: center;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-row:last-child {
+  justify-content: flex-end;
+}
+
+.action-row .el-button {
+  min-width: 70px;
+}
+
+.question-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  padding: 15px 20px;
+}
+
+.question-dialog .el-dialog__title {
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.view-question-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  padding: 15px 20px;
+}
+
+.view-question-dialog .el-dialog__title {
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.knowledge-relation-dialog .el-dialog__header {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  padding: 15px 20px;
+}
+
+.knowledge-relation-dialog .el-dialog__title {
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
 }
 </style>

@@ -1,103 +1,167 @@
 <!-- 少一个获取全部subject的接口 -->
 <template>
   <div class="subject-manage">
+    <!-- 页面标题区域 -->
     <div class="page-header">
-      <h2>学科管理</h2>
-      <el-button type="primary" @click="showAddDialog">
+      <div class="header-content">
+        <h2 class="page-title">学科管理</h2>
+      </div>
+      <el-button type="primary" @click="showAddDialog" size="large">
         <el-icon><Plus /></el-icon>
         添加学科
       </el-button>
     </div>
 
+    <!-- 搜索和筛选区域 -->
     <div class="search-section">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索学科名称或描述"
-        style="width: 300px; margin-right: 15px;"
-        clearable
-        @input="handleSearch"
-      >
-        <template #prefix>
-          <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      
-             <el-select v-model="selectedStatus" placeholder="选择状态" style="width: 150px; margin-right: 15px;" clearable>
-         <el-option label="启用" :value="1" />
-         <el-option label="禁用" :value="0" />
-       </el-select>
-      
-      <el-button type="info" @click="resetSearch">重置</el-button>
+      <div class="search-content">
+        <div class="search-group">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索学科名称或描述"
+            style="width: 300px;"
+            clearable
+            @input="handleSearch"
+            size="large"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          
+          <el-select 
+            v-model="selectedStatus" 
+            placeholder="选择状态" 
+            style="width: 150px;" 
+            clearable
+            size="large"
+          >
+            <el-option label="启用" :value="1" />
+            <el-option label="禁用" :value="0" />
+          </el-select>
+        </div>
+        
+        <div class="search-actions">
+          <el-button type="info" @click="resetSearch" size="large">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
+        </div>
+      </div>
     </div>
 
-    <el-table :data="filteredSubjects" style="width: 100%" v-loading="loading">
-             <el-table-column prop="id" label="ID" width="80" />
-       <el-table-column prop="name" label="学科名称" min-width="200" />
-       <el-table-column prop="category" label="分类" width="120" />
-       <el-table-column prop="description" label="描述" min-width="300" show-overflow-tooltip />
-       <el-table-column prop="code" label="学科代码" width="120" />
-             <el-table-column prop="status" label="状态" width="100">
-         <template #default="scope">
-           <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
-             {{ scope.row.status === 1 ? '启用' : '禁用' }}
-           </el-tag>
-         </template>
-       </el-table-column>
-      <el-table-column prop="knowledgeCount" label="知识点数量" width="120" />
-      <el-table-column prop="createdAt" label="创建时间" width="180">
-        <template #default="scope">
-          {{ formatDateTime(scope.row.createdAt) }}
+    <!-- 数据表格区域 -->
+    <div class="table-section">
+      <el-card class="table-card" shadow="never">
+        <template #header>
+          <div class="table-header">
+            <div class="table-title">
+              <el-icon><Collection /></el-icon>
+              <span>学科列表</span>
+            </div>
+            <div class="table-info">
+              <el-tag type="info" size="large">
+                共 {{ filteredSubjects.length }} 条记录
+              </el-tag>
+            </div>
+          </div>
         </template>
-      </el-table-column>
-             <el-table-column label="操作" width="240" fixed="right">
-          <template #default="scope">
-            <el-button size="small" @click="editSubject(scope.row)">编辑</el-button>
-            <el-button size="small" type="primary" @click="showRelatedCourses(scope.row)">关联课程</el-button>
-            <el-button size="small" type="danger" @click="deleteSubject(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
-    </el-table>
+        
+        <el-table 
+          :data="filteredSubjects" 
+          style="width: 100%" 
+          v-loading="loading"
+          border
+          stripe
+          :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+          :cell-style="{ padding: '12px 0' }"
+        >
+          <el-table-column label="序号" width="80" align="center">
+            <template #default="scope">
+              {{ (scope.$index + 1) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="id" label="ID" width="80" align="center" />
+          <el-table-column prop="name" label="学科名称" min-width="200" />
+          <el-table-column prop="category" label="分类" width="120" align="center" />
+          <el-table-column prop="description" label="描述" min-width="300" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="100" align="center">
+            <template #default="scope">
+              <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" size="large">
+                {{ scope.row.status === 1 ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="创建时间" width="180" align="center">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="280" fixed="right" align="center">
+            <template #default="scope">
+              <div class="action-buttons">
+                <el-button size="small" @click="editSubject(scope.row)" type="primary">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button size="small" type="info" @click="showRelatedCourses(scope.row)">
+                  <el-icon><Link /></el-icon>
+                  关联课程
+                </el-button>
+                <el-button size="small" type="danger" @click="deleteSubject(scope.row)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </div>
 
     <!-- 添加/编辑学科对话框 -->
     <el-dialog 
       v-model="dialogVisible" 
       :title="isEdit ? '编辑学科' : '添加学科'"
       width="600px"
+      :close-on-click-modal="false"
+      class="subject-dialog"
     >
       <el-form :model="subjectForm" :rules="formRules" ref="subjectFormRef" label-width="100px">
-                 <el-form-item label="学科名称" prop="name">
-           <el-input v-model="subjectForm.name" placeholder="请输入学科名称" />
-         </el-form-item>
-         
-         <el-form-item label="分类" prop="category">
-           <el-input v-model="subjectForm.category" placeholder="请输入学科分类" />
-         </el-form-item>
-         
-         <el-form-item label="描述" prop="description">
-           <el-input 
-             v-model="subjectForm.description" 
-             type="textarea" 
-             :rows="3"
-             placeholder="请输入学科描述"
-           />
-         </el-form-item>
+        <el-form-item label="学科名称" prop="name">
+          <el-input v-model="subjectForm.name" placeholder="请输入学科名称" size="large" />
+        </el-form-item>
         
-                 <el-form-item label="状态" prop="status">
-           <el-radio-group v-model="subjectForm.status">
-             <el-radio :value="1">启用</el-radio>
-             <el-radio :value="0">禁用</el-radio>
-           </el-radio-group>
-         </el-form-item>
+        <el-form-item label="分类" prop="category">
+          <el-input v-model="subjectForm.category" placeholder="请输入学科分类" size="large" />
+        </el-form-item>
+        
+        <el-form-item label="描述" prop="description">
+          <el-input 
+            v-model="subjectForm.description" 
+            type="textarea" 
+            :rows="3"
+            placeholder="请输入学科描述"
+            size="large"
+          />
+        </el-form-item>
+        
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="subjectForm.status" size="large">
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
         
         <el-form-item label="排序" prop="sortOrder">
-          <el-input-number v-model="subjectForm.sortOrder" :min="1" :max="999" />
+          <el-input-number v-model="subjectForm.sortOrder" :min="1" :max="999" size="large" />
         </el-form-item>
       </el-form>
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveSubject" :loading="saving">
+          <el-button @click="dialogVisible = false" size="large">取消</el-button>
+          <el-button type="primary" @click="saveSubject" :loading="saving" size="large">
             {{ isEdit ? '更新' : '添加' }}
           </el-button>
         </span>
@@ -109,24 +173,39 @@
       v-model="relatedCoursesDialogVisible"
       title="关联课程"
       width="700px"
+      :close-on-click-modal="false"
+      class="related-courses-dialog"
     >
-      <div v-if="currentSubject && currentSubject.name" style="margin-bottom: 10px;">
-        当前学科：<strong>{{ currentSubject.name }}</strong>
+      <div class="dialog-content">
+        <div class="subject-info">
+          <el-icon><Collection /></el-icon>
+          <span class="info-label">当前学科：</span>
+          <el-tag type="primary" size="large">{{ currentSubject?.name }}</el-tag>
+        </div>
+        
+        <el-table 
+          :data="relatedCourses" 
+          style="width: 100%" 
+          v-loading="relatedCoursesLoading"
+          border
+          stripe
+          :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
+        >
+          <el-table-column prop="id" label="课程ID" width="100" align="center" />
+          <el-table-column prop="name" label="课程名称" min-width="200" />
+          <el-table-column prop="code" label="课程编码" width="140" align="center" />
+          <el-table-column prop="category" label="分类" width="140" align="center" />
+          <el-table-column prop="createTime" label="创建时间" width="180" align="center">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.createTime || scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
-      <el-table :data="relatedCourses" style="width: 100%" v-loading="relatedCoursesLoading">
-        <el-table-column prop="id" label="课程ID" width="100" />
-        <el-table-column prop="name" label="课程名称" min-width="200" />
-        <el-table-column prop="code" label="课程编码" width="140" />
-        <el-table-column prop="category" label="分类" width="140" />
-        <el-table-column prop="createTime" label="创建时间" width="180">
-          <template #default="scope">
-            {{ formatDateTime(scope.row.createTime || scope.row.createdAt) }}
-          </template>
-        </el-table-column>
-      </el-table>
+      
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="relatedCoursesDialogVisible = false">关闭</el-button>
+          <el-button @click="relatedCoursesDialogVisible = false" size="large">关闭</el-button>
         </span>
       </template>
     </el-dialog>
@@ -136,7 +215,10 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { 
+  Plus, Search, Refresh, Edit, Link, Delete, 
+  Collection 
+} from '@element-plus/icons-vue'
 import { subjectController } from '@/api/apiLearning'
 
 // 响应式数据
@@ -383,23 +465,135 @@ onMounted(() => {
   border-bottom: 1px solid #e4e7ed;
 }
 
-.page-header h2 {
+.header-content {
+  display: flex;
+  flex-direction: column;
+  margin-right: 20px;
+}
+
+.page-title {
   margin: 0;
   color: #303133;
   font-size: 24px;
   font-weight: 600;
 }
 
+.page-subtitle {
+  color: #909399;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
 .search-section {
   margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.search-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-group {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+}
+
+.table-section {
+  margin-top: 20px;
+}
+
+.table-card {
+  border-radius: 8px;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.table-info {
+  color: #909399;
+  font-size: 14px;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.subject-dialog .el-dialog__header {
+  background-color: #409eff;
+  color: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.subject-dialog .el-dialog__header .el-dialog__title {
+  color: white;
+}
+
+.related-courses-dialog .el-dialog__header {
+  background-color: #67c23a;
+  color: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.related-courses-dialog .el-dialog__header .el-dialog__title {
+  color: white;
+}
+
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.subject-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.info-label {
+  color: #606266;
+  font-size: 15px;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-buttons .el-button {
+  flex: 1;
+  min-width: 70px;
+  white-space: nowrap;
 }
 </style>
