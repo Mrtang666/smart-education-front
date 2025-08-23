@@ -359,16 +359,17 @@ export function clearAuth() {
   // 清除用户信息
   removeUserInfo();
   
-  // 清除其他登录状态为false
-  localStorage.setItem('is_logged_in', 'false');
+  // 清除token过期时间
+  localStorage.removeItem(TOKEN_EXPIRY_KEY);
   
-  // 确认清除完成
-  const checkTokens = localStorage.getItem(TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (checkTokens) {
-    console.warn('警告: token清除失败，尝试第二次清除');
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-  }
+  // 清除用户角色信息
+  localStorage.removeItem('user_role');
   
-  console.log('所有认证信息已清除');
+  // 清除登录状态
+  localStorage.removeItem('is_logged_in');
+  
+  // 清除所有localStorage中的信息
+  localStorage.clear();
+  
+  console.log('所有localStorage信息已清除');
 }
