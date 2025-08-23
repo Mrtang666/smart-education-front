@@ -241,6 +241,109 @@
 
       <!-- 考试结果已隐藏 -->
     </div>
+
+    <!-- 编程题提交结果弹窗 -->
+    <el-dialog
+      v-model="codeSubmissionDialogVisible"
+      title="编程题提交结果"
+      width="80%"
+      :close-on-click-modal="false"
+    >
+      <div class="code-submission-result">
+        <!-- 当前提交结果 -->
+        <div v-if="currentSubmissionResult" class="current-result">
+          <h3>本次提交结果</h3>
+          <div class="result-info">
+            <div class="result-item">
+              <span class="label">提交时间：</span>
+              <span class="value">{{ formatDateTime(currentSubmissionResult.submitTime) }}</span>
+            </div>
+            <div class="result-item">
+              <span class="label">编译状态：</span>
+              <el-tag :type="currentSubmissionResult.compileSuccess ? 'success' : 'danger'">
+                {{ currentSubmissionResult.compileSuccess ? '编译成功' : '编译失败' }}
+              </el-tag>
+            </div>
+            <div v-if="!currentSubmissionResult.compileSuccess" class="result-item">
+              <span class="label">编译错误：</span>
+              <div class="error-message">{{ currentSubmissionResult.compileMessage }}</div>
+            </div>
+            <div v-if="currentSubmissionResult.compileSuccess" class="result-item">
+              <span class="label">运行状态：</span>
+              <el-tag :type="currentSubmissionResult.runSuccess ? 'success' : 'danger'">
+                {{ currentSubmissionResult.runSuccess ? '运行成功' : '运行失败' }}
+              </el-tag>
+            </div>
+            <div v-if="currentSubmissionResult.compileSuccess && !currentSubmissionResult.runSuccess" class="result-item">
+              <span class="label">运行错误：</span>
+              <div class="error-message">{{ currentSubmissionResult.runMessage }}</div>
+            </div>
+            <div v-if="currentSubmissionResult.compileSuccess && currentSubmissionResult.runSuccess" class="result-item">
+              <span class="label">测试结果：</span>
+              <el-tag :type="currentSubmissionResult.allTestsPassed ? 'success' : 'warning'">
+                {{ currentSubmissionResult.allTestsPassed ? '全部测试通过' : '部分测试未通过' }}
+              </el-tag>
+            </div>
+            <div v-if="currentSubmissionResult.score !== null" class="result-item">
+              <span class="label">得分：</span>
+              <span class="score" :class="{ 'score-positive': currentSubmissionResult.score > 0 }">{{ currentSubmissionResult.score }} 分</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 历史提交记录 -->
+        <div class="submission-history">
+          <h3>历史提交记录</h3>
+          <div v-if="submissionHistory.length === 0" class="no-history">
+            <el-empty description="暂无提交记录" />
+          </div>
+          <div v-else class="history-list">
+            <div 
+              v-for="(submission, index) in submissionHistory" 
+              :key="submission.id || index"
+              class="history-item"
+              :class="{ 'current-submission': submission.id === currentSubmissionResult?.id }"
+            >
+              <div class="history-header">
+                <span class="submission-number">第 {{ index + 1 }} 次提交</span>
+                <span class="submission-time">{{ formatDateTime(submission.submitTime) }}</span>
+              </div>
+              <div class="history-content">
+                <div class="status-tags">
+                  <el-tag size="small" :type="submission.compileSuccess ? 'success' : 'danger'">
+                    {{ submission.compileSuccess ? '编译成功' : '编译失败' }}
+                  </el-tag>
+                  <el-tag v-if="submission.compileSuccess" size="small" :type="submission.runSuccess ? 'success' : 'danger'">
+                    {{ submission.runSuccess ? '运行成功' : '运行失败' }}
+                  </el-tag>
+                  <el-tag v-if="submission.compileSuccess && submission.runSuccess" size="small" :type="submission.allTestsPassed ? 'success' : 'warning'">
+                    {{ submission.allTestsPassed ? '全部测试通过' : '部分测试未通过' }}
+                  </el-tag>
+                </div>
+                <div v-if="submission.score !== null" class="submission-score" :class="{ 'score-positive': submission.score > 0 }">
+                  得分：{{ submission.score }} 分
+                </div>
+                <div v-if="!submission.compileSuccess && submission.compileMessage" class="error-detail">
+                  <span class="error-label">编译错误：</span>
+                  <div class="error-text">{{ submission.compileMessage }}</div>
+                </div>
+                <div v-if="submission.compileSuccess && !submission.runSuccess && submission.runMessage" class="error-detail">
+                  <span class="error-label">运行错误：</span>
+                  <div class="error-text">{{ submission.runMessage }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeCodeSubmissionDialog">关闭</el-button>
+          <el-button type="primary" @click="continueCode">继续编程</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -278,6 +381,12 @@ const studentAnswers = ref([]) // 学生答案详情
 // 获取用户信息
 const userInfo = getUserInfo()
 const studentId = userInfo?.studentId
+
+// 编程题提交结果弹窗相关数据
+const codeSubmissionDialogVisible = ref(false)
+const currentSubmissionResult = ref(null)
+const submissionHistory = ref([])
+const currentCodeQuestion = ref(null)
 
 
 
@@ -874,6 +983,34 @@ const submitAnswer = async (question) => {
         // 标记为已答题
         answeredQuestions.value[questionId] = { answered: true }
         
+        // 字段映射：将后端字段映射到前端期望的字段
+        const mappedResult = {
+          submitTime: result.submitTime || new Date().toISOString(),
+          compileSuccess: result.status === 'ACCEPTED' || result.status === 'WRONG_ANSWER' || result.status === 'PARTIAL_CORRECT',
+          runSuccess: result.status === 'ACCEPTED' || result.status === 'WRONG_ANSWER' || result.status === 'PARTIAL_CORRECT',
+          allTestsPassed: result.status === 'ACCEPTED',
+          compileMessage: result.status === 'COMPILE_ERROR' ? '编译错误' : '',
+          runMessage: result.status === 'RUNTIME_ERROR' ? '运行时错误' : result.status === 'TIME_LIMIT_EXCEEDED' ? '超时' : '',
+          // 保留原始字段
+          caseAccepted: result.caseAccepted,
+          caseTotal: result.caseTotal,
+          score: result.score,
+          status: result.status,
+          timeMs: result.timeMs
+        }
+        
+        console.log('映射后的提交结果:', mappedResult);
+        
+        // 设置当前提交结果和题目信息
+        currentSubmissionResult.value = mappedResult
+        currentCodeQuestion.value = question
+        
+        // 获取历史提交记录
+        await getSubmissionHistory(questionId, studentId)
+        
+        // 显示提交结果弹窗
+        codeSubmissionDialogVisible.value = true
+        
         ElMessage.success('代码已成功提交')
         return result
       } catch (error) {
@@ -1356,7 +1493,7 @@ const openVSCode = async (question) => {
   }
   try {
     // 准备文件内容（包含题目描述和示例）
-    const fileContent = `/*\n题目: ${questionDetail.title}\n\n描述:\n${questionDetail.description}\n\n示例输入:\n${questionDetail.sampleInputs ? questionDetail.sampleInputs.join('\n') : ''}\n\n示例输出:\n${questionDetail.sampleOutputs ? questionDetail.sampleOutputs.join('\n') : ''}\n\n请在此处编写你的代码\n*/\n\npublic class Solution {\n    public static void main(String[] args) {\n        // 你的代码\n    }\n}\n`
+    const fileContent = `/*\n题目: ${questionDetail.title}\n\n描述:\n${questionDetail.description}\n\n示例输入:\n${questionDetail.sampleInputs ? questionDetail.sampleInputs.join('\n') : ''}\n\n示例输出:\n${questionDetail.sampleOutputs ? questionDetail.sampleOutputs.join('\n') : ''}\n\n请在此处编写你的代码\n*/\n\npublic class Main {\n    public static void main(String[] args) {\n        // 你的代码\n    }\n}\n`
     // const fileContent = `测试111`
     // 写入文件内容
     await scriptForwardAPI.writeFile(folderName, fileName, fileContent)
@@ -1382,6 +1519,53 @@ const formatDateTime = (dateString) => {
 
   const date = new Date(dateString)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+// 获取编程题历史提交记录
+const getSubmissionHistory = async (questionId, studentId) => {
+  try {
+    const response = await codeQuestionAPI.getStudentQuestionSubmissions(questionId, studentId)
+    console.log('获取到的历史提交记录:', response)
+    
+    // 字段映射：将后端字段映射到前端期望的字段
+    const mappedHistory = Array.isArray(response) ? response.map(item => ({
+      submitTime: item.submitTime || new Date().toISOString(),
+      compileSuccess: item.status === 'ACCEPTED' || item.status === 'WRONG_ANSWER' || item.status === 'PARTIAL_CORRECT',
+      runSuccess: item.status === 'ACCEPTED' || item.status === 'WRONG_ANSWER' || item.status === 'PARTIAL_CORRECT',
+      allTestsPassed: item.status === 'ACCEPTED',
+      compileMessage: item.status === 'COMPILE_ERROR' ? '编译错误' : '',
+      runMessage: item.status === 'RUNTIME_ERROR' ? '运行时错误' : item.status === 'TIME_LIMIT_EXCEEDED' ? '超时' : '',
+      // 保留原始数据的其他字段
+      caseAccepted: item.caseAccepted,
+      caseTotal: item.caseTotal,
+      score: item.score,
+      status: item.status,
+      timeMs: item.timeMs,
+      ...item
+    })) : []
+    
+    console.log('映射后的历史提交记录:', mappedHistory)
+    submissionHistory.value = mappedHistory
+  } catch (error) {
+    console.error('获取历史提交记录失败:', error)
+    submissionHistory.value = []
+  }
+}
+
+// 关闭编程题提交结果弹窗
+const closeCodeSubmissionDialog = () => {
+  codeSubmissionDialogVisible.value = false
+  currentSubmissionResult.value = null
+  submissionHistory.value = []
+  currentCodeQuestion.value = null
+}
+
+// 继续编程
+const continueCode = () => {
+  closeCodeSubmissionDialog()
+  if (currentCodeQuestion.value) {
+    openVSCode(currentCodeQuestion.value)
+  }
 }
 
 // 百分比格式化函数已移除
@@ -1980,5 +2164,172 @@ onUnmounted(() => {
 
 .answered-question .question-header {
   color: #67c23a;
+}
+
+/* 编程题提交结果弹窗样式 */
+.code-submission-result {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.current-result {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.current-result h3 {
+  margin: 0 0 15px 0;
+  color: #409eff;
+  font-size: 18px;
+}
+
+.result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.result-item .label {
+  font-weight: 600;
+  color: #606266;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.result-item .value {
+  color: #303133;
+}
+
+.result-item .score {
+  font-weight: bold;
+  color: #f56c6c;
+  font-size: 16px;
+}
+
+.result-item .score.score-positive {
+  color: #67c23a;
+}
+
+.error-message {
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: #f56c6c;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.submission-history {
+  margin-top: 20px;
+}
+
+.submission-history h3 {
+  margin: 0 0 15px 0;
+  color: #606266;
+  font-size: 16px;
+}
+
+.history-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-item {
+  margin-bottom: 15px;
+  padding: 15px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background-color: #fff;
+}
+
+.history-item.current-submission {
+  border-color: #409eff;
+  background-color: #f0f9ff;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.submission-number {
+  font-weight: 600;
+  color: #303133;
+}
+
+.submission-time {
+  color: #909399;
+  font-size: 12px;
+}
+
+.history-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.submission-score {
+  font-weight: 600;
+  color: #f56c6c;
+}
+
+.submission-score.score-positive {
+  color: #67c23a;
+}
+
+.error-detail {
+  margin-top: 8px;
+}
+
+.error-label {
+  font-weight: 600;
+  color: #f56c6c;
+  font-size: 12px;
+}
+
+.error-text {
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #f56c6c;
+  font-family: monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 60px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.no-history {
+  text-align: center;
+  padding: 20px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 </style>
