@@ -40,9 +40,10 @@ const rememberMe = ref(false);
 const router = useRouter();
 import { ElMessage } from 'element-plus'
 import { initUserInfo, setToken, setRefreshToken } from '@/utils/auth';
-const handleLogin = () => {
-    // 教师学生统一登录接口
-    authAPI.studentLogin(username.value, password.value).then(res => {
+const handleLogin = async () => {
+    try {
+        // 教师学生统一登录接口
+        const res = await authAPI.studentLogin(username.value, password.value);
         // console.log('登录响应:', res);
 
         // 设置token到本地存储
@@ -53,21 +54,27 @@ const handleLogin = () => {
         localStorage.setItem('user_role', JSON.stringify(res.roles));
         console.log("token 和 refreshToken 设置成功");
 
-        // 初始化用户信息
-        initUserInfo();
+        // 初始化用户信息并等待完成
+        const userInfo = await initUserInfo();
         
-        // 根据角色不同跳转至首页
-        if (res.roles && res.roles.includes('ROLE_ADMIN')) {
-            router.push('/admin');
-        } else if (res.roles && res.roles.includes('ROLE_STUDENT')) {
-            router.push('/student');
-        } else if (res.roles && res.roles.includes('ROLE_TEACHER')) {
-            router.push('/teacher');
+        if (userInfo) {
+            console.log('用户信息初始化成功，准备跳转');
+            // 根据角色不同跳转至首页
+            if (res.roles && res.roles.includes('ROLE_ADMIN')) {
+                router.push('/admin');
+            } else if (res.roles && res.roles.includes('ROLE_STUDENT')) {
+                router.push('/student');
+            } else if (res.roles && res.roles.includes('ROLE_TEACHER')) {
+                router.push('/teacher');
+            }
+        } else {
+            console.error('用户信息初始化失败');
+            ElMessage.error('用户信息初始化失败，请重新登录');
         }
-    }).catch(err => {
+    } catch (err) {
         console.error('登录失败:', err);
         ElMessage.error('登录失败,请稍后再试');
-    });
+    }
 };
 
 

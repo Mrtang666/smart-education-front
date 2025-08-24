@@ -539,18 +539,12 @@ export default {
     const userInfo = getUserInfo();
     this.studentId = userInfo?.studentId;
 
-    // 如果从 getUserInfo 获取不到 studentId，尝试从 localStorage 直接获取
-    if (!this.studentId || this.studentId === 'default-student-id') {
-      // 尝试从 localStorage 中的用户信息获取
-      const userInfoStr = localStorage.getItem('user_info');
-      if (userInfoStr) {
-        try {
-          const parsedUserInfo = JSON.parse(userInfoStr);
-          this.studentId = parsedUserInfo.studentId;
-        } catch (error) {
-          console.error('解析localStorage中的用户信息失败:', error);
-        }
-      }
+    // 如果从 getUserInfo 获取不到 studentId，说明用户未登录
+    if (!this.studentId) {
+      console.error('未获取到学生ID，用户可能未登录');
+      this.$message.error('请先登录');
+      this.$router.push('/login');
+      return;
     }
 
     // 从路由参数获取作业ID

@@ -563,10 +563,10 @@ function fetchStudentData() {
     // 从localStorage获取学生信息
     const userInfo = getUserInfo();
 
-    // 如果没有真实的用户信息（返回的是默认对象），可以考虑重定向到登录页
-    if (!userInfo || userInfo.studentId === 'default-student-id') {
+    // 如果没有真实的用户信息，重定向到登录页
+    if (!userInfo) {
         console.warn('未找到真实用户信息，可能需要重新登录')
-        // 清除localhost，退出登陆
+        // 清除localStorage，退出登录
         clearAuth();
         // 重定向到登录页
         router.push('/login')

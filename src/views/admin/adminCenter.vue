@@ -6,6 +6,12 @@
         <div class="logo-section">
           <h1>慧课平台后台管理中心</h1>
         </div>
+        <div class="header-actions">
+          <el-button type="danger" @click="handleLogout" class="logout-btn">
+            <el-icon><SwitchButton /></el-icon>
+            退出登录
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -79,7 +85,24 @@
 </template>
 
 <script setup>
-import { User, UserFilled, DataLine, Setting, Collection, Files, QuestionFilled } from '@element-plus/icons-vue'
+import { User, UserFilled, DataLine, Setting, Collection, Files, QuestionFilled, SwitchButton } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { clearAuth } from '@/utils/auth'
+
+const router = useRouter()
+
+// 退出登录
+function handleLogout() {
+  // 清除所有认证信息
+  clearAuth()
+  
+  // 提示用户已退出登录
+  ElMessage.success('已退出登录')
+  
+  // 跳转到登录页
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -104,6 +127,9 @@ import { User, UserFilled, DataLine, Setting, Collection, Files, QuestionFilled 
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .logo-section {
@@ -144,6 +170,27 @@ h1 {
   color: #7f8c8d;
   font-size: 16px;
   font-weight: 400;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.logout-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+}
+
+.logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  background: linear-gradient(135deg, #ff5252, #e53935);
 }
 
 /* 侧边栏 */

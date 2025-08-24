@@ -217,7 +217,7 @@ import { ref, onMounted, onUnmounted, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Reading, EditPen, Document, User, Timer } from '@element-plus/icons-vue'
-import { courseAPI, examAPI, knowledgeAPI, assignmentAPI, problemAPI } from '@/api/api'
+import { courseAPI, examAPI, knowledgeAPI, assignmentAPI, problemAPI, questionAPI, codeQuestionAPI } from '@/api/api'
 import { getUserInfo } from '@/utils/auth'
 
 // 配置ElMessage默认选项
@@ -669,12 +669,40 @@ async function fetchExams(isRetry = false) {
     const examData = Array.isArray(response) ? response : [response].filter(Boolean)
     
     // 处理API返回的数据，并确保ID是有效的数字
-    exams.value = examData.map(exam => {
+    const processedExams = await Promise.all(examData.map(async exam => {
       // 确保考试ID是有效数字
       const examId = exam.examId || exam.id
       if (!examId || isNaN(Number(examId))) {
         console.warn('发现无效的考试ID:', examId, exam)
         return null // 返回null以便后续过滤
+      }
+      
+      // 计算考试总分：获取所有题目并累加分数
+      let calculatedTotalScore = '--'
+      try {
+        // 获取普通题目
+        const regularQuestions = await questionAPI.getQuestionsByExamId(examId)
+        let regularScore = 0
+        if (Array.isArray(regularQuestions)) {
+          regularScore = regularQuestions.reduce((sum, question) => {
+            return sum + (Number(question.scorePoints) || 0)
+          }, 0)
+        }
+        
+        // 获取编程题
+        const codeQuestions = await codeQuestionAPI.getExamCodeQuestions(examId)
+        let codeScore = 0
+        if (Array.isArray(codeQuestions)) {
+          codeScore = codeQuestions.reduce((sum, question) => {
+            return sum + (Number(question.scorePoints) || 0)
+          }, 0)
+        }
+        
+        calculatedTotalScore = regularScore + codeScore
+        console.log(`考试 ${examId} 总分计算: 普通题${regularScore}分 + 编程题${codeScore}分 = ${calculatedTotalScore}分`)
+      } catch (error) {
+        console.warn(`计算考试 ${examId} 总分失败:`, error)
+        calculatedTotalScore = exam.totalScore || '--'
       }
       
       return {
@@ -689,10 +717,12 @@ async function fetchExams(isRetry = false) {
         type: exam.type || 'exam', // 保存type字段，默认为exam
         durationMinutes: exam.durationMinutes || (exam.startTime && exam.endTime ? 
           Math.floor((new Date(exam.endTime) - new Date(exam.startTime)) / 60000) : '--'),
-        totalScore: exam.totalScore || '--',
+        totalScore: calculatedTotalScore,
         description: exam.description || ''
       }
-    }).filter(Boolean) // 过滤掉null值
+    }))
+    
+    exams.value = processedExams.filter(Boolean) // 过滤掉null值
     
     console.log('处理后的教师考试数据:', exams.value)
     

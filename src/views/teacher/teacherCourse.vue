@@ -1024,6 +1024,11 @@ async function createCourse() {
         selectedKnowledge.value = []
 
         ElMessage.success('课程创建成功')
+        
+        // 创建课程成功后自动刷新页面
+        setTimeout(() => {
+          window.location.reload()
+        }, 100) // 延迟0.1秒后刷新，让用户看到成功提示
       } catch (error) {
         console.error('创建课程失败:', error)
         ElMessage.error('创建课程失败，请稍后重试')

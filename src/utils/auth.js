@@ -144,22 +144,26 @@ export function removeRefreshToken() {
 
 /**
  * 初始化存储用户信息
+ * @returns {Promise<Object|null>} 返回Promise，成功时resolve用户信息，失败时resolve null
  */
 export function initUserInfo() {
-  // 导入API，避免循环依赖
+  return new Promise((resolve) => {
+    // 导入API，避免循环依赖
     import('@/api/api').then(({ studentAPI, teacherAPI }) => {
-    // 获取用户信息
-    // 根据角色不同调用不同接口
-    const userRole = localStorage.getItem('user_role');
-    console.log('当前用户角色信息:', userRole);
-    
-    if (!userRole) {
-      console.error('未找到用户角色信息');
-      ElMessage.error('未找到用户角色信息');
-      return;
-    }
-    
-    try {
+      try {
+      
+      // 获取用户信息
+      // 根据角色不同调用不同接口
+      const userRole = localStorage.getItem('user_role');
+      console.log('当前用户角色信息:', userRole);
+      
+      if (!userRole) {
+        console.error('未找到用户角色信息');
+        ElMessage.error('未找到用户角色信息');
+        resolve(null);
+        return;
+      }
+      
       const roleObj = JSON.parse(userRole);
       console.log('解析后的角色对象:', roleObj);
       
@@ -173,6 +177,7 @@ export function initUserInfo() {
         };
         console.log('处理后的用户信息:', userInfo);
         localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
+        resolve(userInfo);
       };
 
       if (roleObj.includes('ROLE_ADMIN')) {
@@ -187,6 +192,7 @@ export function initUserInfo() {
         }).catch(err => {
           console.error('获取管理员信息失败:', err);
           ElMessage.error('获取管理员信息失败');
+          resolve(null);
         });
       } else if (roleObj.length === 1) {
         if (roleObj[0] === 'ROLE_STUDENT') {
@@ -197,6 +203,7 @@ export function initUserInfo() {
           }).catch(err => {
             console.error('获取学生信息失败:', err);
             ElMessage.error('获取学生信息失败');
+            resolve(null);
           });
         } else if (roleObj[0] === 'ROLE_TEACHER') {
           console.log('获取教师信息');
@@ -206,23 +213,30 @@ export function initUserInfo() {
           }).catch(err => {
             console.error('获取教师信息失败:', err);
             ElMessage.error('获取教师信息失败');
+            resolve(null);
           });
         } else {
           console.error('未知的用户角色:', roleObj[0]);
           ElMessage.error('未知的用户角色');
+          resolve(null);
         }
       } else {
         console.error('用户角色配置错误:', roleObj);
         ElMessage.error('用户角色配置错误');
+        resolve(null);
       }
     } catch (err) {
       console.error('解析用户角色失败:', err);
       ElMessage.error('用户角色格式错误');
-    }
-  }).catch(err => {
-    console.error('导入API模块失败:', err);
-  });
-}
+      resolve(null);
+     }
+     }).catch(err => {
+       console.error('导入API模块失败:', err);
+       ElMessage.error('初始化用户信息失败');
+       resolve(null);
+     });
+   });
+ }
 
 /**
  * 获取用户信息
@@ -233,24 +247,18 @@ export function getUserInfo() {
     const userInfoStr = localStorage.getItem(USER_INFO_KEY);
     if (!userInfoStr) {
       console.warn('localStorage中未找到用户信息');
-      // 返回默认用户信息，防止页面报错
-      return {
-        studentId: 'default-student-id',
-        username: 'default-user',
-        fullName: '默认用户',
-        roles: ['student']
-      };
+      return null; // 返回null而不是默认用户信息
     }
-    return JSON.parse(userInfoStr);
+    const userInfo = JSON.parse(userInfoStr);
+    // 检查是否是真实的用户信息（不是默认值）
+    if (userInfo.studentId === 'default-student-id' || userInfo.username === 'default-user') {
+      console.warn('检测到默认用户信息，视为无效');
+      return null;
+    }
+    return userInfo;
   } catch (error) {
     console.error('解析用户信息失败:', error);
-    // 解析失败时也返回默认用户信息
-    return {
-      studentId: 'default-student-id',
-      username: 'default-user',
-      fullName: '默认用户',
-      roles: ['student']
-    };
+    return null; // 解析失败时返回null
   }
 }
 
