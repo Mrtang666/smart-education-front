@@ -601,7 +601,7 @@
                   <!-- AI生成的具体题目 -->
                   <div v-if="exercise.content" class="content-section">
                     <div class="content-label">题目内容：</div>
-                    <div class="content-text">{{ exercise.content }}</div>
+                    <div class="content-text" v-html="formatAIContent(exercise.content)"></div>
                   </div>
 
                   <!-- 选择题选项 -->
@@ -620,7 +620,7 @@
                         <span class="option-label" :class="exercise.type === 'MULTI_CHOICE' ? 'multi-label' : 'single-label'">
                           {{ String.fromCharCode(65 + optIndex) }}.
                         </span>
-                        <span class="option-text">{{ option }}</span>
+                        <span class="option-text" v-html="formatAIContent(option)"></span>
                         <span v-if="isCorrectOption(exercise, optIndex)" class="correct-indicator">
                           <i class="el-icon-check"></i>
                         </span>
@@ -631,13 +631,13 @@
                   <!-- 答案 -->
                   <div v-if="exercise.expectedAnswer" class="content-section">
                     <div class="content-label">答案：</div>
-                    <div class="answer-text">{{ exercise.expectedAnswer }}</div>
+                    <div class="answer-text" v-html="formatAIContent(exercise.expectedAnswer)"></div>
                   </div>
 
                   <!-- 解析 -->
                   <div v-if="exercise.analysis" class="content-section">
                     <div class="content-label">解析：</div>
-                    <div class="explanation-text">{{ exercise.analysis }}</div>
+                    <div class="explanation-text" v-html="formatAIContent(exercise.analysis)"></div>
                   </div>
                 </div>
               </div>
@@ -2642,6 +2642,26 @@ function handleAddQuestion() {
   }
 }
 
+// AI生成题目后的表单初始化
+function handleAddQuestionAfterAI() {
+  editingQuestion.value = null
+  showEditDialog.value = true
+  // 清空表单，使用5分作为默认分数
+  editForm.value = {
+    content: '',
+    questionType: 'SINGLE_CHOICE',
+    options: [
+      { key: 'A', text: '' },
+      { key: 'B', text: '' },
+      { key: 'C', text: '' },
+      { key: 'D', text: '' }
+    ],
+    referenceAnswer: '',
+    difficulty: 'MEDIUM',
+    scorePoints: 5  // AI生成题目使用5分作为默认分数
+  }
+}
+
 // 已移除"编辑题目"功能
 
 function deleteQuestion(question) {
@@ -2727,7 +2747,7 @@ const editForm = ref({
   caseOutputs: [''],
   referenceAnswer: '',
   difficulty: 'MEDIUM',
-  scorePoints: 100
+  scorePoints: 5
 })
 
 // 监听题型变化，设置默认分数
@@ -3127,6 +3147,17 @@ async function generateAIExercises() {
             return
           }
 
+          // 调试信息：检查解析后的题目数据
+          console.log('解析后的题目数据:', questions)
+          questions.forEach((q, index) => {
+            console.log(`题目${index + 1}:`, {
+              content: q.content,
+              options: q.options,
+              expectedAnswer: q.expectedAnswer,
+              analysis: q.analysis
+            })
+          })
+
           // 存储生成的题目
           aiGeneratedExercises.value = questions
           ElMessage.success(`成功生成 ${questions.length} 道习题！`)
@@ -3135,7 +3166,7 @@ async function generateAIExercises() {
           aiDialogVisible.value = false
 
           // 打开题目编辑对话框显示AI生成的习题
-          handleAddQuestion()
+          handleAddQuestionAfterAI()
 
         } catch (error) {
           console.error('生成练习失败:', error)
@@ -3143,12 +3174,12 @@ async function generateAIExercises() {
           // 如果是405错误，使用模拟数据
           if (error.response && error.response.status === 405) {
             console.log('后端接口不可用，使用模拟数据演示')
-            const mockResponse = generateMockResponse(aiForm.value.generateType)
+            const mockResponse = generateMockResponse()
             const questions = parseAIResponse(mockResponse)
             aiGeneratedExercises.value = questions
             ElMessage.success(`成功生成 ${questions.length} 道习题！（演示模式）`)
             aiDialogVisible.value = false
-            handleAddQuestion()
+            handleAddQuestionAfterAI()
           } else {
             throw error
           }
@@ -3326,7 +3357,7 @@ async function addAllAIQuestions() {
           questionType: exercise.type || 'SINGLE_CHOICE',
           referenceAnswer: exercise.expectedAnswer || '',
           difficulty: getDifficultyFromAI(exercise.difficulty),
-          scorePoints: 100, // 默认分值
+          scorePoints: 5, // 默认分值
           examId: examId
         }
 
@@ -3455,6 +3486,134 @@ function copyExerciseText(exercise) {
   }
 }
 
+// 解析题目块 - 专门处理您提供的格式
+function parseQuestionBlocks(content) {
+  const questions = []
+  
+  console.log('开始解析题目块，原始内容:', content)
+  
+  // 使用正则表达式匹配题目块
+  // 匹配格式：题目X: 内容\n选项: \nA. ...\nB. ...\n答案: ...\n解析: ...
+  const questionPattern = /题目(\d+):\s*([\s\S]*?)(?=题目\d+:|$)/g
+  
+  let match
+  let questionIndex = 0
+  
+  while ((match = questionPattern.exec(content)) !== null) {
+    questionIndex++
+    const [, questionNumber, questionContent] = match
+    
+    console.log(`解析题目${questionNumber}:`, questionContent)
+    
+    // 解析题目内容
+    const question = parseSingleQuestion(questionContent, questionIndex)
+    questions.push(question)
+  }
+  
+  console.log('解析到的题目块:', questions)
+  return questions
+}
+
+// 解析单个题目
+function parseSingleQuestion(content, index) {
+  const question = {
+    id: index,
+    title: `题目${index}`,
+    content: '',
+    type: 'SINGLE_CHOICE',
+    options: [],
+    expectedAnswer: '',
+    analysis: '',
+    score: 5,
+    sequence: index
+  }
+  
+  // 按行分割内容
+  const lines = content.split('\n').map(line => line.trim()).filter(line => line)
+  
+  let currentSection = 'content' // content, options, answer, analysis
+  
+  for (const line of lines) {
+    if (line.startsWith('选项:')) {
+      currentSection = 'options'
+      continue
+    } else if (line.startsWith('答案:')) {
+      currentSection = 'answer'
+      // 提取答案内容（去掉"答案:"前缀）
+      const answerContent = line.replace(/^答案:\s*/, '').trim()
+      if (answerContent) {
+        question.expectedAnswer = answerContent
+      }
+      continue
+    } else if (line.startsWith('解析:')) {
+      currentSection = 'analysis'
+      // 提取解析内容（去掉"解析:"前缀）
+      const analysisContent = line.replace(/^解析:\s*/, '').trim()
+      if (analysisContent) {
+        question.analysis = analysisContent
+      }
+      continue
+    }
+    
+    switch (currentSection) {
+      case 'content':
+        if (question.content) {
+          question.content += '\n' + line
+        } else {
+          question.content = line
+        }
+        break
+      case 'options': {
+        // 匹配选项格式 A. B. C. D.
+        const optionMatch = line.match(/^([A-D])[.、]\s*(.+)$/)
+        if (optionMatch) {
+          question.options.push(optionMatch[2])
+        }
+        break
+      }
+      case 'answer':
+        // 如果答案已经存在，追加内容
+        if (question.expectedAnswer) {
+          question.expectedAnswer += '\n' + line
+        } else {
+          question.expectedAnswer = line
+        }
+        break
+      case 'analysis':
+        // 如果解析已经存在，追加内容
+        if (question.analysis) {
+          question.analysis += '\n' + line
+        } else {
+          question.analysis = line
+        }
+        break
+    }
+  }
+  
+  // 确定题目类型
+  if (question.options.length > 0) {
+    const answer = question.expectedAnswer.toUpperCase().trim()
+    if (answer.length > 1 || answer.includes(',') || answer.includes('、')) {
+      question.type = 'MULTI_CHOICE'
+    } else {
+      question.type = 'SINGLE_CHOICE'
+    }
+  } else {
+    question.type = 'FILL_BLANK'
+  }
+  
+  // 调试信息
+  console.log(`题目${index}解析结果:`, {
+    content: question.content,
+    options: question.options,
+    expectedAnswer: question.expectedAnswer,
+    analysis: question.analysis,
+    type: question.type
+  })
+  
+  return question
+}
+
 // 解析AI响应数据（模仿studentCourseDetail.vue的处理方式）
 function parseAIResponse(response) {
   try {
@@ -3502,108 +3661,112 @@ function parseAIResponse(response) {
 
     // 尝试多种解析方式
 
-    // 方式1: 按行分割内容解析
-    const lines = content.split(/[\n\r]+/).filter(line => line.trim())
+    // 方式1: 使用正则表达式解析题目块
+    const questionBlocks = parseQuestionBlocks(content)
+    
+    if (questionBlocks.length > 0) {
+      questions.push(...questionBlocks)
+    } else {
+      // 方式2: 按行分割内容解析（备用方法）
+      const lines = content.split(/[\n\r]+/).filter(line => line.trim())
+      let currentQuestion = null
+      let questionIndex = 0
 
-    let currentQuestion = null
-    let questionIndex = 0
+      for (const line of lines) {
+        const trimmedLine = line.trim()
+        console.log('处理行:', trimmedLine)
 
-    for (const line of lines) {
-      const trimmedLine = line.trim()
-      console.log('处理行:', trimmedLine)
+        // 检测题目开始 - 支持多种格式
+        if (trimmedLine.match(/题目\d+[:：]/) || trimmedLine.startsWith('题目[') || trimmedLine.match(/^\d+[.、]/)) {
+          // 如果有之前的题目，先保存
+          if (currentQuestion) {
+            questions.push(currentQuestion)
+          }
 
-      // 检测题目开始 - 支持多种格式
-      if (trimmedLine.match(/题目\d+[:：]/) || trimmedLine.startsWith('题目[') || trimmedLine.match(/^\d+[.、]/)) {
-        // 如果有之前的题目，先保存
-        if (currentQuestion) {
-          questions.push(currentQuestion)
+          // 开始新题目
+          questionIndex++
+          let title = trimmedLine
+
+          // 提取题目标题
+          if (trimmedLine.includes(':') || trimmedLine.includes('：')) {
+            const parts = trimmedLine.split(/[:：]/)
+            title = parts.length > 1 ? parts.slice(1).join(':').trim() : parts[0].trim()
+          }
+
+          currentQuestion = {
+            id: questionIndex,
+            title: title || `题目${questionIndex}`,
+            content: '',
+            type: 'SINGLE_CHOICE', // 默认单选题
+            options: [],
+            expectedAnswer: '',
+            analysis: '',
+            score: 5,
+            sequence: questionIndex
+          }
+
+          // 如果标题行就包含了题目内容，直接设置
+          if (title && title.length > 10) {
+            currentQuestion.content = title
+          }
         }
+        // 检测题目内容
+        else if ((trimmedLine.startsWith('题目内容:') || trimmedLine.startsWith('题目内容：')) && currentQuestion) {
+          currentQuestion.content = trimmedLine.replace(/题目内容[:：]/, '').trim()
+        }
+        // 检测选择题选项 - 支持中英文和更多格式
+        else if (trimmedLine.match(/^[A-D][.、]\s*/) && currentQuestion) {
+          const optionText = trimmedLine.replace(/^[A-D][.、]\s*/, '').trim()
+          if (optionText) {
+            currentQuestion.options.push(optionText)
+            currentQuestion.type = 'SINGLE_CHOICE' // 先设为单选，后面会根据答案调整
+          }
+        }
+        // 检测其他可能的选项格式
+        else if (trimmedLine.match(/^[（(][A-D][）)]\s*/) && currentQuestion) {
+          const optionText = trimmedLine.replace(/^[（(][A-D][）)]\s*/, '').trim()
+          if (optionText) {
+            currentQuestion.options.push(optionText)
+            currentQuestion.type = 'SINGLE_CHOICE'
+          }
+        }
+        // 检测答案 - 支持中英文
+        else if ((trimmedLine.startsWith('答案:') || trimmedLine.startsWith('答案：')) && currentQuestion) {
+          currentQuestion.expectedAnswer = trimmedLine.replace(/答案[:：]/, '').trim()
+        }
+        // 检测解析 - 支持中英文
+        else if ((trimmedLine.startsWith('解析:') || trimmedLine.startsWith('解析：')) && currentQuestion) {
+          currentQuestion.analysis = trimmedLine.replace(/解析[:：]/, '').trim()
+        }
+        // 如果当前有题目但没有内容，且这行不是选项或答案，可能是题目内容
+        else if (currentQuestion && !currentQuestion.content && trimmedLine.length > 5 &&
+                 !trimmedLine.match(/^[A-D][.、]/) &&
+                 !trimmedLine.startsWith('答案') &&
+                 !trimmedLine.startsWith('解析')) {
+          currentQuestion.content = trimmedLine
+        }
+        // 检查是否包含连续的选项（如 "A. 选项1 B. 选项2 C. 选项3 D. 选项4"）
+        else if (currentQuestion && trimmedLine.match(/[A-D][.、].*[A-D][.、]/)) {
+          console.log('发现连续选项行:', trimmedLine)
+          // 解析连续选项
+          const optionMatches = trimmedLine.match(/([A-D][.、]\s*[^A-D]*?)(?=[A-D][.、]|$)/g)
+          if (optionMatches) {
+            optionMatches.forEach(match => {
+              const optionText = match.replace(/^[A-D][.、]\s*/, '').trim()
+              if (optionText && !currentQuestion.options.includes(optionText)) {
+                currentQuestion.options.push(optionText)
+              }
+            })
+            currentQuestion.type = 'SINGLE_CHOICE'
+            console.log('解析到连续选项:', currentQuestion.options)
+          }
+        }
+      }
 
-        // 开始新题目
-        questionIndex++
-        let title = trimmedLine
-
-        // 提取题目标题
-        if (trimmedLine.includes(':') || trimmedLine.includes('：')) {
-          const parts = trimmedLine.split(/[:：]/)
-          title = parts.length > 1 ? parts.slice(1).join(':').trim() : parts[0].trim()
-        }
-
-        currentQuestion = {
-          id: questionIndex,
-          title: title || `题目${questionIndex}`,
-          content: '',
-          type: 'SINGLE_CHOICE', // 默认单选题
-          options: [],
-          expectedAnswer: '',
-          analysis: '',
-          score: 10,
-          sequence: questionIndex
-        }
-
-        // 如果标题行就包含了题目内容，直接设置
-        if (title && title.length > 10) {
-          currentQuestion.content = title
-        }
+      // 保存最后一个题目
+      if (currentQuestion) {
+        questions.push(currentQuestion)
       }
-      // 检测题目内容
-      else if ((trimmedLine.startsWith('题目内容:') || trimmedLine.startsWith('题目内容：')) && currentQuestion) {
-        currentQuestion.content = trimmedLine.replace(/题目内容[:：]/, '').trim()
-      }
-      // 检测选择题选项 - 支持中英文和更多格式
-      else if (trimmedLine.match(/^[A-D][.、]\s*/) && currentQuestion) {
-        const optionText = trimmedLine.replace(/^[A-D][.、]\s*/, '').trim()
-        if (optionText) {
-          currentQuestion.options.push(optionText)
-          currentQuestion.type = 'SINGLE_CHOICE' // 先设为单选，后面会根据答案调整
-        }
-      }
-      // 检测其他可能的选项格式
-      else if (trimmedLine.match(/^[（(][A-D][）)]\s*/) && currentQuestion) {
-        const optionText = trimmedLine.replace(/^[（(][A-D][）)]\s*/, '').trim()
-        if (optionText) {
-          currentQuestion.options.push(optionText)
-          currentQuestion.type = 'SINGLE_CHOICE'
-        }
-      }
-      // 检测答案 - 支持中英文
-      else if ((trimmedLine.startsWith('答案:') || trimmedLine.startsWith('答案：')) && currentQuestion) {
-        currentQuestion.expectedAnswer = trimmedLine.replace(/答案[:：]/, '').trim()
-      }
-      // 检测解析 - 支持中英文
-      else if ((trimmedLine.startsWith('解析:') || trimmedLine.startsWith('解析：')) && currentQuestion) {
-        currentQuestion.analysis = trimmedLine.replace(/解析[:：]/, '').trim()
-      }
-      // 如果当前有题目但没有内容，且这行不是选项或答案，可能是题目内容
-      else if (currentQuestion && !currentQuestion.content && trimmedLine.length > 5 &&
-               !trimmedLine.match(/^[A-D][.、]/) &&
-               !trimmedLine.startsWith('答案') &&
-               !trimmedLine.startsWith('解析')) {
-        currentQuestion.content = trimmedLine
-      }
-      // 检查是否包含连续的选项（如 "A. 选项1 B. 选项2 C. 选项3 D. 选项4"）
-      else if (currentQuestion && trimmedLine.match(/[A-D][.、].*[A-D][.、]/)) {
-        console.log('发现连续选项行:', trimmedLine)
-        // 解析连续选项
-        const optionMatches = trimmedLine.match(/([A-D][.、]\s*[^A-D]*?)(?=[A-D][.、]|$)/g)
-        if (optionMatches) {
-          optionMatches.forEach(match => {
-            const optionText = match.replace(/^[A-D][.、]\s*/, '').trim()
-            if (optionText && !currentQuestion.options.includes(optionText)) {
-              currentQuestion.options.push(optionText)
-            }
-          })
-          currentQuestion.type = 'SINGLE_CHOICE'
-          console.log('解析到连续选项:', currentQuestion.options)
-        }
-      }
-    }
-
-    // 保存最后一个题目
-    if (currentQuestion) {
-      // 在保存前进行题目类型和格式的最终检查
-      finalizeQuestion(currentQuestion)
-      questions.push(currentQuestion)
     }
 
     // 对所有题目进行最终处理
@@ -3807,7 +3970,7 @@ function parseAIResponseAlternative(content) {
               options: [],
               expectedAnswer: '请参考解析',
               analysis: '这是从AI响应中提取的内容',
-              score: 10,
+              score: 5,
               sequence: 1
             }]
           }
@@ -3827,7 +3990,7 @@ function parseAIResponseAlternative(content) {
         options: [],
         expectedAnswer: '请根据题目内容作答',
         analysis: '这是AI生成的练习题目',
-        score: 10,
+        score: 5,
         sequence: 1
       }
 
@@ -3849,45 +4012,136 @@ function parseAIResponseAlternative(content) {
 }
 
 // 生成模拟响应数据（用于演示）
-function generateMockResponse(type) {
-  const sampleQuestions = [
-    {
-      title: "线性代数基础概念",
-      content: "下列关于矩阵的说法正确的是？",
-      options: ["矩阵的行数必须等于列数", "矩阵的乘法满足交换律", "单位矩阵的对角线元素都是1", "所有矩阵都有逆矩阵"],
-      answer: "C",
-      analysis: "单位矩阵是主对角线上的元素都是1，其余元素都是0的方阵。"
-    },
-    {
-      title: "微积分应用",
-      content: "函数f(x) = x²在点x=2处的导数值是多少？",
-      options: ["2", "4", "8", "16"],
-      answer: "B",
-      analysis: "f'(x) = 2x，所以f'(2) = 2×2 = 4"
-    },
-    {
-      title: "概率论基础",
-      content: "抛掷一枚公平硬币3次，恰好出现2次正面的概率是？",
-      options: ["1/8", "3/8", "1/2", "5/8"],
-      answer: "B",
-      analysis: "使用二项分布公式：C(3,2) × (1/2)³ = 3 × 1/8 = 3/8"
-    }
-  ]
+function generateMockResponse() {
+  // 使用您提供的实际数据格式
+  const content = `题目1: 以下关于C语言中指针的说法，哪个是正确的？
+选项: 
+A.指针变量只能存储整型变量的地址 
+B.指针的大小与它所指向的数据类型无关 
+C.指针变量可以直接赋值为一个整数 
+D.指针运算时，加减操作的单位是指针变量本身的大小
+答案: B
+解析: 
+A错误，指针可以存储任何类型的变量地址；
+B正确，指针的大小取决于系统架构（如32位系统为4字节，64位系统为8字节）；
+C错误，指针赋值需要类型匹配或强制转换；
+D错误，指针加减的单位是其指向数据类型的大小。
 
-  // 构造符合解析格式的响应
-  let content = ""
-  sampleQuestions.forEach((q, index) => {
-    const title = type === 'course' ? `${aiForm.value.courseName || '课程'}题目${index + 1}` : q.title
-    content += `题目[题目${index + 1}]: ${title}\n`
-    content += `题目内容: ${q.content}\n`
-    q.options.forEach((option, optIndex) => {
-      content += `${String.fromCharCode(65 + optIndex)}. ${option}\n`
-    })
-    content += `答案: ${q.answer}\n`
-    content += `解析: ${q.analysis}\n\n`
-  })
+题目2: 写出以下代码段的输出结果：
+int x = 5;
+printf("%d", x++ * ++x);
+答案: 42
+解析:
+x++是后置递增（先使用值5，之后x变为6），
+++x是前置递增（x从6变为7后再使用），
+因此表达式计算为5 * 7 = 35（注：实际结果可能因编译器不同而有差异，这是未定义行为）
+
+题目3: 下列哪个不是C语言合法的标识符？
+选项: 
+A._var1 
+B.3rd_var 
+C.VAR_3 
+D.var_name
+答案: B
+解析: 
+C语言标识符不能以数字开头，B选项以数字3开头不合法。`
 
   return { content }
+}
+
+// 格式化AI生成的内容，支持代码块、粗体、斜体等格式
+function formatAIContent(content) {
+  if (!content || typeof content !== 'string') {
+    return content
+  }
+
+  let formatted = content
+    // 代码块处理 - 支持 ```language 和 ``` 格式
+    .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+      const language = lang || 'text'
+      return `<div class="ai-code-block">
+        <div class="ai-code-header">
+          <span class="ai-code-lang">${language}</span>
+          <button class="ai-copy-code-btn" onclick="copyAICode(this)">复制</button>
+        </div>
+        <pre class="ai-code-content"><code class="language-${language}">${escapeHtml(code.trim())}</code></pre>
+      </div>`
+    })
+    // 行内代码
+    .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
+    // 粗体
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="ai-bold-text">$1</strong>')
+    // 斜体
+    .replace(/\*(.*?)\*/g, '<em class="ai-italic-text">$1</em>')
+    // 标题
+    .replace(/^### (.*$)/gm, '<h3 class="ai-heading-3">$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2 class="ai-heading-2">$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1 class="ai-heading-1">$1</h1>')
+    // 列表
+    .replace(/^\* (.*$)/gm, '<li class="ai-list-item">$1</li>')
+    .replace(/^- (.*$)/gm, '<li class="ai-list-item">$1</li>')
+    .replace(/^\d+\. (.*$)/gm, '<li class="ai-ordered-item">$1</li>')
+    // 换行
+    .replace(/\n\n/g, '</p><p class="ai-paragraph">')
+    .replace(/\n/g, '<br>')
+
+  // 包装列表项
+  formatted = formatted.replace(/(<li class="ai-list-item">.*?<\/li>)/gs, '<ul class="ai-list">$1</ul>')
+  formatted = formatted.replace(/(<li class="ai-ordered-item">.*?<\/li>)/gs, '<ol class="ai-ordered-list">$1</ol>')
+
+  // 包装段落
+  if (!formatted.includes('<p class="ai-paragraph">')) {
+    formatted = `<p class="ai-paragraph">${formatted}</p>`
+  } else {
+    formatted = `<p class="ai-paragraph">${formatted}</p>`
+  }
+
+  return formatted
+}
+
+// HTML转义函数
+function escapeHtml(text) {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
+
+// 复制代码到剪贴板 - 添加到全局作用域
+window.copyAICode = function(button) {
+  const codeBlock = button.closest('.ai-code-block')
+  const codeElement = codeBlock.querySelector('code')
+  const codeText = codeElement.textContent
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(codeText).then(() => {
+      ElMessage.success('代码已复制到剪贴板')
+    }).catch(() => {
+      fallbackCopyTextToClipboard(codeText)
+    })
+  } else {
+    fallbackCopyTextToClipboard(codeText)
+  }
+}
+
+// 备用复制方法
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement('textarea')
+  textArea.value = text
+  textArea.style.position = 'fixed'
+  textArea.style.left = '-999999px'
+  textArea.style.top = '-999999px'
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+  
+  try {
+    document.execCommand('copy')
+    ElMessage.success('代码已复制到剪贴板')
+  } catch (err) {
+    ElMessage.error('复制失败，请手动复制')
+  }
+  
+  document.body.removeChild(textArea)
 }
 </script>
 
@@ -4785,5 +5039,118 @@ function generateMockResponse(type) {
   color: #909399;
   margin-top: 5px;
   line-height: 1.4;
+}
+
+/* AI内容格式化样式 */
+.ai-paragraph {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.ai-heading-1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  color: #303133;
+}
+
+.ai-heading-2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 14px 0 6px 0;
+  color: #303133;
+}
+
+.ai-heading-3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 12px 0 4px 0;
+  color: #303133;
+}
+
+.ai-bold-text {
+  font-weight: 600;
+  color: #303133;
+}
+
+.ai-italic-text {
+  font-style: italic;
+  color: #606266;
+}
+
+.ai-inline-code {
+  background-color: #f1f2f3;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: #e83e8c;
+}
+
+.ai-code-block {
+  margin: 12px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e4e7ed;
+  background: #f6f8fa;
+}
+
+.ai-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f1f3f4;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.ai-code-lang {
+  font-size: 12px;
+  font-weight: 500;
+  color: #606266;
+  text-transform: uppercase;
+}
+
+.ai-copy-code-btn {
+  background: #409EFF;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ai-copy-code-btn:hover {
+  background: #337ecc;
+}
+
+.ai-code-content {
+  margin: 0;
+  padding: 12px;
+  background: #f6f8fa;
+  overflow-x: auto;
+}
+
+.ai-code-content code {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #24292e;
+  background: none;
+  padding: 0;
+}
+
+.ai-list,
+.ai-ordered-list {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.ai-list-item,
+.ai-ordered-item {
+  margin: 4px 0;
+  line-height: 1.5;
 }
 </style>

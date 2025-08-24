@@ -32,6 +32,205 @@
             </div>
           </div>
           
+          <!-- 视频播放区域 -->
+          <div class="video-section">
+            <div class="video-header">
+              <h3><el-icon><VideoPlay /></el-icon> 相关视频</h3>
+                             <div class="video-info">
+                 <span class="video-title">{{ videoTitle }}</span>
+                 <el-tag size="small" type="info">B站视频</el-tag>
+               </div>
+            </div>
+            
+                         <div class="video-container">
+               <div class="video-wrapper">
+                 <!-- 视频加载中状态 -->
+                 <div v-if="showVideo && videoLoading" class="video-loading">
+                   <div class="loading-content">
+                     <el-icon class="loading-icon"><Loading /></el-icon>
+                     <p class="loading-text">正在加载视频...</p>
+                   </div>
+                 </div>
+                 
+                 <!-- 视频播放器 -->
+                 <iframe
+                   v-else-if="showVideo && !videoLoading"
+                   :src="getBilibiliEmbedUrl()"
+                   frameborder="0"
+                   allowfullscreen
+                   class="video-iframe"
+                   title="C语言指针详解"
+                   @load="onVideoLoad"
+                   @error="onVideoError"
+                 ></iframe>
+                 
+                 <!-- 视频占位符 -->
+                 <div v-else class="video-placeholder" @click="loadVideo">
+                   <div class="placeholder-content">
+                     <el-icon class="play-icon"><VideoPlay /></el-icon>
+                     <p class="placeholder-text">点击播放视频</p>
+                     <p class="video-description">{{ videoDescription }}</p>
+                   </div>
+                 </div>
+               </div>
+             
+              <div class="video-controls">
+                <el-button 
+                  v-if="!showVideo" 
+                  type="primary" 
+                  @click="loadVideo"
+                  class="play-button"
+                >
+                  <el-icon><VideoPlay /></el-icon>
+                  播放视频
+                </el-button>
+                <el-button 
+                  v-else 
+                  type="warning" 
+                  @click="hideVideo"
+                  class="hide-button"
+                >
+                  <el-icon><VideoPause /></el-icon>
+                  隐藏视频
+                </el-button>
+                <el-button 
+                  type="info" 
+                  @click="openInNewTab"
+                  class="external-button"
+                >
+                  <el-icon><Link /></el-icon>
+                  在新窗口打开
+                </el-button>
+              </div>
+              
+              <!-- 视频信息 -->
+              <div class="video-info-section">
+                <div class="info-item">
+                  <span class="info-label">视频来源：</span>
+                  <span class="info-value">哔哩哔哩 (Bilibili)</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">视频时长：</span>
+                  <span class="info-value">约 15 分钟</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">视频质量：</span>
+                  <span class="info-value">高清</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">更新时间：</span>
+                  <span class="info-value">2024年</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 视频分析和时间线 -->
+          <div class="video-analysis-section">
+            <div class="analysis-header">
+              <h3><el-icon><Clock /></el-icon> AI视频内容自动分析</h3>
+              <div class="analysis-info">
+                <span class="total-segments">{{ videoSegments.length }} 个章节</span>
+                <el-tag size="small" type="success">已分析</el-tag>
+              </div>
+            </div>
+            
+                         <!-- 时间线导航 -->
+             <div class="timeline-navigation">
+               <div class="timeline-header">
+                 <h4>时间线导航</h4>
+                 <div class="timeline-actions">
+                   <el-button 
+                     type="success" 
+                     size="small" 
+                     @click="testJumpToTime(120)"
+                     class="test-jump-button"
+                   >
+                     <el-icon><VideoPlay /></el-icon>
+                     测试跳转(2分钟)
+                   </el-button>
+                   <el-button 
+                     type="primary" 
+                     size="small" 
+                     @click="expandAllSegments"
+                     :disabled="allExpanded"
+                   >
+                     <el-icon><Expand /></el-icon>
+                     展开全部
+                   </el-button>
+                 </div>
+               </div>
+              
+              <div class="timeline-list">
+                <div 
+                  v-for="(segment, index) in videoSegments" 
+                  :key="index"
+                  class="timeline-item"
+                  :class="{ 'active': currentSegment === index }"
+                >
+                                     <div class="timeline-marker" @click="jumpToTimeEnhanced(segment.startTime)">
+                     <div class="time-display">{{ formatTime(segment.startTime) }}</div>
+                     <div class="segment-title">{{ segment.title }}</div>
+                   </div>
+                  
+                  <div class="segment-content">
+                    <div class="segment-summary">
+                      <p>{{ segment.summary }}</p>
+                    </div>
+                    
+                    <div class="segment-details" v-if="segment.details && segment.details.length > 0">
+                      <h5>详细要点：</h5>
+                      <ul>
+                        <li v-for="(detail, detailIndex) in segment.details" :key="detailIndex">
+                          {{ detail }}
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div class="segment-actions">
+                                             <el-button 
+                         type="primary" 
+                         size="small" 
+                         @click="jumpToTimeEnhanced(segment.startTime)"
+                         class="jump-button"
+                       >
+                         <el-icon><VideoPlay /></el-icon>
+                         跳转到此处
+                       </el-button>
+                      <el-button 
+                        type="info" 
+                        size="small" 
+                        @click="toggleSegment(index)"
+                        class="toggle-button"
+                      >
+                        <el-icon><ArrowDown v-if="!segment.expanded" /><ArrowUp v-else /></el-icon>
+                        {{ segment.expanded ? '收起' : '展开' }}
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 学习建议 -->
+            <div class="learning-suggestions">
+              <div class="suggestions-header">
+                <h4><el-icon><Lightbulb /></el-icon> 学习建议</h4>
+              </div>
+              <div class="suggestions-content">
+                <div class="suggestion-item" v-for="(suggestion, index) in learningSuggestions" :key="index">
+                  <div class="suggestion-icon">
+                    <el-icon><component :is="suggestion.icon" /></el-icon>
+                  </div>
+                  <div class="suggestion-text">
+                    <h5>{{ suggestion.title }}</h5>
+                    <p>{{ suggestion.content }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <!-- 学习完成按钮 -->
           <div class="learning-actions">
             <el-button type="primary" @click="markAsCompleted" :disabled="isCompleted">
@@ -448,7 +647,7 @@ import { knowledgeAPI, learningProgressAPI } from '@/api/api';
 import { BigNumber } from 'bignumber.js';
 import { getUserInfo } from '@/utils/auth';
 import { minioController } from '@/api/api';
-import { Search, Refresh, Download, Folder, View, Document, ArrowLeft } from '@element-plus/icons-vue';
+import { Search, Refresh, Download, Folder, View, Document, ArrowLeft, VideoPlay, VideoPause, Link, Loading, Clock, Expand, ArrowDown, ArrowUp, Lightbulb, Star } from '@element-plus/icons-vue';
 
 export default {
   name: 'StudentKnowledgeDetail',
@@ -459,7 +658,17 @@ export default {
     Folder,
     View,
     Document,
-    ArrowLeft
+    ArrowLeft,
+    VideoPlay,
+    VideoPause,
+    Link,
+    Loading,
+    Clock,
+    Expand,
+    ArrowDown,
+    ArrowUp,
+    Lightbulb,
+    Star
   },
   data() {
     return {
@@ -495,12 +704,255 @@ export default {
       showFilePreview: false,
       previewLoading: true,
       currentPreviewFile: null,
+
+      // 视频播放相关
+      showVideo: false,
+      videoLoading: false,
+      videoError: false,
+      videoUrl: 'https://www.bilibili.com/video/BV1dr4y1n7vA/?spm_id_from=333.788.videopod.episodes&vd_source=1df8a948d08a674dc763c0cdf32bd5d5&p=7', // B站视频URL
+      videoTitle: 'C语言入门程序',
+      videoDescription: 'C语言入门程序',
       
       // 树形控件配置
       defaultProps: {
         children: 'children',
         label: 'name'
-      }
+      },
+             videoSegments: [
+         {
+           startTime: 0,
+           title: '视频开场介绍',
+           summary: '介绍C语言入门程序的课程内容',
+           details: [
+             '简单介绍devc++的具体使用',
+             '为什么选择C语言作为入门语言',
+             '本课程的学习目标和预期收获'
+           ],
+           expanded: false
+         },
+         {
+           startTime: 120,
+           title: '开发环境搭建',
+           summary: '详细介绍如何使用C语言开发环境devc++',
+           details: [
+             '选择合适的IDE为devc++',
+             '编写完整第一个c语言程序Hello World！',
+             '创建第一个C语言项目'
+           ],
+           expanded: false
+         },
+         {
+           startTime: 240,
+           title: '第一个C程序：Hello World的运行',
+           summary: '保存文件并设置文件名以运行第一个C语言程序',
+           details: [
+             'C语言程序文件的命名与保存',
+             '编译运行看结果成功的标志',
+             '终端认识及编译和运行程序的步骤',
+             '常见错误和调试技巧'
+           ],
+           expanded: false
+         },
+         {
+           startTime: 360,
+           title: '程序框架',
+           summary: '学习C语言中的程序框架',
+           details: [
+             'c语言程序的基本写法',
+             '认识c语言中的基本程序框架',
+             '认识main函数及如何正确输出内容',
+             '字符串和换行的定义和使用'
+           ],
+           expanded: false
+         },
+         {
+           startTime: 480,
+           title: '程序中的错误处理',
+           summary: '如何正确处理程序中的错误处理',
+           details: [
+             '结尾分号遗漏错误示例',
+             'main函数错误的位置确定',
+             '讲解具体的错误原因及程序运行原理',
+             'c语言的一些运行的细节，例如换行的写法，中文输入法的bug',
+           ],
+           expanded: false
+         },
+         {
+           startTime: 600,
+           title: '总结视频',
+           summary: '总结视频的具体内容',
+           details: [
+             '建议不开中文输入法',
+             '双引号的使用',
+             '总结Hello World！程序的运行实现'
+           ],
+           expanded: false
+         },
+        //  {
+        //    startTime: 1020,
+        //    title: '控制结构：循环语句',
+        //    summary: '掌握for、while、do-while循环',
+        //    details: [
+        //      'for循环的语法和使用',
+        //      'while循环的特点',
+        //      'do-while循环的区别',
+        //      '循环的嵌套使用',
+        //      'break和continue语句'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 1200,
+        //    title: '函数基础',
+        //    summary: '学习函数的定义、声明和调用',
+        //    details: [
+        //      '函数的概念和作用',
+        //      '函数的定义和声明',
+        //      '参数传递（值传递和引用传递）',
+        //      '返回值的处理',
+        //      '函数的调用和递归'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 1380,
+        //    title: '数组和字符串',
+        //    summary: '学习数组和字符串的基本操作',
+        //    details: [
+        //      '一维数组的定义和使用',
+        //      '二维数组的概念',
+        //      '字符数组和字符串',
+        //      '字符串处理函数',
+        //      '数组作为函数参数'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 1560,
+        //    title: '指针基础',
+        //    summary: '介绍指针的基本概念和使用',
+        //    details: [
+        //      '指针的概念和内存地址',
+        //      '指针变量的声明和初始化',
+        //      '指针的运算',
+        //      '指针和数组的关系',
+        //      '指针作为函数参数'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 1740,
+        //    title: '结构体和联合体',
+        //    summary: '学习自定义数据类型的定义和使用',
+        //    details: [
+        //      '结构体的定义和声明',
+        //      '结构体成员的访问',
+        //      '结构体数组',
+        //      '结构体指针',
+        //      '联合体的概念和使用'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 1920,
+        //    title: '文件操作',
+        //    summary: '学习C语言中的文件读写操作',
+        //    details: [
+        //      '文件的概念和类型',
+        //      '文件的打开和关闭',
+        //      '文件的读写操作',
+        //      '文件指针的定位',
+        //      '错误处理和异常情况'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 2100,
+        //    title: '动态内存分配',
+        //    summary: '学习malloc、free等内存管理函数',
+        //    details: [
+        //      '动态内存分配的概念',
+        //      'malloc和calloc函数',
+        //      'realloc函数的使用',
+        //      'free函数和内存释放',
+        //      '内存泄漏的预防'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 2280,
+        //    title: '预处理器和宏',
+        //    summary: '学习C语言预处理器的使用',
+        //    details: [
+        //      '预处理器的概念',
+        //      '#include指令的使用',
+        //      '#define宏定义',
+        //      '条件编译',
+        //      '预定义宏'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 2460,
+        //    title: '项目实战：简单计算器',
+        //    summary: '综合运用所学知识，开发一个简单计算器',
+        //    details: [
+        //      '项目需求分析',
+        //      '程序结构设计',
+        //      '功能模块实现',
+        //      '用户界面设计',
+        //      '程序测试和调试'
+        //    ],
+        //    expanded: false
+        //  },
+        //  {
+        //    startTime: 2640,
+        //    title: '课程总结和学习建议',
+        //    summary: '回顾课程内容，提供进一步学习建议',
+        //    details: [
+        //      '课程重点内容回顾',
+        //      '常见问题和解决方案',
+        //      '进一步学习的方向',
+        //      '实践项目建议',
+        //      '学习资源推荐'
+        //    ],
+        //    expanded: false
+        //  }
+       ],
+      currentSegment: 0,
+      allExpanded: false,
+             learningSuggestions: [
+         {
+           icon: 'Lightbulb',
+           title: '循序渐进学习',
+           content: '建议按照视频时间线顺序学习，每个章节都要确保理解透彻后再进入下一章节。'
+         },
+         {
+           icon: 'VideoPlay',
+           title: '动手实践',
+           content: '观看视频时建议同步在电脑上编写代码，理论结合实践效果更佳。'
+         },
+         {
+           icon: 'Document',
+           title: '做好笔记',
+           content: '记录重要的语法规则和编程技巧，建立自己的知识体系。'
+         },
+         {
+           icon: 'Refresh',
+           title: '重复学习',
+           content: '对于难点内容可以多次观看，直到完全理解为止。'
+         },
+         {
+           icon: 'Search',
+           title: '查阅资料',
+           content: '遇到问题时可以查阅C语言官方文档或相关编程书籍。'
+         },
+         {
+           icon: 'Star',
+           title: '项目练习',
+           content: '学完基础后尝试独立完成一些小项目，巩固所学知识。'
+         }
+       ]
     };
   },
   computed: {
@@ -1207,7 +1659,178 @@ export default {
           this.$message.error('下载文件失败: ' + (error.message || '请稍后重试'));
         }
       }
-    }
+    },
+
+         // 视频播放相关方法
+     loadVideo() {
+       this.showVideo = true;
+       this.videoLoading = true;
+       this.videoError = false;
+       this.$message.success('正在加载B站视频...');
+       
+       // 模拟视频加载完成
+       setTimeout(() => {
+         this.videoLoading = false;
+       }, 2000);
+     },
+
+     hideVideo() {
+       this.showVideo = false;
+       this.$message.info('视频已隐藏');
+     },
+
+     openInNewTab() {
+       window.open(this.videoUrl, '_blank');
+     },
+
+           // 获取B站视频嵌入URL
+      getBilibiliEmbedUrl() {
+        // 从原始URL中提取视频ID
+        const match = this.videoUrl.match(/BV\w+/);
+        if (match) {
+          const videoId = match[0];
+          return `https://player.bilibili.com/player.html?bvid=${videoId}&page=7&high_quality=1&danmaku=0&autoplay=0`;
+        }
+        return this.videoUrl;
+      },
+
+     // 视频加载完成事件
+     onVideoLoad() {
+       this.videoLoading = false;
+       this.$message.success('视频加载完成！');
+     },
+
+     // 视频加载错误事件
+     onVideoError() {
+       this.videoLoading = false;
+       this.videoError = true;
+       this.$message.error('视频加载失败，请检查网络连接或稍后重试');
+     },
+           jumpToTime(time) {
+        // 跳转到指定时间
+        console.log(`跳转到时间: ${time}秒`);
+        
+        // 更新当前选中的章节
+        this.currentSegment = this.videoSegments.findIndex(segment => segment.startTime === time);
+        
+        // 如果视频正在播放，尝试跳转到指定时间
+        if (this.showVideo && !this.videoLoading) {
+          const iframe = document.querySelector('.video-iframe');
+          if (iframe) {
+            try {
+              // 方法1: 尝试通过postMessage与B站播放器通信
+              iframe.contentWindow.postMessage({
+                type: 'seek',
+                time: time
+              }, '*');
+              
+              // 方法2: 尝试通过URL参数跳转
+              setTimeout(() => {
+                const currentSrc = iframe.src;
+                const baseUrl = currentSrc.split('?')[0];
+                const newUrl = `${baseUrl}?bvid=${this.getBilibiliVideoId()}&page=7&high_quality=1&danmaku=0&t=${time}`;
+                iframe.src = newUrl;
+              }, 100);
+              
+              this.$message.success(`已跳转到 ${this.formatTime(time)}`);
+            } catch (error) {
+              console.warn('无法直接跳转视频时间，请手动跳转');
+              this.$message.info(`请手动跳转到 ${this.formatTime(time)}`);
+            }
+          }
+        } else {
+          // 如果视频未播放，先播放视频并跳转
+          this.loadVideo();
+          setTimeout(() => {
+            this.jumpToTime(time);
+          }, 2500); // 等待视频加载完成
+        }
+      },
+      
+      // 增强版跳转方法
+      jumpToTimeEnhanced(time) {
+        // 更新当前选中的章节
+        this.currentSegment = this.videoSegments.findIndex(segment => segment.startTime === time);
+        
+        // 如果视频未播放，先播放视频
+        if (!this.showVideo) {
+          this.loadVideo();
+          this.$message.info('正在加载视频，稍后将自动跳转到指定时间...');
+          setTimeout(() => {
+            this.jumpToTimeEnhanced(time);
+          }, 3000);
+          return;
+        }
+        
+        const iframe = document.querySelector('.video-iframe');
+        if (!iframe) {
+          this.$message.warning('视频播放器未找到，请稍后重试');
+          return;
+        }
+        
+        // 显示跳转提示
+        this.$message.info(`正在跳转到 ${this.formatTime(time)}...`);
+        
+        // 方法1: 通过URL参数跳转（最可靠的方法）
+        const videoId = this.getBilibiliVideoId();
+        const newUrl = `https://player.bilibili.com/player.html?bvid=${videoId}&page=7&high_quality=1&danmaku=0&t=${time}`;
+        iframe.src = newUrl;
+        
+        // 方法2: 尝试postMessage通信
+        setTimeout(() => {
+          try {
+            iframe.contentWindow.postMessage({
+              type: 'seek',
+              time: time
+            }, '*');
+          } catch (error) {
+            console.log('postMessage通信失败，使用URL跳转方式');
+          }
+        }, 500);
+        
+        // 延迟显示成功消息
+        setTimeout(() => {
+          this.$message.success(`已跳转到 ${this.formatTime(time)}`);
+        }, 1000);
+      },
+      
+      // 测试跳转方法
+      testJumpToTime(time) {
+        this.$message.info('测试跳转功能...');
+        this.jumpToTimeEnhanced(time);
+      },
+      
+      // 获取B站视频ID
+      getBilibiliVideoId() {
+        const match = this.videoUrl.match(/BV\w+/);
+        return match ? match[0] : '';
+      },
+      
+      toggleSegment(index) {
+        this.videoSegments[index].expanded = !this.videoSegments[index].expanded;
+        this.updateAllExpandedStatus();
+      },
+      
+      expandAllSegments() {
+        this.videoSegments.forEach(segment => segment.expanded = true);
+        this.allExpanded = true;
+      },
+      
+      updateAllExpandedStatus() {
+        this.allExpanded = this.videoSegments.every(segment => segment.expanded);
+      },
+      
+      formatTime(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        if (hours > 0) {
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+          return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+      }
   }
 };
 </script>
@@ -1843,6 +2466,229 @@ export default {
   transform: scale(1.1);
 }
 
+/* 视频播放区域样式 */
+.video-section {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.video-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.video-header h3 {
+  margin: 0;
+  color: #303133;
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.video-header h3 .el-icon {
+  color: #409EFF;
+  font-size: 20px;
+}
+
+.video-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
+  font-size: 14px;
+}
+
+.video-info .video-title {
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 56.25%; /* 16:9 比例 */
+  background-color: #000;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.video-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.video-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.video-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f7f8fa;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+ .video-placeholder:hover {
+   background-color: #e9ecef;
+ }
+
+ .video-loading {
+   position: absolute;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   background-color: #f7f8fa;
+   border-radius: 6px;
+ }
+
+ .loading-content {
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   gap: 15px;
+   color: #606266;
+ }
+
+ .loading-icon {
+   font-size: 40px;
+   color: #409EFF;
+   animation: spin 2s linear infinite;
+ }
+
+ @keyframes spin {
+   from { transform: rotate(0deg); }
+   to { transform: rotate(360deg); }
+ }
+
+ .loading-text {
+   font-size: 16px;
+   font-weight: 500;
+   color: #409EFF;
+ }
+
+ .placeholder-content {
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   gap: 10px;
+   color: #606266;
+ }
+
+.placeholder-content .play-icon {
+  font-size: 40px;
+  color: #409EFF;
+}
+
+.placeholder-text {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.video-description {
+  font-size: 14px;
+  color: #8c8c8c;
+  text-align: center;
+  margin-top: 5px;
+}
+
+.video-controls {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.video-controls .play-button,
+.video-controls .hide-button,
+.video-controls .external-button {
+  padding: 8px 15px;
+  font-size: 14px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.video-controls .play-button:hover {
+  background-color: #409EFF;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.video-controls .hide-button:hover {
+  background-color: #F56C6C;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+ .video-controls .external-button:hover {
+   background-color: #67C23A;
+   color: #fff;
+   transform: scale(1.05);
+ }
+
+ /* 视频信息区域样式 */
+ .video-info-section {
+   margin-top: 20px;
+   padding: 15px;
+   background-color: #f8f9fa;
+   border-radius: 8px;
+   border: 1px solid #e9ecef;
+ }
+
+ .info-item {
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+   margin-bottom: 8px;
+   padding: 5px 0;
+ }
+
+ .info-item:last-child {
+   margin-bottom: 0;
+ }
+
+ .info-label {
+   font-size: 14px;
+   color: #606266;
+   font-weight: 500;
+ }
+
+ .info-value {
+   font-size: 14px;
+   color: #303133;
+   font-weight: 400;
+ }
+
 /* 文件预览对话框样式 */
 .preview-loading {
   display: flex;
@@ -1944,32 +2790,376 @@ export default {
   padding: 20px;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .files-grid {
-    grid-template-columns: 1fr;
+   /* 视频分析和时间线样式 */
+  .video-analysis-section {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   }
-  
-  .files-card .card-header {
+
+  .analysis-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ebeef5;
+  }
+
+  .analysis-header h3 {
+    margin: 0;
+    color: #303133;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .analysis-header h3 .el-icon {
+    color: #409EFF;
+    font-size: 20px;
+  }
+
+  .analysis-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .total-segments {
+    font-size: 14px;
+    color: #606266;
+    font-weight: 500;
+  }
+
+  /* 时间线导航样式 */
+  .timeline-navigation {
+    margin-bottom: 30px;
+  }
+
+     .timeline-header {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     margin-bottom: 15px;
+   }
+   
+   .timeline-actions {
+     display: flex;
+     gap: 8px;
+     align-items: center;
+   }
+   
+   .test-jump-button {
+     background-color: #67C23A;
+     border-color: #67C23A;
+   }
+   
+   .test-jump-button:hover {
+     background-color: #85ce61;
+     border-color: #85ce61;
+   }
+
+  .timeline-header h4 {
+    margin: 0;
+    color: #303133;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .timeline-list {
+    display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .timeline-item {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .timeline-item:hover {
+    border-color: #409EFF;
+    box-shadow: 0 2px 8px 0 rgba(64, 158, 255, 0.1);
+  }
+
+  .timeline-item.active {
+    border-color: #409EFF;
+    background-color: rgba(64, 158, 255, 0.05);
+  }
+
+  .timeline-marker {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  .timeline-marker:hover {
+    background-color: #e9ecef;
+  }
+
+  .time-display {
+    background-color: #409EFF;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .segment-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #303133;
+    flex: 1;
+  }
+
+  .segment-content {
+    padding: 16px;
+    background-color: #fff;
+  }
+
+  .segment-summary {
+    margin-bottom: 12px;
+  }
+
+  .segment-summary p {
+    margin: 0;
+    color: #606266;
+    line-height: 1.6;
+  }
+
+  .segment-details {
+    margin-bottom: 16px;
+  }
+
+  .segment-details h5 {
+    margin: 0 0 8px 0;
+    color: #303133;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .segment-details ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  .segment-details li {
+    color: #606266;
+    line-height: 1.6;
+    margin-bottom: 4px;
+  }
+
+  .segment-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .jump-button,
+  .toggle-button {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  /* 学习建议样式 */
+  .learning-suggestions {
+    border-top: 1px solid #ebeef5;
+    padding-top: 20px;
+  }
+
+  .suggestions-header {
+    margin-bottom: 16px;
+  }
+
+  .suggestions-header h4 {
+    margin: 0;
+    color: #303133;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .suggestions-header h4 .el-icon {
+    color: #E6A23C;
+    font-size: 18px;
+  }
+
+  .suggestions-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
   }
-  
-  .files-card .header-actions {
-    width: 100%;
-    justify-content: space-between;
+
+  .suggestion-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #E6A23C;
+    transition: all 0.3s ease;
   }
-  
-  .file-item {
-    padding: 12px;
+
+  .suggestion-item:hover {
+    background-color: #fff;
+    box-shadow: 0 2px 8px 0 rgba(230, 162, 60, 0.1);
   }
-  
-  .file-icon {
-    width: 40px;
-    height: 40px;
-    font-size: 24px;
-    margin-right: 12px;
+
+  .suggestion-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background-color: #E6A23C;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 16px;
   }
-}
+
+  .suggestion-text h5 {
+    margin: 0 0 6px 0;
+    color: #303133;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .suggestion-text p {
+    margin: 0;
+    color: #606266;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* 响应式设计 */
+  @media (max-width: 768px) {
+    .files-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .files-card .card-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    
+    .files-card .header-actions {
+      width: 100%;
+      justify-content: space-between;
+    }
+    
+    .file-item {
+      padding: 12px;
+    }
+    
+    .file-icon {
+      width: 40px;
+      height: 40px;
+      font-size: 24px;
+      margin-right: 12px;
+    }
+    
+    /* 视频区域响应式 */
+    .video-section {
+      margin-top: 20px;
+      padding: 15px;
+    }
+    
+    .video-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    
+    .video-info {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+    }
+    
+    .video-controls {
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .video-controls .play-button,
+    .video-controls .hide-button,
+    .video-controls .external-button {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    /* 视频信息区域响应式 */
+    .video-info-section {
+      margin-top: 15px;
+      padding: 12px;
+    }
+    
+    .info-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+    }
+    
+    .info-label {
+      font-size: 13px;
+    }
+    
+    .info-value {
+      font-size: 13px;
+    }
+    
+         /* 视频分析区域响应式 */
+     .video-analysis-section {
+       margin-top: 20px;
+       padding: 15px;
+     }
+     
+     .timeline-actions {
+       flex-direction: column;
+       gap: 10px;
+     }
+     
+     .test-jump-button,
+     .timeline-actions .el-button {
+       width: 100%;
+       justify-content: center;
+     }
+    
+    .analysis-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    
+    .suggestions-content {
+      grid-template-columns: 1fr;
+    }
+    
+    .segment-actions {
+      flex-direction: column;
+    }
+    
+    .jump-button,
+    .toggle-button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
 </style>
