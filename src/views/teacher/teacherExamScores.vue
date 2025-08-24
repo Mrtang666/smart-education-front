@@ -2546,7 +2546,7 @@ async function fetchExamInfo() {
 
       // 最终检查，如果课程名称仍然是加载中或未知课程，设置一个默认值
       if (courseName.value === '加载中...' || courseName.value === '未知课程') {
-        courseName.value = '智慧教育课程'
+        courseName.value = '慧课课程'
       }
       
       // 如果考试已发布，继续执行
@@ -2559,7 +2559,7 @@ async function fetchExamInfo() {
     if (route.query.courseName && route.query.courseName !== '未知课程') {
       courseName.value = route.query.courseName
     } else {
-      courseName.value = '智慧教育课程'
+              courseName.value = '慧课课程'
     }
     // 出错时默认返回true，允许继续加载其他数据
     return true
@@ -2642,7 +2642,7 @@ function handleAddQuestion() {
   }
 }
 
-// 已移除“编辑题目”功能
+// 已移除"编辑题目"功能
 
 function deleteQuestion(question) {
   ElMessageBox.confirm('确定要删除该题目吗？', '提示', {

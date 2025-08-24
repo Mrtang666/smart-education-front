@@ -185,7 +185,6 @@ scp -r "D:\git depository\smart-education-front\dist\*" root@118.89.136.119:/pro
 # 上传（方案二，与原流程相同）
 scp -r "D:\git depository\smart-education-front\dist\*" root@118.89.136.119:/projects/frontend/dist/
 ```
-
 ### 更新第二个项目
 ```powershell
 # 本地构建

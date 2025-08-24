@@ -4195,7 +4195,7 @@ export const studentAssistantAPI = {
       console.log("流式聊天请求，数据:", historyData);
 
       const response = await axios.post(
-        "/api/student-assistant/stream/chat/history",
+        "/api/student-assistant/stream/chat-history",
         historyData,
         {
           timeout: 60000, // 60秒超时

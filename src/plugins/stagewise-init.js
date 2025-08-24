@@ -5,7 +5,7 @@ const stagewiseConfig = {
   plugins: [
     {
       name: 'smart-education-plugin',
-      description: '智慧教育平台上下文提供器',
+      description: '慧课平台上下文提供器',
       shortInfoForPrompt: (element) => {
         // 获取选中元素的有用信息
         const tagName = element?.tagName?.toLowerCase() || 'unknown';
@@ -15,7 +15,7 @@ const stagewiseConfig = {
         
         // 构建上下文信息
         return `
-          这是一个智慧教育平台，包含教师端和学生端功能。
+          这是慧课平台，包含教师端和学生端功能。
           
           当前选中的元素是: ${tagName}
           类名: ${className}
